@@ -134,23 +134,9 @@ class Compiler:
         return log
 
 
-def preamble(layout: dict) -> str:
-    width, height, margin = PAPERS[layout["paper"]]
-    # Parameters are validated numeric values; external content is always escaped separately.
-    return rf"""\documentclass{{article}}
-\usepackage[paperwidth={width}mm,paperheight={height}mm,margin={margin}mm]{{geometry}}
-\usepackage{{fontspec}}
-\usepackage[unicode,hidelinks]{{hyperref}}
-\usepackage{{polyglossia}}
-\setdefaultlanguage{{english}}
-\setotherlanguage{{hebrew}}
-\setmainfont{{lmroman10-regular.otf}}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf]
-\newfontfamily\hebrewfont[Script=Hebrew]{{reader-hebrew.ttf}}
-\pagestyle{{empty}}
-\setlength{{\parindent}}{{0pt}}
-\setlength{{\parskip}}{{0pt}}
-\setlength{{\fboxrule}}{{0.35pt}}
-\hfuzz=0.2pt
+def scripture_macros(layout: dict) -> str:
+    if layout.get("verse_layout", "continuous") == "verse-per-line":
+        return rf"""\newcommand{{\Scripture}}[1]{{#1}}
 \newcommand{{\Verse}}[2]{{%
   \noindent\hbox to\linewidth{{%
     \vtop{{\hsize=\dimexpr\linewidth-6mm\relax
@@ -168,6 +154,47 @@ def preamble(layout: dict) -> str:
       \hbox{{\fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont #1}}}}}}}}}}
   }}\par
 }}
+"""
+    return rf"""\newif\ifChapterParagraph
+\newcommand{{\EndScriptureParagraph}}{{%
+  \par\ifChapterParagraph\ifnum\prevgraf<2\vskip{layout["leading_pt"]}pt\fi\fi
+  \ChapterParagraphfalse
+}}
+\newcommand{{\Scripture}}[1]{{\begingroup
+  \setRTL\hebrewfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
+  \parindent=0pt\leftskip=0pt\rightskip=0pt\parfillskip=0pt plus 1fil
+  \tolerance=9999\emergencystretch=3em\noindent #1\EndScriptureParagraph\endgroup
+}}
+\newcommand{{\Verse}}[2]{{%
+  \strut\textenglish{{\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont #1}}\nobreak\hspace{{0.35em}}#2%
+}}
+\newcommand{{\ChapterOpen}}[1]{{%
+  \EndScriptureParagraph\vskip7pt\ChapterParagraphtrue\hangindent=-14mm\hangafter=-2\noindent
+  \textenglish{{\makebox[0pt][l]{{\hspace{{2mm}}\smash{{\raisebox{{-2mm}}{{%
+    \fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont #1}}}}}}%
+  }}}}}}}}%
+}}
+"""
+
+
+def preamble(layout: dict) -> str:
+    width, height, margin = PAPERS[layout["paper"]]
+    # Parameters are validated numeric values; external content is always escaped separately.
+    return rf"""\documentclass{{article}}
+\usepackage[paperwidth={width}mm,paperheight={height}mm,margin={margin}mm]{{geometry}}
+\usepackage{{fontspec}}
+\usepackage[unicode,hidelinks]{{hyperref}}
+\usepackage{{polyglossia}}
+\setdefaultlanguage{{english}}
+\setotherlanguage{{hebrew}}
+\setmainfont{{lmroman10-regular.otf}}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf]
+\newfontfamily\hebrewfont[Script=Hebrew]{{reader-hebrew.ttf}}
+\pagestyle{{empty}}
+\setlength{{\parindent}}{{0pt}}
+\setlength{{\parskip}}{{0pt}}
+\setlength{{\fboxrule}}{{0.35pt}}
+\hfuzz=0.2pt
+{scripture_macros(layout)}
 \newcommand{{\HelpMarker}}[2]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{7}}{{8}}\selectfont\hyperlink{{#1}}{{#2}}}}}}}}
 \newcommand{{\ReadingMark}}[1]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{6}}{{7}}\selectfont #1}}}}}}
 \newcommand{{\Note}}[5]{{\hypertarget{{#1}}{{}}\mbox{{\textsuperscript{{#2}}\texthebrew{{#3}}}}\nobreak\hspace{{0.2em}}#4#5.\hspace{{0.9em}}}}
@@ -229,20 +256,28 @@ def blocks(document: ReaderDocument):
 def contents(groups: list, document: ReaderDocument, prefix: str):
     scripture = []
     verses = [v for group in groups for v in group]
-    for group in groups:
-        first = group[0]
-        if first["verse"] == 1:
-            second = group[1] if len(group) > 1 else None
-            scripture.append(
-                rf"\ChapterOpen{{{first['chapter']}}}{{{verse_content(first, document, prefix)}}}"
-                + "{"
-                + (str(second["verse"]) if second else "")
-                + "}{"
-                + (verse_content(second, document, prefix) if second else "")
-                + "}"
-            )
-        else:
-            scripture.append(rf"\Verse{{{first['verse']}}}{{{verse_content(first, document, prefix)}}}")
+    if document.config["layout"].get("verse_layout", "continuous") == "verse-per-line":
+        for group in groups:
+            first = group[0]
+            if first["verse"] == 1:
+                second = group[1] if len(group) > 1 else None
+                scripture.append(
+                    rf"\ChapterOpen{{{first['chapter']}}}{{{verse_content(first, document, prefix)}}}"
+                    + "{"
+                    + (str(second["verse"]) if second else "")
+                    + "}{"
+                    + (verse_content(second, document, prefix) if second else "")
+                    + "}"
+                )
+            else:
+                scripture.append(rf"\Verse{{{first['verse']}}}{{{verse_content(first, document, prefix)}}}")
+    else:
+        for verse in verses:
+            content = verse_content(verse, document, prefix)
+            if verse["verse"] == 1:
+                scripture.append(rf"\ChapterOpen{{{verse['chapter']}}}" + content)
+            else:
+                scripture.append(rf"\Verse{{{verse['verse']}}}{{{content}}}")
     note_ids = sorted(
         {h for v in verses for t in v["tokens"] for h in t["helps"]},
         key=lambda h: (document.helps[h]["chapter"], document.helps[h]["label"]),
@@ -267,7 +302,7 @@ def contents(groups: list, document: ReaderDocument, prefix: str):
             + escape_latex(gloss)
             + "}"
         )
-    return "\n".join(scripture), r"\Notes{" + "\n".join(notes) + "}", note_ids
+    return r"\Scripture{" + "\n".join(scripture) + "}", r"\Notes{" + "\n".join(notes) + "}", note_ids
 
 
 def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDocument):
@@ -307,9 +342,19 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
         if compiler.cancelled():
             raise Cancelled("Build cancelled")
         progress(f"Measuring page {len(plans) + 1}")
-        window = min(len(remaining), int(usable_pt / layout["leading_pt"]) + 2)
-        candidates = [remaining[:n] for n in range(1, window + 1)]
-        metrics = measure_candidates(compiler, candidates, document)
+        batch_size = int(usable_pt / layout["leading_pt"]) + 2
+        candidates = []
+        metrics = []
+        # Run-in verses can share a line. Extend the initial measurement window
+        # while its last prefix fits, rather than imposing a verse-per-line cap.
+        while len(candidates) < len(remaining):
+            start = len(candidates) + 1
+            stop = min(len(remaining), len(candidates) + batch_size)
+            batch = [remaining[:n] for n in range(start, stop + 1)]
+            candidates.extend(batch)
+            metrics.extend(measure_candidates(compiler, batch, document))
+            if sum(metrics[-1]) > budget_sp:
+                break
         fitting = [i for i, (text, notes) in enumerate(metrics) if text + notes <= budget_sp]
         if not fitting:
             raise ReaderError(

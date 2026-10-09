@@ -94,3 +94,48 @@ uv build
 See [operations](operations.md) for state backups, source review, errors, and
 supported-platform limits. No scholarly-content or cross-installation byte-identical
 PDF guarantee follows merely from passing software tests.
+
+## Continuous scripture update — 2026-10-09
+
+The initial update introduced justified RTL paragraphs with inline verse numbers,
+following `bereshit002.jpg`. The release results above describe the earlier layout.
+
+`make check` passes **71 tests and 8 unittest subtests**, including actual PDF
+baseline checks for consecutive run-in verses and a synthetic 60-short-verse
+pagination stress case. Reference/A4/Letter remain one reader page plus credits;
+A5 remains two reader pages plus credits. `make demo` emits the compatibility
+specimen, and `make pdf` compiles the production proof with shell escape disabled.
+
+The reference proof at `build/reader-20261009-144420-217346/reader.pdf`, both A5
+reader pages, and the single-verse chapter opening were rasterized and inspected.
+Review covered inline numbers, Hebrew points, maqaf, K/Q markers, chapter-box
+insets, chapter/page boundaries, and dense mixed-script notes. Automated checks
+verify all 17 source verses, 37 helps, same-page marker destinations, embedded
+fonts, and absence of missing glyphs or overfull boxes. A short chapter opening
+reserves two lines so its box does not extend beyond the measured text area.
+
+## Layout choice and code-review skill — 2026-10-09
+
+`layout.verse_layout` now selects continuous text (default) or separate verse
+starts. The browser exposes both choices and saves the selection per project.
+CLI JSON/TOML configuration and immutable worker snapshots retain the same setting.
+
+`make check` passes **80 tests and 8 unittest subtests**, including both layouts
+on all four paper profiles, actual verse-number positions, single-verse openings,
+offline bundle recompilation, reproducibility, and large-type A5 wrapping.
+`make demo` and `make pdf` pass. Both layouts' reference/A5 proofs and short chapter
+openings were rasterized and inspected. Complete-source CLI proofs are retained
+at `build/reader-20261009-150439-581867/` (continuous) and
+`build/reader-20261009-150318-621564/` (verse-per-line).
+
+Browser acceptance passed at `test-results/browser-20261009-150255/`, checking
+layout selection, persistence after reload, successful worker builds in both
+modes, exports, failure/cancellation, and mobile width.
+
+The new `.agents/skills/code-review-agent/SKILL.md` passes the skill validator and
+was exercised with an independent read-only reviewer. That review found continuous
+A5 overflow at 26 pt text / 38 pt leading. Adjusting paragraph tolerance fixed the
+overflow; both modes now have a regression test for that configuration. The
+reviewer verified the correction on compiled pages with no remaining actionable
+findings. Full-book continuous flow and SBL Hebrew were not requalified in this
+update.

@@ -25,6 +25,8 @@
         <label for="frequency">Maximum occurrences in this book</label><input id="frequency" type="number" min="1" max="100000">
         <details><summary>Page &amp; reading settings</summary>
           <label for="paper">Page profile</label><select id="paper"><option value="reference">Reader reference · 180 × 281 mm</option><option value="a4">A4</option><option value="a5">A5</option><option value="letter">US Letter</option></select>
+          <label for="verse-layout">Verse layout</label><select id="verse-layout"><option value="continuous">Continuous text</option><option value="verse-per-line">One verse per line</option></select>
+          <p class="hint">Long verses wrap in either layout.</p>
           <label for="hebrew-font">Hebrew typeface</label><select id="hebrew-font"><option>Ezra SIL</option><option>SBL Hebrew</option></select>
           <div class="paired"><div><label for="body-pt">Text size</label><input id="body-pt" type="number" min="12" max="26" step="0.5"></div><div><label for="leading-pt">Line spacing</label><input id="leading-pt" type="number" min="16" max="38" step="0.5"></div></div>
           <div class="paired"><div><label for="notes-pt">Note size</label><input id="notes-pt" type="number" min="7.5" max="14" step="0.5"></div><div><label for="folio">First page</label><input id="folio" type="number" min="1" max="99999"></div></div>

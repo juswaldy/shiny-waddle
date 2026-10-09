@@ -6,7 +6,8 @@ reviewable reader document → measured LaTeX → printable PDF.
 The app imports the Open Scriptures Hebrew Bible and STEP short glosses, keeps
 source readings and editorial decisions separate, and puts each page's lexical
 helps beside the verses that need them. The reference edition is Proverbs
-1:29–2:12, following the structure of the supplied `mishle002.jpg`.
+1:29–2:12. Choose continuous scripture flow as in `bereshit002.jpg` or separate
+verse starts as in `mishle002.jpg`, with chapter-grouped lexical notes in both modes.
 
 ## Start
 
@@ -42,7 +43,11 @@ SBL Hebrew is optional and must be installed separately.
 ```
 
 JSON and TOML project files use the same validated settings as the browser. The
-reference help selection applies to Proverbs 1:29–2:12. For other passages choose
+**Verse layout** selector under **Page & reading settings** offers **Continuous
+text** (the default) and **One verse per line**. In a project file set
+`layout.verse_layout` to `"continuous"` or `"verse-per-line"`; long verses can wrap
+in either mode. Projects without this setting use continuous text.
+The reference help selection applies to Proverbs 1:29–2:12. For other passages choose
 `all` or `book-frequency`; the latter counts occurrences in the entire selected
 source book. `known_entries` and per-anchor `decisions` support exclusions and
 reviewed glosses. Ambiguous or unmatched selected helps must be resolved or
@@ -60,7 +65,7 @@ builds include the PDF and compiler log. Ezra exports include the font and licen
   annotations, and written/read forms retained.
 - Extended lexical-ID matching, explicit ambiguity review, gloss overrides,
   frequency and known-word policies, and chapter-local shared help labels.
-- Separate verse starts, chapter boxes, mixed Hebrew/English notes, running
+- Continuous RTL text or separate verse starts, chapter boxes, mixed Hebrew/English notes, running
   references, four paper profiles, and measured page-local apparatus placement.
 - Saved projects with revision-conflict checks, durable build jobs, cancellation,
   interrupted-job recovery, PDF preview, and export bundles.

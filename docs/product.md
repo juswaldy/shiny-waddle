@@ -31,9 +31,15 @@ The local reference image `mishle002.jpg` shows a Proverbs reader page with:
   glosses, and short grammatical labels.
 - A running passage reference, book name, and page number.
 
-Use these layout qualities as the print target. The scan's publisher, edition, and
-redistribution terms have not been identified. It is not a source for transcription
-or lexical data and should not be packaged into outputs.
+The reader chooses **Continuous text**, following `bereshit002.jpg`, or **One
+verse per line**, following the Proverbs scan. Continuous is the default and uses
+justified RTL paragraphs with smaller verse numbers inline. The alternative starts
+each verse separately; long verses wrap in either mode. Both retain the double
+chapter box and chapter-grouped lexical apparatus. The choice is saved per project
+and used by both the app and CLI.
+The scans' publishers, editions, and redistribution terms have not been identified.
+They are not sources for transcription or lexical data and should not be packaged
+into outputs.
 
 ## First usable reader
 

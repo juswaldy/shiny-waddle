@@ -34,10 +34,13 @@ def test_project_review_edit_build_snapshot_and_conflict(client):
     queued = client.post(url + "/builds").json()
     assert queued["project_revision"] == 1
     project["config"]["name"] = "Saved edition"
+    project["config"]["layout"]["verse_layout"] = "verse-per-line"
     payload = {"revision": 1, "config": project["config"]}
     assert client.put(url, json=payload).json()["revision"] == 2
+    assert client.get(url).json()["config"]["layout"]["verse_layout"] == "verse-per-line"
     assert client.put(url, json=payload).status_code == 409
     assert client.get(f"/api/jobs/{queued['id']}").json()["config"]["name"] == "Proverbs reader"
+    assert client.get(f"/api/jobs/{queued['id']}").json()["config"]["layout"]["verse_layout"] == "continuous"
     assert client.post(f"/api/jobs/{queued['id']}/cancel").json()["status"] == "cancelled"
 
 

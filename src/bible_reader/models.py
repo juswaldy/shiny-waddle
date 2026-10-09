@@ -52,6 +52,7 @@ class Decision(StrictModel):
 
 class Layout(StrictModel):
     paper: Literal["reference", "a4", "a5", "letter"] = "reference"
+    verse_layout: Literal["continuous", "verse-per-line"] = "continuous"
     body_pt: float = Field(default=18.0, ge=12, le=26)
     leading_pt: float = Field(default=23.5, ge=16, le=38)
     notes_pt: float = Field(default=9.0, ge=7.5, le=14)

@@ -54,11 +54,17 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(page.locator(".help-row")).to_have_count(40)
             expect(page.locator("#coverage")).to_contain_text("37")
             page.screenshot(path=str(OUTPUT / "review-desktop.png"), full_page=False)
+            page.locator("#project-form summary").click()
+            expect(page.locator("#verse-layout")).to_have_value("continuous")
+            page.locator("#verse-layout").select_option("verse-per-line")
+            page.get_by_role("button", name="Save settings", exact=True).click()
+            expect(page.locator("#notice")).to_have_text("Edition settings saved")
             row = page.locator('[data-anchor="20qg1:0"]')
             row.locator("textarea").fill("Editorial browser test gloss")
             row.get_by_role("button", name="Save help").click()
             expect(row.locator(".note-label")).to_have_text("23")
             page.reload()
+            expect(page.locator("#verse-layout")).to_have_value("verse-per-line")
             expect(page.locator('[data-anchor="20qg1:0"] textarea')).to_have_value(
                 "Editorial browser test gloss"
             )
@@ -72,6 +78,20 @@ with (OUTPUT / "server.log").open("w") as log:
             bundle = page.request.get(url + page.locator("#download-bundle").get_attribute("href"))
             assert bundle.ok and bundle.body().startswith(b"PK")
             (OUTPUT / "downloaded-bundle.zip").write_bytes(bundle.body())
+            # Switching the layout must reach the immutable worker build config.
+            page.locator("#project-form summary").click()
+            page.locator("#verse-layout").select_option("continuous")
+            previous_pdf = page.locator("#download-pdf").get_attribute("href")
+            page.locator("#build").click()
+            expect(page.locator("#download-pdf")).not_to_have_attribute("href", previous_pdf, timeout=90_000)
+            expect(page.locator("#download-pdf")).to_be_visible(timeout=90_000)
+            assert page.locator("#download-pdf").get_attribute("href") != previous_pdf
+            jobs = page.request.get(url + "/api/jobs").json()
+            successful_builds = [j for j in jobs if j["kind"] == "build" and j["status"] == "succeeded"]
+            assert {j["config"]["layout"]["verse_layout"] for j in successful_builds} == {
+                "continuous",
+                "verse-per-line",
+            }
             page.evaluate("window.scrollTo(0, 0)")
             page.wait_for_timeout(
                 2000
@@ -110,6 +130,7 @@ with (OUTPUT / "server.log").open("w") as log:
                         "review",
                         "edit",
                         "persist",
+                        "verse layout selection, reload, and both PDF builds",
                         "real PDF build",
                         "PDF and bundle download",
                         "offline import job",
