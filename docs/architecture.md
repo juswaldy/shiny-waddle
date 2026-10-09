@@ -74,7 +74,10 @@ chapter-qualified help identity. Printed numbers are not lexical identities.
 helps, review rows, chapter registry, source lock, and warnings. The source lock
 contains actual artifact hashes and upstream revisions. `page-plan.json` contains
 verse blocks, first/last references, folios, measured heights in TeX scaled points,
-and unique help IDs per page. Final TeX uses exactly those blocks and page breaks.
+and unique help IDs per page. Each candidate's complete page height includes its
+actual running head and separator spacing, measured using the same box assembly
+as final output. Fit is checked against TeX's usable text height; there is no fixed
+header allowance. Final TeX uses exactly those boxes, blocks, and page breaks.
 Verse blocks are pagination units. `layout.verse_layout` selects continuous
 justified RTL paragraphs with inline verse numbers, or separately started,
 right-aligned verse paragraphs with a number gutter. Chapter boxes reserve the
@@ -82,6 +85,12 @@ first two lines in continuous mode and the first two verses in verse-per-line mo
 Measurements and the final PDF use the same selected construction. Saved projects
 and immutable build snapshots retain the choice; omitted settings default to
 continuous through project validation.
+
+`layout.paper` defaults to `reader` (140 × 216 mm). Existing named profiles retain
+their dimensions. Selecting `custom` requires validated `paper_width_mm` and
+`paper_height_mm`; project revisions, immutable build snapshots, and reader JSON
+retain them. A shared dimension resolver supplies measurement, page budgets, and
+final PDF geometry, with 10 mm margins for reader/custom paper.
 
 ## Persistence and reproducibility
 

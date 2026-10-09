@@ -45,13 +45,20 @@ async function refreshProjects(selected) {
 function fillForm() {
   const c = current.config;
   const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max,
-    paper: c.layout.paper, "verse-layout": c.layout.verse_layout ?? "continuous", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
+    paper: c.layout.paper, "paper-width": c.layout.paper_width_mm ?? 140, "paper-height": c.layout.paper_height_mm ?? 216,
+    "verse-layout": c.layout.verse_layout ?? "continuous", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
     "notes-pt": c.layout.notes_pt, folio: c.layout.first_folio, readings: c.readings, cantillation: c.cantillation};
   Object.entries(values).forEach(([id, value]) => { $(id).value = value; });
+  updatePaperFields();
   $("frequency").disabled = c.selection !== "book-frequency";
   $("edition-title").textContent = c.name;
   $("edition-subtitle").textContent = `${sourceInfo.books[c.book]?.title || c.book} ${c.passage} · Hebrew text with English lexical helps`;
   $("book-word").textContent = sourceInfo.books[c.book]?.hebrew || "";
+}
+function updatePaperFields() {
+  const custom = $("paper").value === "custom";
+  $("custom-paper").hidden = !custom;
+  $("paper-width").disabled = $("paper-height").disabled = !custom;
 }
 async function loadProject(identity) {
   viewedJob = undefined;
@@ -65,6 +72,12 @@ function formConfig() {
     frequency_max: Number($("frequency").value), readings: $("readings").value, cantillation: $("cantillation").value});
   Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
     leading_pt: Number($("leading-pt").value), notes_pt: Number($("notes-pt").value), first_folio: Number($("folio").value)});
+  if (c.layout.paper === "custom") {
+    if (!$("paper-width").reportValidity() || !$("paper-height").reportValidity()) {
+      throw new Error("Enter a valid custom paper width and height in millimetres.");
+    }
+    Object.assign(c.layout, {paper_width_mm: Number($("paper-width").value), paper_height_mm: Number($("paper-height").value)});
+  }
   if (c.book !== current.config.book) c.decisions = {};
   return c;
 }
@@ -188,6 +201,7 @@ $("show-sources").onclick = () => tab("sources");
 $("project-picker").onchange = guard(() => loadProject($("project-picker").value));
 $("project-form").onsubmit = guard(async event => {event.preventDefault(); await saveConfig(formConfig()); notice("Edition settings saved");});
 $("selection").onchange = () => { $("frequency").disabled = $("selection").value !== "book-frequency"; };
+$("paper").onchange = updatePaperFields;
 $("book").onchange = () => {if ($("book").value !== "Prov") {$("selection").value = "book-frequency"; $("passage").value = "1:1-10"; $("frequency").disabled = false;}};
 $("new-project").onclick = guard(async () => {const config = structuredClone(current.config); config.name = "New reader edition"; const project = await api("/projects", "POST", config); await refreshProjects(project.id);});
 $("build").onclick = guard(async () => {viewedJob = undefined; await saveConfig(formConfig()); const job = await api(`/projects/${current.id}/builds`, "POST"); allJobs.unshift(job); tab("preview"); renderJobs();});

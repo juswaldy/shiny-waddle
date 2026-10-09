@@ -51,7 +51,9 @@ class Decision(StrictModel):
 
 
 class Layout(StrictModel):
-    paper: Literal["reference", "a4", "a5", "letter"] = "reference"
+    paper: Literal["reader", "reference", "a4", "a5", "letter", "custom"] = "reader"
+    paper_width_mm: float | None = Field(default=None, ge=21, le=1000)
+    paper_height_mm: float | None = Field(default=None, ge=21, le=1000)
     verse_layout: Literal["continuous", "verse-per-line"] = "continuous"
     body_pt: float = Field(default=18.0, ge=12, le=26)
     leading_pt: float = Field(default=23.5, ge=16, le=38)
@@ -60,7 +62,9 @@ class Layout(StrictModel):
     hebrew_font: Literal["Ezra SIL", "SBL Hebrew"] = "Ezra SIL"
 
     @model_validator(mode="after")
-    def spacing(self):
+    def validate_layout(self):
+        if self.paper == "custom" and (self.paper_width_mm is None or self.paper_height_mm is None):
+            raise ValueError("Custom paper requires both paper_width_mm and paper_height_mm")
         if self.leading_pt < self.body_pt * 1.12:
             raise ValueError("Line spacing must leave room for Hebrew vowel marks")
         return self

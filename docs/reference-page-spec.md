@@ -203,6 +203,9 @@ header + header gap + scripture blocks + chapter gaps
 
 Do not allocate scripture to pages first and append all notes afterward. A
 candidate page's note set changes when a verse crosses its boundary.
+Measure this complete assembly with the final page macros and actual selected
+font. Fixed header/separator allowances must not leave usable space unavailable
+to scripture and notes.
 
 **R17 — Breaking rules.** Prefer page breaks between verses. Keep a chapter box
 with its opening group. Keep ordinary short verses and all their notes on one
@@ -218,6 +221,11 @@ extra vertical space between text and apparatus when bottom-aligning the notes;
 do not stretch Hebrew baselines to fill the page.
 
 ## 6. First proof profile
+
+The reader defaults to 140 × 216 mm paper with 10 mm margins. Its **Paper size**
+selector also offers custom dimensions and the named presets below. The larger
+reference proof remains a separate, explicitly chosen calibration profile; its
+one-page target does not apply to the default or custom paper sizes.
 
 These are proposed starting values for calibration, not measurements of the
 original print edition. Store them in a named profile rather than embedding them
@@ -239,7 +247,7 @@ in Python algorithms. Pin font files/versions once a proof is approved.
 | Horizontal rules | Start 0.35 pt |
 
 The reference design area is a way to compare page composition without claiming
-the scan reveals paper trim. A4, A5, and Letter exports should reflow through the
+the scan reveals paper trim. Default, custom, A4, A5, and Letter exports reflow through the
 same planner; they are not required to keep this passage on exactly one page.
 The calibrated reference profile must fit the target passage on one page with
 its reviewed help set. If it does not, revise the explicit profile or gloss

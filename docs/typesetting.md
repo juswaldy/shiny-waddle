@@ -17,19 +17,33 @@ make check
 
 | Profile | Page size | Margins |
 | --- | --- | --- |
+| reader (default) | 140 × 216 mm | 10 mm |
 | reference | 180 × 281 mm | 10 mm |
 | a4 | 210 × 297 mm | 16 mm |
 | a5 | 148 × 210 mm | 10 mm |
 | letter | 215.9 × 279.4 mm | 16 mm |
+| custom | Project width × height in mm | 10 mm |
+
+The app's **Paper size** selector offers these profiles. Custom requires both
+`layout.paper_width_mm` and `layout.paper_height_mm`, each a finite number from
+21 to 1000 mm. Dimensions may include decimals and may specify landscape paper.
+The same dimensions govern TeX measurement, page budgets, and final PDF geometry;
+an atomic verse/opening that cannot fit still reports a layout overflow.
+Omitted paper settings use `reader`; an explicitly selected profile keeps its size.
+`examples/reference.project.json` explicitly selects the larger reference proof.
 
 Reference dimensions are calibrated approximations; the photograph does not
 establish physical paper size. Defaults are Ezra SIL 18 pt / 23.5 pt leading and
 9 pt notes. Latin Modern is loaded by its TeX font filenames. Type sizes, leading,
 folio, accent policy, reading policy, and font choice are validated project settings.
 
-The planner measures complete candidate scripture boxes and their unique notes in
-TeX scaled points, in batches per page. It reserves conservative header/separator
-space, selects the fullest legal fitting prefix, and emits explicit page breaks.
+The planner measures each complete candidate page in TeX scaled points, in batches
+per page: its actual header, scripture box, separator spacing, and unique notes.
+Measurement and final output share the same page assembly, so unused fixed
+allowances cannot push fitting verses to the next page. It selects the fullest
+legal fitting prefix against TeX's actual text height and emits explicit breaks.
+Page plans retain scripture/note heights, complete page height, usable height,
+and the content budget derived from the measured header and separator.
 The `layout.verse_layout` setting chooses `continuous` (default) or
 `verse-per-line`. The app exposes it as **Verse layout** in page settings.
 Continuous scripture flows in justified RTL paragraphs with inline LTR verse

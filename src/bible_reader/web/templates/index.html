@@ -24,7 +24,11 @@
         <label for="selection">Lexical helps</label><select id="selection"><option value="reference">Proverbs sample selection</option><option value="book-frequency">Uncommon in this book</option><option value="all">All lexical items</option></select>
         <label for="frequency">Maximum occurrences in this book</label><input id="frequency" type="number" min="1" max="100000">
         <details><summary>Page &amp; reading settings</summary>
-          <label for="paper">Page profile</label><select id="paper"><option value="reference">Reader reference · 180 × 281 mm</option><option value="a4">A4</option><option value="a5">A5</option><option value="letter">US Letter</option></select>
+          <label for="paper">Paper size</label><select id="paper"><option value="reader">Reader · 140 × 216 mm (default)</option><option value="reference">Reference proof · 180 × 281 mm</option><option value="a4">A4</option><option value="a5">A5</option><option value="letter">US Letter</option><option value="custom">Custom</option></select>
+          <div id="custom-paper" hidden>
+            <div class="paired"><div><label for="paper-width">Width (mm)</label><input id="paper-width" type="number" min="21" max="1000" step="any" required disabled></div><div><label for="paper-height">Height (mm)</label><input id="paper-height" type="number" min="21" max="1000" step="any" required disabled></div></div>
+            <p class="hint">Custom paper uses 10 mm margins.</p>
+          </div>
           <label for="verse-layout">Verse layout</label><select id="verse-layout"><option value="continuous">Continuous text</option><option value="verse-per-line">One verse per line</option></select>
           <p class="hint">Long verses wrap in either layout.</p>
           <label for="hebrew-font">Hebrew typeface</label><select id="hebrew-font"><option>Ezra SIL</option><option>SBL Hebrew</option></select>

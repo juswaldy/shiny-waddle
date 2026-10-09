@@ -11,6 +11,7 @@ import urllib.request
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
+from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "test-results" / time.strftime("browser-%Y%m%d-%H%M%S")
@@ -55,6 +56,17 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(page.locator("#coverage")).to_contain_text("37")
             page.screenshot(path=str(OUTPUT / "review-desktop.png"), full_page=False)
             page.locator("#project-form summary").click()
+            expect(page.locator("#paper")).to_have_value("reader")
+            expect(page.locator("#custom-paper")).to_be_hidden()
+            expect(page.locator("#paper-width")).to_be_disabled()
+            page.locator("#paper").select_option("custom")
+            expect(page.locator("#custom-paper")).to_be_visible()
+            page.locator("#paper-width").fill("")
+            page.locator("#build").click()
+            expect(page.locator("#notice")).to_contain_text("Enter a valid custom paper")
+            assert page.request.get(url + "/api/jobs").json() == []
+            page.locator("#paper-width").fill("160.5")
+            page.locator("#paper-height").fill("230.25")
             expect(page.locator("#verse-layout")).to_have_value("continuous")
             page.locator("#verse-layout").select_option("verse-per-line")
             page.get_by_role("button", name="Save settings", exact=True).click()
@@ -64,6 +76,9 @@ with (OUTPUT / "server.log").open("w") as log:
             row.get_by_role("button", name="Save help").click()
             expect(row.locator(".note-label")).to_have_text("23")
             page.reload()
+            expect(page.locator("#paper")).to_have_value("custom")
+            expect(page.locator("#paper-width")).to_have_value("160.5")
+            expect(page.locator("#paper-height")).to_have_value("230.25")
             expect(page.locator("#verse-layout")).to_have_value("verse-per-line")
             expect(page.locator('[data-anchor="20qg1:0"] textarea')).to_have_value(
                 "Editorial browser test gloss"
@@ -75,11 +90,17 @@ with (OUTPUT / "server.log").open("w") as log:
                 page.locator("#download-pdf").click()
             downloading.value.save_as(OUTPUT / "downloaded-reader.pdf")
             assert (OUTPUT / "downloaded-reader.pdf").read_bytes().startswith(b"%PDF-")
+            for pdf_page in PdfReader(OUTPUT / "downloaded-reader.pdf").pages:
+                assert abs(float(pdf_page.mediabox.width) * 25.4 / 72 - 160.5) < 0.01
+                assert abs(float(pdf_page.mediabox.height) * 25.4 / 72 - 230.25) < 0.01
             bundle = page.request.get(url + page.locator("#download-bundle").get_attribute("href"))
             assert bundle.ok and bundle.body().startswith(b"PK")
             (OUTPUT / "downloaded-bundle.zip").write_bytes(bundle.body())
             # Switching the layout must reach the immutable worker build config.
             page.locator("#project-form summary").click()
+            page.locator("#paper").select_option("reader")
+            expect(page.locator("#custom-paper")).to_be_hidden()
+            expect(page.locator("#paper-height")).to_be_disabled()
             page.locator("#verse-layout").select_option("continuous")
             previous_pdf = page.locator("#download-pdf").get_attribute("href")
             page.locator("#build").click()
@@ -92,6 +113,12 @@ with (OUTPUT / "server.log").open("w") as log:
                 "continuous",
                 "verse-per-line",
             }
+            assert {j["config"]["layout"]["paper"] for j in successful_builds} == {"reader", "custom"}
+            default_pdf = page.request.get(url + page.locator("#download-pdf").get_attribute("href"))
+            (OUTPUT / "default-reader.pdf").write_bytes(default_pdf.body())
+            for pdf_page in PdfReader(OUTPUT / "default-reader.pdf").pages:
+                assert abs(float(pdf_page.mediabox.width) * 25.4 / 72 - 140) < 0.01
+                assert abs(float(pdf_page.mediabox.height) * 25.4 / 72 - 216) < 0.01
             page.evaluate("window.scrollTo(0, 0)")
             page.wait_for_timeout(
                 2000
@@ -131,6 +158,7 @@ with (OUTPUT / "server.log").open("w") as log:
                         "edit",
                         "persist",
                         "verse layout selection, reload, and both PDF builds",
+                        "default/custom paper selection, validation, persistence, and actual PDF dimensions",
                         "real PDF build",
                         "PDF and bundle download",
                         "offline import job",
