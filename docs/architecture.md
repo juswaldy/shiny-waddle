@@ -75,6 +75,10 @@ helps, review rows, chapter registry, source lock, and warnings. The source lock
 contains actual artifact hashes and upstream revisions. `page-plan.json` contains
 verse blocks, first/last references, folios, measured heights in TeX scaled points,
 and unique help IDs per page. Final TeX uses exactly those blocks and page breaks.
+Verse blocks are pagination units; within each page the renderer joins them into
+continuous justified RTL paragraphs with inline verse numbers. A chapter opening
+starts a new paragraph with a two-line inset for its box. Measurements use the
+same continuous paragraph construction as the final PDF.
 
 ## Persistence and reproducibility
 

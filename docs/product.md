@@ -31,7 +31,11 @@ The local reference image `mishle002.jpg` shows a Proverbs reader page with:
   glosses, and short grammatical labels.
 - A running passage reference, book name, and page number.
 
-Use these layout qualities as the print target. The scan's publisher, edition, and
+The current scripture flow follows `bereshit002.jpg`: justified continuous RTL
+text with smaller verse numbers inline. This replaces the Proverbs scan's separate
+verse starts. Chapter openings retain the double box with a two-line inset, and
+the chapter-grouped lexical apparatus remains the print target.
+The scans' publishers, editions, and
 redistribution terms have not been identified. It is not a source for transcription
 or lexical data and should not be packaged into outputs.
 

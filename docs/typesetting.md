@@ -30,8 +30,14 @@ folio, accent policy, reading policy, and font choice are validated project sett
 The planner measures complete candidate scripture boxes and their unique notes in
 TeX scaled points, in batches per page. It reserves conservative header/separator
 space, selects the fullest legal fitting prefix, and emits explicit page breaks.
-The first two verses of a chapter share an inset beside a double chapter box.
-A passage containing only verse 1 keeps its chapter marker. The final page may be
+Scripture flows in justified RTL paragraphs with inline LTR verse numbers,
+as in `bereshit002.jpg`. Numbers stay with the first word of their verse.
+Chapter openings start a new paragraph; its first two lines share an inset beside
+a double chapter box, then the text returns to full width. The first two verses
+remain one page-planning unit. A passage containing only verse 1 keeps its chapter
+marker and reserves at least two lines for the box. Candidate measurement windows
+extend when more short verses fit, since several verses may share a line.
+The final page may be
 sparse: there is no global paragraph/page balancing pass. Notes align at the page
 bottom with flexible whitespace above them.
 

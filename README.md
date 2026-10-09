@@ -6,7 +6,8 @@ reviewable reader document → measured LaTeX → printable PDF.
 The app imports the Open Scriptures Hebrew Bible and STEP short glosses, keeps
 source readings and editorial decisions separate, and puts each page's lexical
 helps beside the verses that need them. The reference edition is Proverbs
-1:29–2:12, following the structure of the supplied `mishle002.jpg`.
+1:29–2:12, with continuous scripture flow as in `bereshit002.jpg` and the
+chapter-grouped apparatus shown in `mishle002.jpg`.
 
 ## Start
 
@@ -60,7 +61,7 @@ builds include the PDF and compiler log. Ezra exports include the font and licen
   annotations, and written/read forms retained.
 - Extended lexical-ID matching, explicit ambiguity review, gloss overrides,
   frequency and known-word policies, and chapter-local shared help labels.
-- Separate verse starts, chapter boxes, mixed Hebrew/English notes, running
+- Continuous RTL text with inline verse numbers, chapter boxes, mixed Hebrew/English notes, running
   references, four paper profiles, and measured page-local apparatus placement.
 - Saved projects with revision-conflict checks, durable build jobs, cancellation,
   interrupted-job recovery, PDF preview, and export bundles.

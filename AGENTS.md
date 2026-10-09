@@ -33,7 +33,7 @@ supported environments and limits. The original v1 renderer is compatibility cod
   Do not invent scholarly content to fill gaps or infer a sense from spelling alone.
 - Hebrew/Aramaic runs are RTL; Greek/English runs are LTR. Store logical Unicode
   order, never visually reverse strings. Test mixed-script markers and notes.
-- The final reader starts each verse separately and reuses semantic help labels
+- The final reader flows continuously with inline verse numbers and reuses semantic help labels
   within a chapter. Notes are unique per page and grouped by chapter. The v1 demo's
   per-occurrence numbering and passage-end notes are not the final product contract.
 - Keep imported text, annotations, lexica, fonts, and reference images under

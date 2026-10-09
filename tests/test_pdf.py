@@ -8,7 +8,7 @@ from pypdf import PdfReader
 from bible_reader.editorial import build_document
 from bible_reader.models import Cancelled, Decision, ProjectConfig, ReaderError
 from bible_reader.service import build
-from bible_reader.tex import Compiler, paginate
+from bible_reader.tex import Compiler, final_tex, paginate, verify_pdf
 
 pytestmark = pytest.mark.integration
 
@@ -27,6 +27,19 @@ def test_real_pdf_pagination_links_fonts_and_portable_bundle(
     assert [p["folio"] for p in plans] == list(range(1329, 1329 + pages))
     assert sum(len(p["references"]) for p in plans) == 17
     assert all(p["text_height_sp"] + p["notes_height_sp"] <= p["budget_sp"] for p in plans)
+    if paper == "reference":
+        # Inspect actual verse-digit baselines: these adjacent verses must run
+        # together, rather than merely using different macros in the TeX source.
+        digits = {}
+
+        def collect_digits(text, cm, tm, font, size):
+            if 10.5 < size < 11.5 and text.strip() in {"29", "30"}:
+                digits[text.strip()] = (cm[4] + tm[4], cm[5] + tm[5])
+
+        PdfReader(output / "reader.pdf").pages[0].extract_text(visitor_text=collect_digits)
+        assert set(digits) == {"29", "30"}
+        assert digits["29"][1] == pytest.approx(digits["30"][1], abs=0.1)
+        assert digits["30"][0] < digits["29"][0]
     assert "Sources and edition" in PdfReader(output / "reader.pdf").pages[-1].extract_text()
     manifest = json.loads((output / "manifest.json").read_text())
     for name, expected in manifest["artifacts"].items():
@@ -66,6 +79,23 @@ def test_accents_and_single_verse_chapter_opening(source_state, tmp_path, tex_av
     config = ProjectConfig(passage="2:1", cantillation="preserve")
     result = build(source_state, config, tmp_path / "single")
     assert result["verse_count"] == 1
+
+
+def test_many_short_run_in_verses_fill_a_page(source_state, tmp_path, tex_available):
+    # Synthetic layout stress case derived from one fixture token. This is not
+    # source scripture: it checks that the planner has no verse-per-line cap.
+    document = build_document(source_state, ProjectConfig(passage="1:29"))
+    token = {**document.verses[0]["tokens"][0], "helps": []}
+    document.verses = [
+        {"reference": f"Prov.1.{number}", "chapter": 1, "verse": number, "tokens": [token]}
+        for number in range(2, 62)
+    ]
+    compiler = Compiler(tmp_path / "short-verses", "Ezra SIL")
+    plans = paginate(document, compiler)
+    assert len(plans) == 1
+    assert len(plans[0]["references"]) == 60
+    log = compiler.compile("reader", final_tex(document, plans), passes=2)
+    assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 60
 
 
 def test_compiler_cancellation_and_overflow_fail_explicitly(source_state, tmp_path, tex_available):

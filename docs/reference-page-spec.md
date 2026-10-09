@@ -1,8 +1,11 @@
 # Reader page specification: Proverbs 1:29–2:12
 
-Status: implementation target, based on direct inspection of `mishle002.jpg`.
+Status: implementation target, based on direct inspection of `mishle002.jpg`,
+with scripture flow updated on 2026-10-09 to follow `bereshit002.jpg`.
 Companion: [Python application plan](python-app-plan.md). This specification
-supersedes the bootstrap's generic “continuous text with notes” layout description.
+retains the Proverbs apparatus and chapter-opening design while using continuous
+scripture paragraphs with inline verse numbers. The Proverbs scan coordinates
+below document the original observation, rather than the new paragraph line count.
 Implementation evidence and current limitations are recorded separately in
 [release-validation.md](release-validation.md).
 
@@ -49,15 +52,15 @@ should admit more text or additional whitespace according to its layout profile.
 ```text
  passage range                Hebrew book title                  folio
  ────────────────────────────────────────────────────────────────────
-                                                Hebrew verse ...   29
-                                                Hebrew verse ...   30
-                                                            ...    33
+  ... Hebrew verse ... 30    ... Hebrew verse ... 29
+  ... Hebrew verse ... 32    ... Hebrew verse ... 31
+                            ... Hebrew verse ... 33
                          section sign / chapter separation
-                                       Hebrew verse ...      ╔══════╗
-                                       Hebrew verse ...   2  ║  2   ║
+                         ... Hebrew verse ...               ╔══════╗
+                         ... Hebrew verse ... 2             ║  2   ║
                                                              ╚══════╝
-                                                Hebrew verse ...    3
-                                                            ...    12
+  ... Hebrew verse ... 4     ... Hebrew verse ... 3
+                            ... Hebrew verse ... 12
 
  ────────────────────────────────────────────────────────────────────
  90 headword gloss.  91 headword gloss.  ... 104 headword gloss.
@@ -72,13 +75,16 @@ order and is shaped by TeX.
 
 ## 3. Scripture typography
 
-**R01 — Verse blocks.** Start each verse on its own RTL paragraph. All 17 verses
-fit on one line in this reference. Preserve a shared right edge and a ragged left
-edge; do not stretch short verses across the page. Longer verses may wrap in other
-passages. Continuation lines use the text measure without repeating the number.
+**R01 — Continuous scripture.** Flow consecutive verses through a justified RTL
+paragraph, as in `bereshit002.jpg`. Verse numbers appear inline; adjacent verses
+may share a line and longer verses wrap naturally without repeating the number.
+The final line is right-aligned. Start a new paragraph at each chapter opening or
+page boundary. Preserve source section signs. Verse boundaries remain explicit
+in source records and page plans, even though they no longer force line breaks.
 
-**R02 — Verse numbers.** Render Arabic digits in a smaller Latin serif face at the
-right of the verse, in a controlled gutter. Keep digits LTR inside the RTL context.
+**R02 — Verse numbers.** Render Arabic digits in a smaller Latin serif face inline
+before the verse's first word, keeping the number attached to that word. Keep
+digits LTR inside the RTL context.
 Verse 1 at a chapter opening has no separate printed `1` in the sample; the chapter
 box introduces it. Verse 2 has its own number beside the inset text.
 
@@ -102,9 +108,11 @@ such as `104` must remain internally LTR and must not collide with Hebrew marks.
 
 **R06 — Chapter opening.** Introduce chapter 2 mid-page with a large Latin `2`
 inside two fine square outlines. Reserve space on the right beside the first two
-verse lines. Treat the opening and those verses as a measured group; the box is
-not an independent floating object. If the verses wrap, reserve enough space for
-the box and keep the first two verse blocks together when they fit on a page.
+lines of the continuous chapter paragraph. The text returns to full width after
+those two lines. Treat the opening and its first two verses as a measured page
+group; the box is not an independent floating object. Reserve two lines even for
+a passage containing only a short verse 1, so the box remains inside the measured
+scripture area.
 
 **R07 — Alternative readings and editorial signs.** Small raised K/Q labels and
 alternative forms are visible around 2:7–8. Represent written/read alternatives
@@ -264,8 +272,8 @@ details panels, not between routine reading/export actions.
 | Passage coverage | Exactly 1:29–33 and 2:1–12, in order, without missing or extra tokens |
 | Source fidelity | Text/marks/readings match the selected source and documented display policy |
 | Reference header | Correct passage, centered Hebrew book title, configurable folio |
-| Verse layout | Separate RTL verse starts, right-side digits, stable wrapping and punctuation |
-| Chapter opening | Double-boxed 2, no redundant verse-1 digit, room beside first two verse blocks |
+| Verse layout | Continuous justified RTL flow, inline LTR digits attached to first words, stable wrapping and punctuation |
+| Chapter opening | Double-boxed 2, no redundant verse-1 digit, room beside first two paragraph lines |
 | Shared notes | Labels 4 and 9 are demonstrably reused in the reference fixture |
 | Reference apparatus | Two paragraphs with 15 and 22 unique entries when using the reference topology |
 | Page membership | Every marker resolves on that page to exactly one chapter-qualified help |

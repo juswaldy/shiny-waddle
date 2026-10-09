@@ -94,3 +94,22 @@ uv build
 See [operations](operations.md) for state backups, source review, errors, and
 supported-platform limits. No scholarly-content or cross-installation byte-identical
 PDF guarantee follows merely from passing software tests.
+
+## Continuous scripture update — 2026-10-09
+
+The reader now uses justified RTL paragraphs with inline verse numbers, following
+`bereshit002.jpg`. The release results above describe the earlier layout.
+
+`make check` passes **71 tests and 8 unittest subtests**, including actual PDF
+baseline checks for consecutive run-in verses and a synthetic 60-short-verse
+pagination stress case. Reference/A4/Letter remain one reader page plus credits;
+A5 remains two reader pages plus credits. `make demo` emits the compatibility
+specimen, and `make pdf` compiles the production proof with shell escape disabled.
+
+The reference proof at `build/reader-20261009-144420-217346/reader.pdf`, both A5
+reader pages, and the single-verse chapter opening were rasterized and inspected.
+Review covered inline numbers, Hebrew points, maqaf, K/Q markers, chapter-box
+insets, chapter/page boundaries, and dense mixed-script notes. Automated checks
+verify all 17 source verses, 37 helps, same-page marker destinations, embedded
+fonts, and absence of missing glyphs or overfull boxes. A short chapter opening
+reserves two lines so its box does not extend beyond the measured text area.
