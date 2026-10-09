@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "oshb_revision": "3d15126fb1ef74867fc1434be1942e837932691f",
+  "step_revision": "b99716b0cddb648ddb95cc786a197180f2f97d48",
+  "verified_at": "2026-10-02",
+  "books": {
+    "Gen": {
+      "title": "Genesis",
+      "hebrew": "בראשית",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Gen.xml",
+      "sha256": "0526e5c9a5fb4d907847645f954ed3d1268fa69decbd872056cedd2668d86449"
+    },
+    "Exod": {
+      "title": "Exodus",
+      "hebrew": "שמות",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Exod.xml",
+      "sha256": "04868367cdacb6ccdc61488e923e20f918172042e6437842a0621f63ac5b847f"
+    },
+    "Lev": {
+      "title": "Leviticus",
+      "hebrew": "ויקרא",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Lev.xml",
+      "sha256": "e21e70265c9ef500182f8ccb4f4e1186e5a79e1169d24cef23cc479baf07b191"
+    },
+    "Num": {
+      "title": "Numbers",
+      "hebrew": "במדבר",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Num.xml",
+      "sha256": "02e4febfcc027d10b3e35e4f091eae67a40d26f37b6254faac6b4af053fe4896"
+    },
+    "Deut": {
+      "title": "Deuteronomy",
+      "hebrew": "דברים",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Deut.xml",
+      "sha256": "04f8087442a1e67a631cd70f2ac4e42fe0a780ae132edb165a3a29f3f290358f"
+    },
+    "Josh": {
+      "title": "Joshua",
+      "hebrew": "יהושע",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Josh.xml",
+      "sha256": "a066200ab2269c0a86a2e9ba119a3d0fce8c5f7ecc44bb53ec134b83dffc6006"
+    },
+    "Judg": {
+      "title": "Judges",
+      "hebrew": "שופטים",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Judg.xml",
+      "sha256": "3b3a909f04041dbd52dc6b7293a96ce75d94db8a90fdeda878943db7b8fac57f"
+    },
+    "Ruth": {
+      "title": "Ruth",
+      "hebrew": "רות",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Ruth.xml",
+      "sha256": "fb6a2660383c7176941cb87b2be182ef634b66d49d057635869f4d9cb1f0a11e"
+    },
+    "1Sam": {
+      "title": "1 Samuel",
+      "hebrew": "שמואל א",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/1Sam.xml",
+      "sha256": "960432732c22286b82d80b6b25af8d10dc5f2e82a4e5e48b2e3a1b1eea17f3cb"
+    },
+    "2Sam": {
+      "title": "2 Samuel",
+      "hebrew": "שמואל ב",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/2Sam.xml",
+      "sha256": "e7793e141ed94eadbd2dfb23936abbb4062e81a7dcd41114a6e36644f50b8333"
+    },
+    "1Kgs": {
+      "title": "1 Kings",
+      "hebrew": "מלכים א",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/1Kgs.xml",
+      "sha256": "832ba10f605dce34c4888ee0a795d91edc2b293391d6ae9c36c36c6350761a3e"
+    },
+    "2Kgs": {
+      "title": "2 Kings",
+      "hebrew": "מלכים ב",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/2Kgs.xml",
+      "sha256": "056db5393beaef0a1159d9bcaac7dfd865df9bab2eb240ea90e9fa3f0c0e7449"
+    },
+    "1Chr": {
+      "title": "1 Chronicles",
+      "hebrew": "דברי הימים א",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/1Chr.xml",
+      "sha256": "8b59992b6607c6ca0fc423813be8cc244f011c1da32bc8485c0c0f581a897ed4"
+    },
+    "2Chr": {
+      "title": "2 Chronicles",
+      "hebrew": "דברי הימים ב",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/2Chr.xml",
+      "sha256": "507294e8ca0fcf31ec25fe62fa24a7f2581f53116519bf08cfe96ff85e9c99fb"
+    },
+    "Ezra": {
+      "title": "Ezra",
+      "hebrew": "עזרא",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Ezra.xml",
+      "sha256": "fb28ff697d0ee17eba5b4db47fb7261ee1870cea0d5701bfc77c9e28d4138129"
+    },
+    "Neh": {
+      "title": "Nehemiah",
+      "hebrew": "נחמיה",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Neh.xml",
+      "sha256": "be082e95c206469122455b9849d4dd08da50c817732d8198c1beece90402801a"
+    },
+    "Esth": {
+      "title": "Esther",
+      "hebrew": "אסתר",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Esth.xml",
+      "sha256": "f9b5b8adaf504dcac409bb6a27c9328967f47eeb4e920070cd53ef5301299019"
+    },
+    "Job": {
+      "title": "Job",
+      "hebrew": "איוב",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Job.xml",
+      "sha256": "7db3311184122f37a8fd52f3c7c0c4a6d2da7b77ee82f4fdb26bcba9171d297f"
+    },
+    "Ps": {
+      "title": "Psalms",
+      "hebrew": "תהלים",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Ps.xml",
+      "sha256": "fe55eef316a65fb0f46d833d526ca2fd722e86ff7339f1a39f0c5b7f9062ced2"
+    },
+    "Prov": {
+      "title": "Proverbs",
+      "hebrew": "משלי",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Prov.xml",
+      "sha256": "964f99c00239b53b854c4686c99490c8d1ac7664784a30afdfc23781a3abb161"
+    },
+    "Eccl": {
+      "title": "Ecclesiastes",
+      "hebrew": "קהלת",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Eccl.xml",
+      "sha256": "2dfc858d19048f6479eca33b9fe781c2d7e9059e9ae3ab0b37b802d3afec02bb"
+    },
+    "Song": {
+      "title": "Song of Songs",
+      "hebrew": "שיר השירים",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Song.xml",
+      "sha256": "5cd6ae36d32c059aaf794af5a5eaed914ac643486db3e412eb0b969760db82ca"
+    },
+    "Isa": {
+      "title": "Isaiah",
+      "hebrew": "ישעיהו",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Isa.xml",
+      "sha256": "0807678de609bdef284bed5400b94ddab570d101b593c7f59ae1939015572fa2"
+    },
+    "Jer": {
+      "title": "Jeremiah",
+      "hebrew": "ירמיהו",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Jer.xml",
+      "sha256": "1a7ad7bc26a2cae1d3964230e8eb73043bc1f32505cb86cd69a25261dc39f493"
+    },
+    "Lam": {
+      "title": "Lamentations",
+      "hebrew": "איכה",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Lam.xml",
+      "sha256": "be68fc6a913313367280c2596e28733ee8cf877c12a65227237733b40d0248c4"
+    },
+    "Ezek": {
+      "title": "Ezekiel",
+      "hebrew": "יחזקאל",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Ezek.xml",
+      "sha256": "90bf8adfa66b2f6695c702263fe668755c99c6afc386202c12de4f704f5d4e46"
+    },
+    "Dan": {
+      "title": "Daniel",
+      "hebrew": "דניאל",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Dan.xml",
+      "sha256": "bc69d0fa9708dacb11ea6d587509250bf1bcc1b4343eac2d6e97f8b41518fc0d"
+    },
+    "Hos": {
+      "title": "Hosea",
+      "hebrew": "הושע",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Hos.xml",
+      "sha256": "f38ae44a3a97d142768bd5f4d40e77b69265184f9a5aec9e6af1b9b226e8daae"
+    },
+    "Joel": {
+      "title": "Joel",
+      "hebrew": "יואל",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Joel.xml",
+      "sha256": "c0fefc6881afe949b023968106cdccc05a690734b8bb6e9aa48914d77e5369af"
+    },
+    "Amos": {
+      "title": "Amos",
+      "hebrew": "עמוס",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Amos.xml",
+      "sha256": "6ad94c6a18076762f1a458720c62156d354e5111ee25719b7792b70792d0084d"
+    },
+    "Obad": {
+      "title": "Obadiah",
+      "hebrew": "עבדיה",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Obad.xml",
+      "sha256": "1e893e552a7ed7e2e6d4048637ff5da8a2853a9e4432f4095cede80b959d850c"
+    },
+    "Jonah": {
+      "title": "Jonah",
+      "hebrew": "יונה",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Jonah.xml",
+      "sha256": "1e1afcc3aaba1399d5c884ee106894c6bfca87c8c81fa57783ab75a923eee17d"
+    },
+    "Mic": {
+      "title": "Micah",
+      "hebrew": "מיכה",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Mic.xml",
+      "sha256": "267e111adc1b941e32444816af07aa136ecde02cb315cd42597f78b393e67a01"
+    },
+    "Nah": {
+      "title": "Nahum",
+      "hebrew": "נחום",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Nah.xml",
+      "sha256": "5993b28bdbee3c922e3e93002d343a655493e8bd45e3472f3b62d77beadcb62c"
+    },
+    "Hab": {
+      "title": "Habakkuk",
+      "hebrew": "חבקוק",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Hab.xml",
+      "sha256": "2592b212d816775adc8dac46bd0c46263982c308a186dde64dfb8239c57bd2d1"
+    },
+    "Zeph": {
+      "title": "Zephaniah",
+      "hebrew": "צפניה",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Zeph.xml",
+      "sha256": "eb5bd2a745fba1ffeed31dfafd834ce7c290929c992390be1a2b9451d22dea2e"
+    },
+    "Hag": {
+      "title": "Haggai",
+      "hebrew": "חגי",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Hag.xml",
+      "sha256": "26ebbae4fe491cf89ce70e1264cbcbf66a562b497cb214b677e67a9a43ad545c"
+    },
+    "Zech": {
+      "title": "Zechariah",
+      "hebrew": "זכריה",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Zech.xml",
+      "sha256": "2e287c8d0e0abd3bf601eb8ef9b4ee6ca3ae12cf36c0ed1612a7dcca54a2e777"
+    },
+    "Mal": {
+      "title": "Malachi",
+      "hebrew": "מלאכי",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Mal.xml",
+      "sha256": "1583e6a701406dce7b8c2bf85e3522ec31383756de130685fc7c2eb6df8964b2"
+    }
+  },
+  "lexicon": {
+    "url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/b99716b0cddb648ddb95cc786a197180f2f97d48/Lexicons/TBESH%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Hebrew%20-%20STEPBible.org%20CC%20BY.txt",
+    "sha256": "464dccadd95fd8620dd05fa0d7a4caba58ec3c4d5db3ebf38e43d046ca25b591"
+  },
+  "notices": {
+    "oshb": {
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/LICENSE.md",
+      "sha256": "9bf4a2890c25372e4c1dc750d550bfb4eacfbfcb63c53123b0628159370d1878"
+    },
+    "step": {
+      "url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/b99716b0cddb648ddb95cc786a197180f2f97d48/README.md",
+      "sha256": "261d5157c0ffeadeedad3f734db945a4c3642e3e4ce5fa28002985b6c52437b1"
+    }
+  },
+  "attributions": [
+    "Original work of the Open Scriptures Hebrew Bible available at https://github.com/openscriptures/morphhb. WLC text: public domain; lemma and morphology annotations: CC BY 4.0.",
+    "STEP Bible https://www.STEPBible.org — short Gloss fields and lexical metadata, CC BY 4.0, based on work at Tyndale House Cambridge. Long Meaning definitions excluded."
+  ],
+  "transformations": [
+    "OSHB slash segmentation retained in source records and removed only for display.",
+    "STEP Gloss and lexical metadata imported; Meaning column omitted."
+  ]
+}

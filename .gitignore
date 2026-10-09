@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.tools/
+.reader/
+.uv-cache/
+test-results/
+build/
+dist/
+data/raw/
+data/derived/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Existing local layout reference; rights/provenance not yet identified.
+/mishle002.jpg

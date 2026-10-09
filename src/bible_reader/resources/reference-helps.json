@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "text_revision": "3d15126fb1ef74867fc1434be1942e837932691f",
+  "basis": "Observed word-marker placement mapped to OSHB source IDs. Distinct reference slots 2/10 and 14/21 intentionally remain separate. No scanned definitions are transcribed.",
+  "anchors": {
+    "20RXg:0": {
+      "chapter": 1,
+      "label": 90
+    },
+    "20pqY:0": {
+      "chapter": 1,
+      "label": 91
+    },
+    "20v5z:0": {
+      "chapter": 1,
+      "label": 92
+    },
+    "20bCC:0": {
+      "chapter": 1,
+      "label": 93
+    },
+    "206By:0": {
+      "chapter": 1,
+      "label": 94
+    },
+    "20VTb:0": {
+      "chapter": 1,
+      "label": 95
+    },
+    "203k3:0": {
+      "chapter": 1,
+      "label": 96
+    },
+    "201rL:0": {
+      "chapter": 1,
+      "label": 97
+    },
+    "20mL3:0": {
+      "chapter": 1,
+      "label": 98
+    },
+    "20zfc:0": {
+      "chapter": 1,
+      "label": 99
+    },
+    "20GvF:0": {
+      "chapter": 1,
+      "label": 100
+    },
+    "20dAC:0": {
+      "chapter": 1,
+      "label": 101
+    },
+    "20ecS:0": {
+      "chapter": 1,
+      "label": 102
+    },
+    "202tG:0": {
+      "chapter": 1,
+      "label": 103
+    },
+    "20Xzm:0": {
+      "chapter": 1,
+      "label": 104
+    },
+    "20xCL:0": {
+      "chapter": 2,
+      "label": 1
+    },
+    "206kU:0": {
+      "chapter": 2,
+      "label": 2
+    },
+    "20bvP:0": {
+      "chapter": 2,
+      "label": 3
+    },
+    "20qg1:0": {
+      "chapter": 2,
+      "label": 4
+    },
+    "20T2S:0": {
+      "chapter": 2,
+      "label": 4
+    },
+    "20e6B:0": {
+      "chapter": 2,
+      "label": 4
+    },
+    "2074R:0": {
+      "chapter": 2,
+      "label": 4
+    },
+    "20ibe:0": {
+      "chapter": 2,
+      "label": 5
+    },
+    "20v2F:0": {
+      "chapter": 2,
+      "label": 6
+    },
+    "207vt:0": {
+      "chapter": 2,
+      "label": 7
+    },
+    "20eRa:0": {
+      "chapter": 2,
+      "label": 8
+    },
+    "2063G:0": {
+      "chapter": 2,
+      "label": 9
+    },
+    "20koG:0": {
+      "chapter": 2,
+      "label": 9
+    },
+    "201Cv:0": {
+      "chapter": 2,
+      "label": 9
+    },
+    "20GpK:0": {
+      "chapter": 2,
+      "label": 10
+    },
+    "20CMz:0": {
+      "chapter": 2,
+      "label": 11
+    },
+    "20D4c:0": {
+      "chapter": 2,
+      "label": 12
+    },
+    "20JnD:0": {
+      "chapter": 2,
+      "label": 13
+    },
+    "20jfz:0": {
+      "chapter": 2,
+      "label": 14
+    },
+    "20ErQ:0": {
+      "chapter": 2,
+      "label": 15
+    },
+    "20jyT:0": {
+      "chapter": 2,
+      "label": 16
+    },
+    "20Unh:0": {
+      "chapter": 2,
+      "label": 16
+    },
+    "20hj3:0": {
+      "chapter": 2,
+      "label": 17
+    },
+    "206Lo:0": {
+      "chapter": 2,
+      "label": 18
+    },
+    "20mr5:0": {
+      "chapter": 2,
+      "label": 19
+    },
+    "20QDu:0": {
+      "chapter": 2,
+      "label": 20
+    },
+    "206zt:0": {
+      "chapter": 2,
+      "label": 21
+    },
+    "20Kz2:0": {
+      "chapter": 2,
+      "label": 22
+    }
+  }
+}

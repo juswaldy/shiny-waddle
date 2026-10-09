@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "title": "Hebrew reader — synthetic typesetting specimen",
+  "language": "hbo",
+  "source_notice": "Synthetic project-authored layout fixture. These are sample words and placeholder helps, not a biblical passage or sourced lexical definitions.",
+  "entries": [
+    {"id": "demo:v1:a", "headword": "אָב", "gloss": "Synthetic help A (layout only)."},
+    {"id": "demo:v1:b", "headword": "בֵּן", "gloss": "Synthetic help B (layout only)."}
+  ],
+  "verses": [
+    {
+      "reference": "Demo 1:1",
+      "tokens": [
+        {"id": "demo:1:1:1", "surface": "אָב", "entry_id": "demo:v1:a"},
+        {"id": "demo:1:1:2", "surface": "בֵּן", "entry_id": "demo:v1:b"}
+      ]
+    },
+    {
+      "reference": "Demo 1:2",
+      "tokens": [
+        {"id": "demo:1:2:1", "surface": "בֵּן", "entry_id": null},
+        {"id": "demo:1:2:2", "surface": "אָב", "entry_id": "demo:v1:a"}
+      ]
+    }
+  ]
+}

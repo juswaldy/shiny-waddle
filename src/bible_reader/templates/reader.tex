@@ -1,0 +1,26 @@
+% Generated from plain-text reader data. Compile using XeLaTeX.
+\documentclass[12pt]{article}
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setdefaultlanguage{english}
+\setotherlanguage{hebrew}
+\setmainfont{lmroman10-regular.otf}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf]
+\newfontfamily\hebrewfont[Script=Hebrew]{SBL Hebrew}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\begin{document}
+\begin{center}
+{\Large $title}
+\end{center}
+
+$verses
+
+\par\medskip\hrule\medskip
+\begin{english}
+\small
+$notes
+\par\bigskip
+{\footnotesize $source_notice}
+\end{english}
+\end{document}

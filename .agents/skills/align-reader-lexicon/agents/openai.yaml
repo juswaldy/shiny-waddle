@@ -1,0 +1,4 @@
+interface:
+  display_name: "Align Reader Lexicon"
+  short_description: "Join lexical helps and expose ambiguous matches"
+  default_prompt: "Use $align-reader-lexicon to align a passage with its lexicon and report unresolved matches."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Import Bible Source"
+  short_description: "Import pinned biblical data with provenance"
+  default_prompt: "Use $import-bible-source to add a source adapter and a small attributable fixture to this reader repo."

@@ -1,0 +1,31 @@
+{
+  "purpose": "Offline parser and editorial regression fixtures; genuine upstream excerpts, not complete source editions.",
+  "upstream": {
+    "oshb_revision": "3d15126fb1ef74867fc1434be1942e837932691f",
+    "step_revision": "b99716b0cddb648ddb95cc786a197180f2f97d48",
+    "text": {
+      "title": "Proverbs",
+      "hebrew": "משלי",
+      "url": "https://raw.githubusercontent.com/openscriptures/morphhb/3d15126fb1ef74867fc1434be1942e837932691f/wlc/Prov.xml",
+      "sha256": "964f99c00239b53b854c4686c99490c8d1ac7664784a30afdfc23781a3abb161"
+    },
+    "lexicon": {
+      "url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/b99716b0cddb648ddb95cc786a197180f2f97d48/Lexicons/TBESH%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Hebrew%20-%20STEPBible.org%20CC%20BY.txt",
+      "sha256": "464dccadd95fd8620dd05fa0d7a4caba58ec3c4d5db3ebf38e43d046ca25b591"
+    }
+  },
+  "transformations": [
+    "OSHB XML reserialized with ElementTree; chapters 1–2 retained. Logical Unicode word text, attributes and annotations preserved.",
+    "TBESH entries referenced by Proverbs 1–2 retained, columns 1–7 preserved. Column 8 (Meaning) removed and left empty."
+  ],
+  "attributions": [
+    "Original work of the Open Scriptures Hebrew Bible available at https://github.com/openscriptures/morphhb. WLC text: public domain; lemma and morphology annotations: CC BY 4.0.",
+    "STEP Bible https://www.STEPBible.org — short Gloss fields and lexical metadata, CC BY 4.0, based on work at Tyndale House Cambridge. Long Meaning definitions excluded."
+  ],
+  "files": {
+    "OSHB-LICENSE.md": "9bf4a2890c25372e4c1dc750d550bfb4eacfbfcb63c53123b0628159370d1878",
+    "STEP-README.md": "261d5157c0ffeadeedad3f734db945a4c3642e3e4ce5fa28002985b6c52437b1",
+    "Prov.xml": "354bc052f1ae994d4d64f42a656abba89a63e751a09272f4bc845156d0f9ad91",
+    "TBESH.txt": "6c2f2ab7dacc9083d9f52417376272ceef97eadd1add69b16f2553cc623c72e1"
+  }
+}

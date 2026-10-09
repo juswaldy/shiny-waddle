@@ -1,0 +1,8 @@
+{
+  "schema_version": 2,
+  "name": "Proverbs reader — reference proof",
+  "book": "Prov",
+  "passage": "1:29-2:12",
+  "selection": "reference",
+  "layout": {"first_folio": 1329}
+}

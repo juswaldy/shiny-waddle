@@ -1,0 +1,4 @@
+interface:
+  display_name: "Typeset Bible Reader"
+  short_description: "Build and inspect Hebrew reader LaTeX and PDFs"
+  default_prompt: "Use $typeset-bible-reader to render a reader document and verify its typography and lexical notes."
