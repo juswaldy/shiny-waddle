@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import tarfile
 from pathlib import Path
-from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = {
@@ -26,18 +25,42 @@ def acquire(directory, name):
     url, checksum = ASSETS[name]
     archive = directory / name
     if not archive.exists():
+        if shutil.which("curl") is None:
+            raise RuntimeError("Install curl to download the pinned TeX archives")
         print(f"Downloading {name}", flush=True)
         partial = archive.with_suffix(archive.suffix + ".part")
         try:
-            with (
-                urlopen(
-                    Request(url, headers={"User-Agent": "BibleReader-Setup/0.2"}), timeout=120
-                ) as response,
-                partial.open("wb") as output,
-            ):
-                shutil.copyfileobj(response, output)
-            if hashlib.sha256(partial.read_bytes()).hexdigest() != checksum:
-                raise RuntimeError(f"Checksum mismatch for {name}; not installed")
+            # texlive.info serves a bot challenge to urllib clients. Use curl's
+            # normal request, then verify the archive before promoting the download.
+            response = subprocess.run(
+                [
+                    "curl",
+                    "--fail",
+                    "--location",
+                    "--silent",
+                    "--show-error",
+                    "--max-time",
+                    "120",
+                    "--output",
+                    str(partial),
+                    "--write-out",
+                    "%{content_type}",
+                    url,
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            )
+            if response.stdout.lower().startswith("text/html"):
+                raise RuntimeError(
+                    f"Download of {name} returned HTML instead of an archive from {url}; "
+                    "the host may be serving a bot challenge or error page; not installed"
+                )
+            actual = hashlib.sha256(partial.read_bytes()).hexdigest()
+            if actual != checksum:
+                raise RuntimeError(
+                    f"Checksum mismatch for {name} from {url}: expected {checksum}, got {actual}; not installed"
+                )
             partial.replace(archive)
         finally:
             partial.unlink(missing_ok=True)

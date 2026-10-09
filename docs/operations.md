@@ -3,10 +3,12 @@
 ## Environment
 
 The supported release target is Linux x86-64, including Ubuntu under WSL, with
-Python 3.11+ (use a maintained patch release). Python dependencies are locked in
-`uv.lock`. `scripts/setup_tex.py` installs TinyTeX v2026.10 plus bidi revision 77682
+Python 3.11+ (use a maintained patch release), uv, and curl. Python dependencies
+are locked in `uv.lock`. `scripts/setup_tex.py` installs TinyTeX v2026.10 plus bidi revision 77682
 from an archived TeX Live repository; both downloads have SHA-256 pins. The script
-is idempotent, does not change system TeX, and can use an alternate `--directory`.
+uses curl because the archive host can return HTML bot challenges to Python's
+HTTP client. HTML responses and checksum mismatches are rejected before extraction.
+The script is idempotent, does not change system TeX, and can use an alternate `--directory`.
 The application discovers the default `.tools/.TinyTeX` relative to the working
 directory. Set `READER_XELATEX` when running an installed wheel elsewhere.
 

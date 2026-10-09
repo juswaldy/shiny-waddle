@@ -11,7 +11,7 @@ helps beside the verses that need them. The reference edition is Proverbs
 ## Start
 
 Supported release environment: **Linux x86-64 / WSL, Python 3.11+**. The setup uses
-[uv](https://docs.astral.sh/uv/getting-started/installation/) and installs pinned
+[uv](https://docs.astral.sh/uv/getting-started/installation/) and curl to install pinned
 Python dependencies and a project-local TeX distribution; no sudo is needed.
 Network access is needed for setup and source import. Subsequent builds are offline.
 
