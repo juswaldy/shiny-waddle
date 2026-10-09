@@ -88,3 +88,21 @@ def test_custom_paper_settings_and_build_snapshot(client):
         ).status_code
         == 422
     )
+
+
+@pytest.mark.parametrize("policy", ["consonants-only", "consonants", "consonants-maqqef-sof-pasuq"])
+def test_consonant_policy_is_saved_reviewed_and_snapshotted(client, policy):
+    project = client.post("/api/projects", json={}).json()
+    assert project["config"]["cantillation"] == "hide"
+    url = f"/api/projects/{project['id']}"
+    project["config"]["cantillation"] = policy
+    saved = client.put(url, json={"revision": 1, "config": project["config"]})
+    assert saved.status_code == 200
+    assert client.get(url).json()["config"]["cantillation"] == policy
+    review = client.get(url + "/review").json()
+    assert review["verses"][0]["tokens"][0]["surface"] == "תחת"
+    assert review["verses"][0]["tokens"][2]["surface"] == ("" if policy == "consonants-only" else "־")
+    queued = client.post(url + "/builds").json()
+    project["config"]["cantillation"] = "preserve"
+    assert client.put(url, json={"revision": 2, "config": project["config"]}).status_code == 200
+    assert client.get(f"/api/jobs/{queued['id']}").json()["config"]["cantillation"] == policy

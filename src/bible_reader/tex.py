@@ -256,6 +256,9 @@ def verse_content(verse: dict, document: ReaderDocument, prefix: str):
     parts = []
     previous = None
     for token in verse["tokens"]:
+        # Hidden punctuation remains in source records without affecting spacing.
+        if not token["surface"]:
+            continue
         kind = token["kind"]
         if kind in {"x-pe", "x-samekh"}:
             parts.append(r"\quad " + word_tex(token, document, prefix))

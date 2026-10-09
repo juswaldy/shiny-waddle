@@ -69,6 +69,11 @@ with (OUTPUT / "server.log").open("w") as log:
             page.locator("#paper-height").fill("230.25")
             expect(page.locator("#verse-layout")).to_have_value("continuous")
             page.locator("#verse-layout").select_option("verse-per-line")
+            expect(page.locator("#cantillation")).to_have_value("hide")
+            expect(page.locator('#cantillation option[value="consonants"]')).to_have_text(
+                "Consonants + maqqef"
+            )
+            page.locator("#cantillation").select_option(label="Consonants only")
             page.get_by_role("button", name="Save settings", exact=True).click()
             expect(page.locator("#notice")).to_have_text("Edition settings saved")
             row = page.locator('[data-anchor="20qg1:0"]')
@@ -80,6 +85,7 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(page.locator("#paper-width")).to_have_value("160.5")
             expect(page.locator("#paper-height")).to_have_value("230.25")
             expect(page.locator("#verse-layout")).to_have_value("verse-per-line")
+            expect(page.locator("#cantillation")).to_have_value("consonants-only")
             expect(page.locator('[data-anchor="20qg1:0"] textarea')).to_have_value(
                 "Editorial browser test gloss"
             )
@@ -96,17 +102,28 @@ with (OUTPUT / "server.log").open("w") as log:
             bundle = page.request.get(url + page.locator("#download-bundle").get_attribute("href"))
             assert bundle.ok and bundle.body().startswith(b"PK")
             (OUTPUT / "downloaded-bundle.zip").write_bytes(bundle.body())
-            # Switching the layout must reach the immutable worker build config.
+            # Layout and consonant choices must reach the immutable worker build config.
             page.locator("#project-form summary").click()
             page.locator("#paper").select_option("reader")
             expect(page.locator("#custom-paper")).to_be_hidden()
             expect(page.locator("#paper-height")).to_be_disabled()
             page.locator("#verse-layout").select_option("continuous")
-            previous_pdf = page.locator("#download-pdf").get_attribute("href")
-            page.locator("#build").click()
-            expect(page.locator("#download-pdf")).not_to_have_attribute("href", previous_pdf, timeout=90_000)
-            expect(page.locator("#download-pdf")).to_be_visible(timeout=90_000)
-            assert page.locator("#download-pdf").get_attribute("href") != previous_pdf
+            for policy, filename in [
+                ("consonants", "maqqef-reader.pdf"),
+                ("consonants-maqqef-sof-pasuq", "default-reader.pdf"),
+            ]:
+                page.locator("#cantillation").select_option(policy)
+                previous_pdf = page.locator("#download-pdf").get_attribute("href")
+                page.locator("#build").click()
+                expect(page.locator("#download-pdf")).not_to_have_attribute(
+                    "href", previous_pdf, timeout=90_000
+                )
+                expect(page.locator("#download-pdf")).to_be_visible(timeout=90_000)
+                pdf = page.request.get(url + page.locator("#download-pdf").get_attribute("href"))
+                (OUTPUT / filename).write_bytes(pdf.body())
+                for pdf_page in PdfReader(OUTPUT / filename).pages:
+                    assert abs(float(pdf_page.mediabox.width) * 25.4 / 72 - 140) < 0.01
+                    assert abs(float(pdf_page.mediabox.height) * 25.4 / 72 - 216) < 0.01
             jobs = page.request.get(url + "/api/jobs").json()
             successful_builds = [j for j in jobs if j["kind"] == "build" and j["status"] == "succeeded"]
             assert {j["config"]["layout"]["verse_layout"] for j in successful_builds} == {
@@ -114,11 +131,11 @@ with (OUTPUT / "server.log").open("w") as log:
                 "verse-per-line",
             }
             assert {j["config"]["layout"]["paper"] for j in successful_builds} == {"reader", "custom"}
-            default_pdf = page.request.get(url + page.locator("#download-pdf").get_attribute("href"))
-            (OUTPUT / "default-reader.pdf").write_bytes(default_pdf.body())
-            for pdf_page in PdfReader(OUTPUT / "default-reader.pdf").pages:
-                assert abs(float(pdf_page.mediabox.width) * 25.4 / 72 - 140) < 0.01
-                assert abs(float(pdf_page.mediabox.height) * 25.4 / 72 - 216) < 0.01
+            assert {j["config"]["cantillation"] for j in successful_builds} == {
+                "consonants-only",
+                "consonants",
+                "consonants-maqqef-sof-pasuq",
+            }
             page.evaluate("window.scrollTo(0, 0)")
             page.wait_for_timeout(
                 2000
@@ -158,6 +175,7 @@ with (OUTPUT / "server.log").open("w") as log:
                         "edit",
                         "persist",
                         "verse layout selection, reload, and both PDF builds",
+                        "consonant policy selection, reload, and all three PDF builds",
                         "default/custom paper selection, validation, persistence, and actual PDF dimensions",
                         "real PDF build",
                         "PDF and bundle download",

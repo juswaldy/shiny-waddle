@@ -2,6 +2,7 @@
 
 import json
 import re
+import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import asdict
 from importlib.resources import files
@@ -11,12 +12,32 @@ from .models import ProjectConfig, ReaderDocument, ReaderError, digest, parse_pa
 from .sources import catalog, lemma_keys, load_book, load_lexicon
 
 STEMS = {"q": "Qal", "N": "Nif", "p": "Piel", "P": "Pual", "h": "Hif", "H": "Hof", "t": "Hitp"}
+CONSONANT_PUNCTUATION = {"consonants-only": "", "consonants": "־", "consonants-maqqef-sof-pasuq": "־׃"}
+DISPLAY_TRANSFORMATIONS = {
+    "preserve": "Display policy preserve: source Hebrew points, accents, and punctuation retained.",
+    "hide": "Display policy hide: only Hebrew accents U+0591–U+05AF hidden; vowel points retained.",
+    "consonants-only": "Display policy consonants-only: Hebrew combining marks and punctuation hidden.",
+    "consonants": "Display policy consonants: Hebrew combining marks and punctuation hidden except maqqef.",
+    "consonants-maqqef-sof-pasuq": (
+        "Display policy consonants-maqqef-sof-pasuq: Hebrew combining marks and punctuation hidden "
+        "except maqqef and sof pasuq."
+    ),
+}
 
 
 def display_surface(raw: str, cantillation: str) -> str:
+    """Transform display text only, without normalizing source Unicode."""
     value = raw.replace("/", "")
     if cantillation == "hide":
         value = "".join(c for c in value if not ("\u0591" <= c <= "\u05af"))
+    elif cantillation in CONSONANT_PUNCTUATION:
+        retained = CONSONANT_PUNCTUATION[cantillation]
+        value = "".join(
+            c
+            for c in value
+            if c in retained
+            or not ("\u0590" <= c <= "\u05ff" and unicodedata.category(c).startswith(("M", "P")))
+        )
     return value
 
 
@@ -213,7 +234,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
             "oshb_revision": info["oshb_revision"],
             "step_revision": info["step_revision"],
             "attributions": info["attributions"],
-            "transformations": info["transformations"],
+            "transformations": info["transformations"] + [DISPLAY_TRANSFORMATIONS[config.cantillation]],
         },
         warnings=warnings,
     )

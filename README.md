@@ -61,6 +61,17 @@ The **Verse layout** selector under **Page & reading settings** offers **Continu
 text** (the default) and **One verse per line**. In a project file set
 `layout.verse_layout` to `"continuous"` or `"verse-per-line"`; long verses can wrap
 in either mode. Projects without this setting use continuous text.
+
+The **Cantillation** selector also offers **Consonants only**, **Consonants +
+maqqef**, and **Consonants + maqqef + sof pasuq**. All three hide Hebrew combining
+marks, including vowels, dagesh, and shin/sin dots. Consonants only hides all Hebrew
+punctuation; the other options retain maqqef (־), or maqqef and sof pasuq (׃).
+Set `cantillation` to `"consonants-only"`, `"consonants"`, or
+`"consonants-maqqef-sof-pasuq"`, respectively, in JSON/TOML projects. The existing
+`"consonants"` setting keeps its maqqef behavior. Source text, K/Q readings,
+section letters, and lexical headwords stay intact. The default remains `"hide"`
+(hide accents, retain vowel points); `"preserve"` retains source accents.
+
 The reference help selection applies to Proverbs 1:29–2:12. For other passages choose
 `all` or `book-frequency`; the latter counts occurrences in the entire selected
 source book. `known_entries` and per-anchor `decisions` support exclusions and
