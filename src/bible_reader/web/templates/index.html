@@ -35,8 +35,8 @@
           <div class="paired"><div><label for="body-pt">Text size</label><input id="body-pt" type="number" min="12" max="26" step="0.5"></div><div><label for="leading-pt">Line spacing</label><input id="leading-pt" type="number" min="16" max="38" step="0.5"></div></div>
           <div class="paired"><div><label for="notes-pt">Note size</label><input id="notes-pt" type="number" min="7.5" max="14" step="0.5"></div><div><label for="folio">First page</label><input id="folio" type="number" min="1" max="99999"></div></div>
           <label for="readings">Written / read forms</label><select id="readings"><option value="both">Both, with K / Q labels</option><option value="qere">Read form (qere)</option><option value="ketiv">Written form (ketiv)</option></select>
-          <label for="cantillation">Cantillation</label><select id="cantillation"><option value="hide">Hide accents; retain vowel points</option><option value="preserve">Preserve source accents</option><option value="consonants">Consonants only</option><option value="consonants-maqqef-sof-pasuq">Consonants + maqqef + sof pasuq</option></select>
-          <p class="hint">Both consonant options retain maqqef; the second also retains sof pasuq.</p>
+          <label for="cantillation">Cantillation</label><select id="cantillation"><option value="hide">Hide accents; retain vowel points</option><option value="preserve">Preserve source accents</option><option value="consonants-only">Consonants only</option><option value="consonants">Consonants + maqqef</option><option value="consonants-maqqef-sof-pasuq">Consonants + maqqef + sof pasuq</option></select>
+          <p class="hint">Consonant options remove Hebrew points and accents.</p>
         </details>
         <button type="submit" class="secondary full">Save settings</button>
       </form>

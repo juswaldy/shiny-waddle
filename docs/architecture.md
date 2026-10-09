@@ -48,11 +48,13 @@ Source `Verse` records preserve ordered `Token`s and serialized source annotatio
 A token keeps its OSHB ID, raw surface, lemma/morphology codes, word/separator kind,
 normal/ketiv/qere reading, language, and source XML. Display strings remove slash
 segmentation. The default `hide` accent policy removes only U+0591–U+05AF;
-`preserve` retains source accents. `consonants` hides Hebrew combining marks and
-punctuation except maqqef; `consonants-maqqef-sof-pasuq` retains maqqef and sof pasuq
-while hiding the other Hebrew marks and punctuation. Other-script characters and section letters
-remain intact. Hidden separator tokens remain in the document with an empty display
-surface; TeX skips them without altering word spacing. These policies apply
+`preserve` retains source accents. `consonants-only` hides Hebrew combining marks
+and punctuation. The existing `consonants` setting hides Hebrew combining marks
+and punctuation except maqqef and is labeled **Consonants + maqqef**;
+`consonants-maqqef-sof-pasuq` retains maqqef and sof pasuq while hiding the other
+Hebrew marks and punctuation. Other-script characters and section letters remain
+intact. Hidden separator tokens remain in the document with an empty display
+surface; TeX skips them so hidden maqqef becomes ordinary word spacing. These policies apply
 to scripture and review surfaces; lexical headwords retain their source pointing.
 The chosen transformation is recorded in the source lock and credits. Raw surfaces
 remain unchanged. Source IDs are interpreted within the pinned book/revision in the lock.

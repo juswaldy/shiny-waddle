@@ -60,7 +60,11 @@ def test_source_unicode_is_separate_from_display(source_state):
 
 @pytest.mark.parametrize(
     "policy,expected",
-    [("consonants", "בראשית־שר"), ("consonants-maqqef-sof-pasuq", "בראשית־שר׃")],
+    [
+        ("consonants-only", "בראשיתשר"),
+        ("consonants", "בראשית־שר"),
+        ("consonants-maqqef-sof-pasuq", "בראשית־שר׃"),
+    ],
 )
 def test_consonant_display_removes_hebrew_points_and_only_retains_chosen_punctuation(policy, expected):
     raw = "בְּ/רֵאשִׁ֖יתֽ־שָׂר׃׀׆\u05bf\u05c4\u05c5\u05c7\u05f3\u05f4"
@@ -68,7 +72,7 @@ def test_consonant_display_removes_hebrew_points_and_only_retains_chosen_punctua
     assert display_surface("אָב פ ס α\u0301 e\u0301 123.", policy) == "אב פ ס α\u0301 e\u0301 123."
 
 
-@pytest.mark.parametrize("policy", ["consonants", "consonants-maqqef-sof-pasuq"])
+@pytest.mark.parametrize("policy", ["consonants-only", "consonants", "consonants-maqqef-sof-pasuq"])
 def test_consonant_policies_preserve_source_records_readings_and_help_selection(source_state, policy):
     original = build_document(source_state, ProjectConfig(cantillation="preserve"))
     document = build_document(source_state, ProjectConfig(cantillation=policy))
@@ -82,7 +86,7 @@ def test_consonant_policies_preserve_source_records_readings_and_help_selection(
                 k: v for k, v in displayed.items() if k != "surface"
             }
             if displayed["kind"] == "x-maqqef":
-                assert displayed["surface"] == "־"
+                assert displayed["surface"] == ("" if policy == "consonants-only" else "־")
             elif displayed["kind"] == "x-sof-pasuq":
                 assert displayed["surface"] == ("׃" if policy == "consonants-maqqef-sof-pasuq" else "")
     assert {r["reading"] for r in document.review} >= {"ketiv", "qere"}
@@ -92,13 +96,14 @@ def test_consonant_policies_preserve_source_records_readings_and_help_selection(
     assert editorial.DISPLAY_TRANSFORMATIONS[policy] in document.sources["transformations"]
 
 
-@pytest.mark.parametrize("policy", ["consonants", "consonants-maqqef-sof-pasuq"])
-def test_consonant_tex_keeps_maqqef_attached_and_skips_hidden_punctuation(source_state, policy):
+@pytest.mark.parametrize("policy", ["consonants-only", "consonants", "consonants-maqqef-sof-pasuq"])
+def test_consonant_tex_respects_maqqef_choice_and_skips_hidden_punctuation(source_state, policy):
     document = build_document(source_state, ProjectConfig(passage="1:29", cantillation=policy))
     verse = document.verses[0]
     # Actual source words/separator; omit helps here to inspect word boundaries.
     first = [{**t, "helps": []} for t in verse["tokens"][1:4]]
-    assert verse_content({"tokens": first}, document, "test") == r"\mbox{כי}־\mbox{שנאו}"
+    expected = r"\mbox{כי} \mbox{שנאו}" if policy == "consonants-only" else r"\mbox{כי}־\mbox{שנאו}"
+    assert verse_content({"tokens": first}, document, "test") == expected
     hidden = {"surface": "", "kind": "x-paseq"}
     assert verse_content({"tokens": [first[0], hidden, first[2]]}, document, "test") == (
         r"\mbox{כי} \mbox{שנאו}"

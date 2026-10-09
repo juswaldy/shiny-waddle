@@ -108,7 +108,7 @@ def test_accents_and_single_verse_chapter_opening(source_state, tmp_path, tex_av
     assert result["verse_count"] == 1
 
 
-@pytest.mark.parametrize("policy", ["consonants", "consonants-maqqef-sof-pasuq"])
+@pytest.mark.parametrize("policy", ["consonants-only", "consonants", "consonants-maqqef-sof-pasuq"])
 @pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
 def test_consonant_policies_build_verified_pdf(source_state, tmp_path, tex_available, policy, verse_layout):
     config = ProjectConfig(cantillation=policy, layout={"verse_layout": verse_layout})
@@ -122,7 +122,8 @@ def test_consonant_policies_build_verified_pdf(source_state, tmp_path, tex_avail
     document = json.loads((output / "reader.v2.json").read_text())
     assert document["config"]["cantillation"] == policy
     first = document["verses"][0]["tokens"]
-    assert [t["surface"] for t in first[:4]] == ["תחת", "כי", "־", "שנאו"]
+    maqqef = "" if policy == "consonants-only" else "־"
+    assert [t["surface"] for t in first[:4]] == ["תחת", "כי", maqqef, "שנאו"]
     assert first[-1]["surface"] == ("׃" if policy == "consonants-maqqef-sof-pasuq" else "")
     assert first[1]["source_surface"] == "כִּי"
 

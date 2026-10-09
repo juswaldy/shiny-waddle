@@ -60,7 +60,7 @@ def test_custom_paper_in_json_and_toml(tmp_path):
     assert load_config(None).layout.paper == "reader"
 
 
-@pytest.mark.parametrize("policy", ["consonants", "consonants-maqqef-sof-pasuq"])
+@pytest.mark.parametrize("policy", ["consonants-only", "consonants", "consonants-maqqef-sof-pasuq"])
 def test_consonant_policy_in_json_and_toml(tmp_path, policy):
     json_config = tmp_path / "consonants.json"
     json_config.write_text(json.dumps({"cantillation": policy}))

@@ -62,11 +62,13 @@ text** (the default) and **One verse per line**. In a project file set
 `layout.verse_layout` to `"continuous"` or `"verse-per-line"`; long verses can wrap
 in either mode. Projects without this setting use continuous text.
 
-The **Cantillation** selector also offers **Consonants only** and **Consonants +
-maqqef + sof pasuq**. Both hide Hebrew combining marks, including vowels, dagesh,
-and shin/sin dots, and retain maqqef (־). The second additionally retains sof pasuq
-(׃); other Hebrew punctuation is hidden. Set `cantillation` to `"consonants"` or
-`"consonants-maqqef-sof-pasuq"` in JSON/TOML projects. Source text, K/Q readings,
+The **Cantillation** selector also offers **Consonants only**, **Consonants +
+maqqef**, and **Consonants + maqqef + sof pasuq**. All three hide Hebrew combining
+marks, including vowels, dagesh, and shin/sin dots. Consonants only hides all Hebrew
+punctuation; the other options retain maqqef (־), or maqqef and sof pasuq (׃).
+Set `cantillation` to `"consonants-only"`, `"consonants"`, or
+`"consonants-maqqef-sof-pasuq"`, respectively, in JSON/TOML projects. The existing
+`"consonants"` setting keeps its maqqef behavior. Source text, K/Q readings,
 section letters, and lexical headwords stay intact. The default remains `"hide"`
 (hide accents, retain vowel points); `"preserve"` retains source accents.
 
