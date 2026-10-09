@@ -203,6 +203,9 @@ header + header gap + scripture blocks + chapter gaps
 
 Do not allocate scripture to pages first and append all notes afterward. A
 candidate page's note set changes when a verse crosses its boundary.
+Measure this complete assembly with the final page macros and actual selected
+font. Fixed header/separator allowances must not leave usable space unavailable
+to scripture and notes.
 
 **R17 — Breaking rules.** Prefer page breaks between verses. Keep a chapter box
 with its opening group. Keep ordinary short verses and all their notes on one

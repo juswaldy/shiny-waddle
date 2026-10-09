@@ -37,9 +37,13 @@ establish physical paper size. Defaults are Ezra SIL 18 pt / 23.5 pt leading and
 9 pt notes. Latin Modern is loaded by its TeX font filenames. Type sizes, leading,
 folio, accent policy, reading policy, and font choice are validated project settings.
 
-The planner measures complete candidate scripture boxes and their unique notes in
-TeX scaled points, in batches per page. It reserves conservative header/separator
-space, selects the fullest legal fitting prefix, and emits explicit page breaks.
+The planner measures each complete candidate page in TeX scaled points, in batches
+per page: its actual header, scripture box, separator spacing, and unique notes.
+Measurement and final output share the same page assembly, so unused fixed
+allowances cannot push fitting verses to the next page. It selects the fullest
+legal fitting prefix against TeX's actual text height and emits explicit breaks.
+Page plans retain scripture/note heights, complete page height, usable height,
+and the content budget derived from the measured header and separator.
 The `layout.verse_layout` setting chooses `continuous` (default) or
 `verse-per-line`. The app exposes it as **Verse layout** in page settings.
 Continuous scripture flows in justified RTL paragraphs with inline LTR verse

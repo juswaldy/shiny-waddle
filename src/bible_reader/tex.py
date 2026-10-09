@@ -9,6 +9,7 @@ import shutil
 import signal
 import subprocess
 import time
+from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
@@ -26,6 +27,23 @@ PAPERS = {
     "letter": (215.9, 279.4, 16),
 }
 PT_PER_MM = 72.27 / 25.4
+
+
+@dataclass(frozen=True)
+class PageMeasurement:
+    text_height_sp: int
+    notes_height_sp: int
+    page_height_sp: int
+    usable_height_sp: int
+
+    @property
+    def fits(self):
+        return self.page_height_sp <= self.usable_height_sp
+
+    @property
+    def budget_sp(self):
+        overhead = self.page_height_sp - self.text_height_sp - self.notes_height_sp
+        return self.usable_height_sp - overhead
 
 
 def paper_dimensions(layout: dict) -> tuple[float, float, float]:
@@ -211,6 +229,12 @@ def preamble(layout: dict) -> str:
   {{\hebrewfont\fontsize{{18}}{{20}}\selectfont #2}}\hfil\llap{{\fontsize{{10}}{{12}}\selectfont #3}}}}\vskip3pt\hrule height0.35pt\vskip9pt}}
 \newbox\BodyBox
 \newbox\NotesBox
+\newbox\PageBox
+\newcommand{{\ReaderPage}}[3]{{%
+  \Header{{#1}}{{#2}}{{#3}}%
+  \copy\BodyBox\vfil\vskip8pt\hrule height0.35pt\vskip5pt
+  \copy\NotesBox\kern0pt
+}}
 \newwrite\Metrics
 \begin{{document}}
 """
@@ -312,25 +336,40 @@ def contents(groups: list, document: ReaderDocument, prefix: str):
     return r"\Scripture{" + "\n".join(scripture) + "}", r"\Notes{" + "\n".join(notes) + "}", note_ids
 
 
-def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDocument):
+def page_tex(groups: list, document: ReaderDocument, prefix: str, folio: int):
+    scripture, notes, _ = contents(groups, document, prefix)
+    first = groups[0][0]["reference"].split(".")
+    last = groups[-1][-1]["reference"].split(".")
+    passage = f"{first[-2]}:{first[-1]}"
+    if first != last:
+        passage += f"–{last[-2]}:{last[-1]}"
+    title = escape_latex(catalog()["books"][document.config["book"]]["hebrew"])
+    boxes = (
+        "\\setbox\\BodyBox=\\vbox{\\hsize=\\linewidth\n" + scripture + "}\n"
+        "\\setbox\\NotesBox=\\vbox{\\hsize=\\linewidth\n" + notes + "}\n"
+    )
+    return boxes, rf"\ReaderPage{{{passage}}}{{{title}}}{{{folio}}}"
+
+
+def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDocument, folio: int):
     body = [preamble(document.config["layout"]), r"\immediate\openout\Metrics=measure.metrics"]
     for index, candidate in enumerate(candidates):
-        scripture, notes, _ = contents(candidate, document, f"measure{index}")
+        boxes, page = page_tex(candidate, document, f"measure{index}", folio)
         body.extend(
             [
-                "\\setbox\\BodyBox=\\vbox{\\hsize=\\linewidth\n" + scripture + "}\n",
-                "\\setbox\\NotesBox=\\vbox{\\hsize=\\linewidth\n" + notes + "}\n",
-                rf"\immediate\write\Metrics{{{index}|\number\dimexpr\ht\BodyBox+\dp\BodyBox\relax|\number\dimexpr\ht\NotesBox+\dp\NotesBox\relax}}",
+                boxes,
+                r"\setbox\PageBox=\vbox{\hsize=\linewidth " + page + "}",
+                rf"\immediate\write\Metrics{{{index}|\number\dimexpr\ht\BodyBox+\dp\BodyBox\relax|\number\dimexpr\ht\NotesBox+\dp\NotesBox\relax|\number\dimexpr\ht\PageBox+\dp\PageBox\relax|\number\textheight}}",
             ]
         )
     body.extend([r"\immediate\closeout\Metrics", r"\end{document}"])
     compiler.compile("measure", "\n".join(body))
     result = []
     for line in (compiler.directory / "measure.metrics").read_text().splitlines():
-        index, scripture, notes = map(int, line.split("|"))
+        index, scripture, notes, page, usable = map(int, line.split("|"))
         if index != len(result):
             raise ReaderError("TeX measurement records are out of order")
-        result.append((scripture, notes))
+        result.append(PageMeasurement(scripture, notes, page, usable))
     if len(result) != len(candidates):
         raise ReaderError("Missing TeX measurements")
     return result
@@ -340,15 +379,13 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
     layout = document.config["layout"]
     _, height, margin = paper_dimensions(layout)
     usable_pt = (height - 2 * margin) * PT_PER_MM
-    # Header and separator spacing: deliberately conservative, final box is measured again.
-    overhead_pt = 55
-    budget_sp = int((usable_pt - overhead_pt) * 65536)
     remaining = blocks(document)
     plans = []
     while remaining:
         if compiler.cancelled():
             raise Cancelled("Build cancelled")
         progress(f"Measuring page {len(plans) + 1}")
+        folio = layout["first_folio"] + len(plans)
         batch_size = int(usable_pt / layout["leading_pt"]) + 2
         candidates = []
         metrics = []
@@ -359,10 +396,10 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
             stop = min(len(remaining), len(candidates) + batch_size)
             batch = [remaining[:n] for n in range(start, stop + 1)]
             candidates.extend(batch)
-            metrics.extend(measure_candidates(compiler, batch, document))
-            if sum(metrics[-1]) > budget_sp:
+            metrics.extend(measure_candidates(compiler, batch, document, folio))
+            if not metrics[-1].fits:
                 break
-        fitting = [i for i, (text, notes) in enumerate(metrics) if text + notes <= budget_sp]
+        fitting = [i for i, measurement in enumerate(metrics) if measurement.fits]
         if not fitting:
             raise ReaderError(
                 f"Layout overflow at {remaining[0][0]['reference']}: a verse/opening and its notes cannot fit. Increase page size or shorten reviewed glosses."
@@ -374,14 +411,16 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
         plans.append(
             {
                 "page": len(plans) + 1,
-                "folio": layout["first_folio"] + len(plans),
+                "folio": folio,
                 "first": verses[0]["reference"],
                 "last": verses[-1]["reference"],
                 "references": [v["reference"] for v in verses],
                 "help_ids": notes,
-                "text_height_sp": metrics[chosen][0],
-                "notes_height_sp": metrics[chosen][1],
-                "budget_sp": budget_sp,
+                "text_height_sp": metrics[chosen].text_height_sp,
+                "notes_height_sp": metrics[chosen].notes_height_sp,
+                "page_height_sp": metrics[chosen].page_height_sp,
+                "usable_height_sp": metrics[chosen].usable_height_sp,
+                "budget_sp": metrics[chosen].budget_sp,
                 "groups": groups,
             }
         )
@@ -391,19 +430,11 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
 
 def final_tex(document: ReaderDocument, plans: list):
     body = [preamble(document.config["layout"])]
-    title = escape_latex(catalog()["books"][document.config["book"]]["hebrew"])
     for plan in plans:
-        scripture, notes, _ = contents(plan["groups"], document, f"p{plan['page']}")
-        first = plan["first"].split(".")
-        last = plan["last"].split(".")
-        passage = f"{first[-2]}:{first[-1]}"
-        if first != last:
-            passage += f"–{last[-2]}:{last[-1]}"
+        boxes, page = page_tex(plan["groups"], document, f"p{plan['page']}", plan["folio"])
+        body.append(boxes)
         body.append(r"\noindent\vbox to\textheight{\hsize=\linewidth")
-        body.append(rf"\Header{{{passage}}}{{{title}}}{{{plan['folio']}}}")
-        body.append(scripture)
-        body.append(r"\vfil\vskip8pt\hrule height0.35pt\vskip5pt")
-        body.append(notes)
+        body.append(page)
         body.append(r"}\par\newpage")
     body.append(r"\raggedright\emergencystretch=3em\section*{Sources and edition}")
     body.append(escape_latex(document.config["name"]) + r"\par\bigskip")

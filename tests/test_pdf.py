@@ -14,20 +14,23 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize(
-    "paper,pages,width,height",
+    "paper,continuous_pages,verse_pages,width,height",
     [
-        ("reader", 2, 140, 216),
-        ("reference", 1, 180, 281),
-        ("a5", 2, 148, 210),
-        ("a4", 1, 210, 297),
-        ("letter", 1, 215.9, 279.4),
-        ("custom", 2, 160.5, 230.25),
+        ("reader", 2, 2, 140, 216),
+        ("reference", 1, 1, 180, 281),
+        ("a5", 2, 2, 148, 210),
+        ("a4", 1, 1, 210, 297),
+        ("letter", 1, 1, 215.9, 279.4),
+        # Measuring the full page reclaims enough space to avoid a second
+        # continuous reader page at this size (previously two in both modes).
+        ("custom", 1, 2, 160.5, 230.25),
     ],
 )
 @pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
 def test_real_pdf_pagination_links_fonts_and_portable_bundle(
-    source_state, tmp_path, tex_available, paper, pages, width, height, verse_layout
+    source_state, tmp_path, tex_available, paper, continuous_pages, verse_pages, width, height, verse_layout
 ):
+    pages = continuous_pages if verse_layout == "continuous" else verse_pages
     layout = {"paper": paper, "first_folio": 1329, "verse_layout": verse_layout}
     if paper == "custom":
         layout.update(paper_width_mm=width, paper_height_mm=height)
@@ -45,6 +48,7 @@ def test_real_pdf_pagination_links_fonts_and_portable_bundle(
     assert [p["folio"] for p in plans] == list(range(1329, 1329 + pages))
     assert sum(len(p["references"]) for p in plans) == 17
     assert all(p["text_height_sp"] + p["notes_height_sp"] <= p["budget_sp"] for p in plans)
+    assert all(p["page_height_sp"] <= p["usable_height_sp"] for p in plans)
     if paper == "reference":
         # Inspect actual verse-digit baselines to distinguish the two layouts.
         digits = {}

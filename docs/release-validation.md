@@ -160,3 +160,32 @@ default/custom selection, invalid-input rejection, saved dimensions after reload
 immutable worker settings, actual downloaded PDF sizes, exports, cancellation,
 and mobile width. Its custom verse-per-line test edition was also rasterized and
 visually inspected across both reader pages.
+
+## Fuller pages — 2026-10-09
+
+Pagination now measures the complete page assembly, including the selected font's
+running head and the actual separator spacing, against TeX's text height. The
+previous fixed 55 pt allowance is removed. Measurement and final emission copy
+the same scripture/note boxes through a shared page macro. Page plans now record
+complete and usable page heights as well as the derived content budget.
+
+The reader-size SBL Hebrew Genesis 1:1–6:1 proof at `build/page-fill-genesis/`
+retains all 139 verses and 231 helps with verified page-local PDF destinations.
+Its first page now ends at 1:13 rather than 1:12. Across non-final pages, mean
+flexible space above the apparatus falls from approximately 47.3 pt to 30.1 pt
+compared with the earlier build at `.reader/builds/d064fb281eb64a7597d6898ed716914b/`.
+The passage still needs 13 reader pages; whole verses and chapter openings can
+leave space when the next group cannot fit, and the final page can be sparse.
+
+The complete-source continuous Proverbs proof at `build/page-fill-custom/`
+(160.5 × 230.25 mm, Ezra SIL) now fits all 17 verses and 37 helps on one reader
+page instead of two. This boundary case is covered by the PDF regression matrix.
+The default proof at `build/reader-20261009-154640-941227/` still needs two reader
+pages. Genesis before/after, chapter openings and transitions, and the dense
+single-page custom proof were rasterized and visually inspected; their final
+logs contain no overfull boxes or missing characters.
+
+`make check` passes **97 tests and 8 unittest subtests**, including both verse
+layouts, all paper profiles, large type, and portable bundle recompilation.
+`make demo`, `make pdf`, and browser acceptance pass. Browser artifacts are at
+`test-results/browser-20261009-154723/`.

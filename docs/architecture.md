@@ -74,7 +74,10 @@ chapter-qualified help identity. Printed numbers are not lexical identities.
 helps, review rows, chapter registry, source lock, and warnings. The source lock
 contains actual artifact hashes and upstream revisions. `page-plan.json` contains
 verse blocks, first/last references, folios, measured heights in TeX scaled points,
-and unique help IDs per page. Final TeX uses exactly those blocks and page breaks.
+and unique help IDs per page. Each candidate's complete page height includes its
+actual running head and separator spacing, measured using the same box assembly
+as final output. Fit is checked against TeX's usable text height; there is no fixed
+header allowance. Final TeX uses exactly those boxes, blocks, and page breaks.
 Verse blocks are pagination units. `layout.verse_layout` selects continuous
 justified RTL paragraphs with inline verse numbers, or separately started,
 right-aligned verse paragraphs with a number gutter. Chapter boxes reserve the
