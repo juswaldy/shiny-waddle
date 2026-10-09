@@ -19,12 +19,19 @@ from .render import escape_latex
 from .sources import catalog
 
 PAPERS = {
+    "reader": (140, 216, 10),
     "reference": (180, 281, 10),
     "a4": (210, 297, 16),
     "a5": (148, 210, 10),
     "letter": (215.9, 279.4, 16),
 }
 PT_PER_MM = 72.27 / 25.4
+
+
+def paper_dimensions(layout: dict) -> tuple[float, float, float]:
+    if layout["paper"] == "custom":
+        return layout["paper_width_mm"], layout["paper_height_mm"], 10
+    return PAPERS[layout["paper"]]
 
 
 def engine_path() -> str:
@@ -178,7 +185,7 @@ def scripture_macros(layout: dict) -> str:
 
 
 def preamble(layout: dict) -> str:
-    width, height, margin = PAPERS[layout["paper"]]
+    width, height, margin = paper_dimensions(layout)
     # Parameters are validated numeric values; external content is always escaped separately.
     return rf"""\documentclass{{article}}
 \usepackage[paperwidth={width}mm,paperheight={height}mm,margin={margin}mm]{{geometry}}
@@ -331,7 +338,7 @@ def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDoc
 
 def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: None):
     layout = document.config["layout"]
-    _, height, margin = PAPERS[layout["paper"]]
+    _, height, margin = paper_dimensions(layout)
     usable_pt = (height - 2 * margin) * PT_PER_MM
     # Header and separator spacing: deliberately conservative, final box is measured again.
     overhead_pt = 55

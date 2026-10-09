@@ -17,10 +17,20 @@ make check
 
 | Profile | Page size | Margins |
 | --- | --- | --- |
+| reader (default) | 140 × 216 mm | 10 mm |
 | reference | 180 × 281 mm | 10 mm |
 | a4 | 210 × 297 mm | 16 mm |
 | a5 | 148 × 210 mm | 10 mm |
 | letter | 215.9 × 279.4 mm | 16 mm |
+| custom | Project width × height in mm | 10 mm |
+
+The app's **Paper size** selector offers these profiles. Custom requires both
+`layout.paper_width_mm` and `layout.paper_height_mm`, each a finite number from
+21 to 1000 mm. Dimensions may include decimals and may specify landscape paper.
+The same dimensions govern TeX measurement, page budgets, and final PDF geometry;
+an atomic verse/opening that cannot fit still reports a layout overflow.
+Omitted paper settings use `reader`; an explicitly selected profile keeps its size.
+`examples/reference.project.json` explicitly selects the larger reference proof.
 
 Reference dimensions are calibrated approximations; the photograph does not
 establish physical paper size. Defaults are Ezra SIL 18 pt / 23.5 pt leading and

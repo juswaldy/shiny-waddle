@@ -62,8 +62,9 @@ across page and chapter boundaries. A successful TeX exit code alone is insuffic
 
 ## Release choices and remaining decisions
 
-The release pins OSHB and STEP source revisions, ships Ezra SIL, and includes
-reference/A4/A5/Letter profiles with explicit K/Q display. Its browser app and CLI
+The release pins OSHB and STEP source revisions, ships Ezra SIL, and defaults to
+140 × 216 mm paper. Reference/A4/A5/Letter presets and custom width/height in
+millimetres are available with explicit K/Q display. Its browser app and CLI
 share the print core. See [release validation](release-validation.md).
 The scan does not establish an exact vocabulary cutoff, font, or meaning for all
 small editorial signs. Remote accounts, live lookup services, translations, and

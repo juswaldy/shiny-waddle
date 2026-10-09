@@ -4,5 +4,5 @@
   "book": "Prov",
   "passage": "1:29-2:12",
   "selection": "reference",
-  "layout": {"first_folio": 1329}
+  "layout": {"paper": "reference", "first_folio": 1329}
 }

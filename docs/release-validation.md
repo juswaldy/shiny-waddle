@@ -139,3 +139,24 @@ overflow; both modes now have a regression test for that configuration. The
 reviewer verified the correction on compiled pages with no remaining actionable
 findings. Full-book continuous flow and SBL Hebrew were not requalified in this
 update.
+
+## Paper size update — 2026-10-09
+
+The default reader paper is now 140 × 216 mm with 10 mm margins. The four earlier
+presets retain their sizes; the reference example explicitly selects its larger
+proof profile. Custom paper saves validated decimal width/height in millimetres
+and uses the same dimensions for measurements, page budgets, and final geometry.
+
+`make check` passes **97 tests and 8 unittest subtests**. PDF checks cover both
+verse layouts on all five presets and 160.5 × 230.25 mm custom paper, checking
+every page's physical dimensions, page-local links, verse coverage, and fonts.
+`make demo` and `make pdf` pass. The complete-source default proof at
+`build/reader-20261009-153412-612918/` has two reader pages plus source credits;
+all three pages were rasterized and inspected for Hebrew/English flow, markers,
+chapter transition, notes, and margins.
+
+Browser acceptance passes at `test-results/browser-20261009-153425/`, including
+default/custom selection, invalid-input rejection, saved dimensions after reload,
+immutable worker settings, actual downloaded PDF sizes, exports, cancellation,
+and mobile width. Its custom verse-per-line test edition was also rasterized and
+visually inspected across both reader pages.

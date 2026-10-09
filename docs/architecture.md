@@ -83,6 +83,12 @@ Measurements and the final PDF use the same selected construction. Saved project
 and immutable build snapshots retain the choice; omitted settings default to
 continuous through project validation.
 
+`layout.paper` defaults to `reader` (140 × 216 mm). Existing named profiles retain
+their dimensions. Selecting `custom` requires validated `paper_width_mm` and
+`paper_height_mm`; project revisions, immutable build snapshots, and reader JSON
+retain them. A shared dimension resolver supplies measurement, page budgets, and
+final PDF geometry, with 10 mm margins for reader/custom paper.
+
 ## Persistence and reproducibility
 
 SQLite stores projects/jobs only; raw sources remain the authority. Imports also

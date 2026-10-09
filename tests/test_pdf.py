@@ -13,17 +13,34 @@ from bible_reader.tex import Compiler, final_tex, paginate, verify_pdf
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.parametrize("paper,pages", [("reference", 1), ("a5", 2), ("a4", 1), ("letter", 1)])
+@pytest.mark.parametrize(
+    "paper,pages,width,height",
+    [
+        ("reader", 2, 140, 216),
+        ("reference", 1, 180, 281),
+        ("a5", 2, 148, 210),
+        ("a4", 1, 210, 297),
+        ("letter", 1, 215.9, 279.4),
+        ("custom", 2, 160.5, 230.25),
+    ],
+)
 @pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
 def test_real_pdf_pagination_links_fonts_and_portable_bundle(
-    source_state, tmp_path, tex_available, paper, pages, verse_layout
+    source_state, tmp_path, tex_available, paper, pages, width, height, verse_layout
 ):
-    config = ProjectConfig(layout={"paper": paper, "first_folio": 1329, "verse_layout": verse_layout})
+    layout = {"paper": paper, "first_folio": 1329, "verse_layout": verse_layout}
+    if paper == "custom":
+        layout.update(paper_width_mm=width, paper_height_mm=height)
+    config = ProjectConfig(layout=layout)
     output = tmp_path / "edition"
     result = build(source_state, config, output)
     assert result["reader_pages"] == pages
     assert result["fonts_embedded"]
     assert result["pdf_marker_destinations"] == "verified"
+    pdf = PdfReader(output / "reader.pdf")
+    for page in pdf.pages:
+        assert float(page.mediabox.width) * 25.4 / 72 == pytest.approx(width, abs=0.01)
+        assert float(page.mediabox.height) * 25.4 / 72 == pytest.approx(height, abs=0.01)
     plans = json.loads((output / "page-plan.json").read_text())
     assert [p["folio"] for p in plans] == list(range(1329, 1329 + pages))
     assert sum(len(p["references"]) for p in plans) == 17

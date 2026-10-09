@@ -62,3 +62,29 @@ def test_validation_and_artifact_allowlist(client, source_state):
     (path / "reader.pdf").unlink()
     (path / "reader.pdf").symlink_to(source_state / "reader.sqlite3")
     assert client.get(base + "reader.pdf").status_code == 404
+
+
+def test_custom_paper_settings_and_build_snapshot(client):
+    project = client.post("/api/projects", json={}).json()
+    assert project["config"]["layout"]["paper"] == "reader"
+    url = f"/api/projects/{project['id']}"
+    project["config"]["layout"].update(paper="custom", paper_width_mm=160.5, paper_height_mm=230.25)
+    saved = client.put(url, json={"revision": 1, "config": project["config"]})
+    assert saved.status_code == 200
+    assert client.get(url).json()["config"]["layout"] == saved.json()["config"]["layout"]
+    queued = client.post(url + "/builds").json()
+    snapshot = client.get(f"/api/jobs/{queued['id']}").json()["config"]["layout"]
+    assert snapshot["paper"] == "custom"
+    assert snapshot["paper_width_mm"] == 160.5
+    assert snapshot["paper_height_mm"] == 230.25
+    project["config"]["layout"]["paper_width_mm"] = 180
+    assert client.put(url, json={"revision": 2, "config": project["config"]}).status_code == 200
+    assert client.get(f"/api/jobs/{queued['id']}").json()["config"]["layout"] == snapshot
+    assert client.post("/api/projects", json={"layout": {"paper": "custom"}}).status_code == 422
+    assert (
+        client.post(
+            "/api/projects",
+            json={"layout": {"paper": "custom", "paper_width_mm": 10, "paper_height_mm": 216}},
+        ).status_code
+        == 422
+    )

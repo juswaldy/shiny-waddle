@@ -43,7 +43,21 @@ SBL Hebrew is optional and must be installed separately.
 ```
 
 JSON and TOML project files use the same validated settings as the browser. The
-**Verse layout** selector under **Page & reading settings** offers **Continuous
+default paper is **140 × 216 mm**, with 10 mm margins. Under **Page & reading
+settings**, **Paper size** offers the existing Reference proof, A4, A5, and US
+Letter presets plus **Custom**, which reveals width and height in millimetres.
+Custom dimensions accept finite numbers from 21 to 1000 mm and use 10 mm margins;
+very small pages may fail with a layout overflow. For JSON projects use:
+
+```json
+{"layout": {"paper": "custom", "paper_width_mm": 160.5, "paper_height_mm": 230.25}}
+```
+
+For TOML, put `paper = "custom"`, `paper_width_mm`, and `paper_height_mm` in the
+`[layout]` table. Omitted paper settings use `"reader"` (140 × 216 mm); explicit
+presets keep their dimensions.
+
+The **Verse layout** selector under **Page & reading settings** offers **Continuous
 text** (the default) and **One verse per line**. In a project file set
 `layout.verse_layout` to `"continuous"` or `"verse-per-line"`; long verses can wrap
 in either mode. Projects without this setting use continuous text.
@@ -66,14 +80,16 @@ builds include the PDF and compiler log. Ezra exports include the font and licen
 - Extended lexical-ID matching, explicit ambiguity review, gloss overrides,
   frequency and known-word policies, and chapter-local shared help labels.
 - Continuous RTL text or separate verse starts, chapter boxes, mixed Hebrew/English notes, running
-  references, four paper profiles, and measured page-local apparatus placement.
+  references, five paper profiles plus custom sizes, and measured page-local apparatus placement.
 - Saved projects with revision-conflict checks, durable build jobs, cancellation,
   interrupted-job recovery, PDF preview, and export bundles.
 - Offline regression fixtures, real PDF checks, browser acceptance tests, and CI.
 
-The sample produces **17 verses, 37 distinct helps, and 43 markers on one reader
-page**, followed by source credits. The scan's long definitions are not copied:
-this edition uses STEP's shorter `Gloss` fields, so note density and wording differ.
+The sample produces **17 verses, 37 distinct helps, and 43 markers**, spanning two
+reader pages at the default paper size, followed by source credits. The larger
+Reference proof profile fits the sample on one reader page. The scan's long
+definitions are not copied: this edition uses STEP's shorter `Gloss` fields, so
+note density and wording differ.
 Exact source-entry matching establishes provenance, not a context-specific sense;
 review lexical wording before publishing an edition.
 
