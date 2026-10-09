@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from bible_reader import editorial
 from bible_reader.editorial import build_document, display_surface, require_resolved
 from bible_reader.models import Decision, Layout, ProjectConfig, ReaderError, parse_passage
+from bible_reader.tex import verse_content
 
 
 def test_reference_matches_every_observed_verse_label(source_state):
@@ -55,6 +56,53 @@ def test_source_unicode_is_separate_from_display(source_state):
     raw = "בְּ/רֵאשִׁ֖יתֽ"
     assert display_surface(raw, "hide") == "בְּרֵאשִׁיתֽ"
     assert display_surface(raw, "preserve") == raw.replace("/", "")
+
+
+@pytest.mark.parametrize(
+    "policy,expected",
+    [("consonants", "בראשית־שר"), ("consonants-maqqef-sof-pasuq", "בראשית־שר׃")],
+)
+def test_consonant_display_removes_hebrew_points_and_only_retains_chosen_punctuation(policy, expected):
+    raw = "בְּ/רֵאשִׁ֖יתֽ־שָׂר׃׀׆\u05bf\u05c4\u05c5\u05c7\u05f3\u05f4"
+    assert display_surface(raw, policy) == expected
+    assert display_surface("אָב פ ס α\u0301 e\u0301 123.", policy) == "אב פ ס α\u0301 e\u0301 123."
+
+
+@pytest.mark.parametrize("policy", ["consonants", "consonants-maqqef-sof-pasuq"])
+def test_consonant_policies_preserve_source_records_readings_and_help_selection(source_state, policy):
+    original = build_document(source_state, ProjectConfig(cantillation="preserve"))
+    document = build_document(source_state, ProjectConfig(cantillation=policy))
+    require_resolved(document)
+    assert document.helps == original.helps
+    assert document.registry == original.registry
+    for before, after in zip(original.verses, document.verses, strict=True):
+        assert before["source_annotations"] == after["source_annotations"]
+        for source, displayed in zip(before["tokens"], after["tokens"], strict=True):
+            assert {k: v for k, v in source.items() if k != "surface"} == {
+                k: v for k, v in displayed.items() if k != "surface"
+            }
+            if displayed["kind"] == "x-maqqef":
+                assert displayed["surface"] == "־"
+            elif displayed["kind"] == "x-sof-pasuq":
+                assert displayed["surface"] == ("׃" if policy == "consonants-maqqef-sof-pasuq" else "")
+    assert {r["reading"] for r in document.review} >= {"ketiv", "qere"}
+    assert [{k: v for k, v in r.items() if k != "surface"} for r in document.review] == [
+        {k: v for k, v in r.items() if k != "surface"} for r in original.review
+    ]
+    assert editorial.DISPLAY_TRANSFORMATIONS[policy] in document.sources["transformations"]
+
+
+@pytest.mark.parametrize("policy", ["consonants", "consonants-maqqef-sof-pasuq"])
+def test_consonant_tex_keeps_maqqef_attached_and_skips_hidden_punctuation(source_state, policy):
+    document = build_document(source_state, ProjectConfig(passage="1:29", cantillation=policy))
+    verse = document.verses[0]
+    # Actual source words/separator; omit helps here to inspect word boundaries.
+    first = [{**t, "helps": []} for t in verse["tokens"][1:4]]
+    assert verse_content({"tokens": first}, document, "test") == r"\mbox{כי}־\mbox{שנאו}"
+    hidden = {"surface": "", "kind": "x-paseq"}
+    assert verse_content({"tokens": [first[0], hidden, first[2]]}, document, "test") == (
+        r"\mbox{כי} \mbox{שנאו}"
+    )
 
 
 @pytest.mark.parametrize("reading,excluded", [("qere", "ketiv"), ("ketiv", "qere")])
@@ -161,6 +209,7 @@ def test_invalid_passages_are_rejected(passage):
         {"layout": {"body_pt": 26, "leading_pt": 16}},
         {"schema_version": 99},
         {"unknown": True},
+        {"cantillation": "unknown"},
     ],
 )
 def test_config_validation(values):

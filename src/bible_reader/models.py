@@ -78,7 +78,7 @@ class ProjectConfig(StrictModel):
     selection: Literal["all", "book-frequency", "reference"] = "reference"
     frequency_max: int = Field(default=10, ge=1, le=100000)
     known_entries: list[str] = Field(default_factory=list, max_length=10000)
-    cantillation: Literal["preserve", "hide"] = "hide"
+    cantillation: Literal["preserve", "hide", "consonants", "consonants-maqqef-sof-pasuq"] = "hide"
     readings: Literal["both", "qere", "ketiv"] = "both"
     decisions: dict[str, Decision] = Field(default_factory=dict, max_length=10000)
     layout: Layout = Field(default_factory=Layout)

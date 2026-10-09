@@ -108,6 +108,25 @@ def test_accents_and_single_verse_chapter_opening(source_state, tmp_path, tex_av
     assert result["verse_count"] == 1
 
 
+@pytest.mark.parametrize("policy", ["consonants", "consonants-maqqef-sof-pasuq"])
+@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
+def test_consonant_policies_build_verified_pdf(source_state, tmp_path, tex_available, policy, verse_layout):
+    config = ProjectConfig(cantillation=policy, layout={"verse_layout": verse_layout})
+    output = tmp_path / "consonants"
+    result = build(source_state, config, output)
+    assert result["verse_count"] == 17
+    assert result["help_count"] == 37
+    assert result["reader_pages"] >= 2
+    assert result["fonts_embedded"]
+    assert result["pdf_marker_destinations"] == "verified"
+    document = json.loads((output / "reader.v2.json").read_text())
+    assert document["config"]["cantillation"] == policy
+    first = document["verses"][0]["tokens"]
+    assert [t["surface"] for t in first[:4]] == ["תחת", "כי", "־", "שנאו"]
+    assert first[-1]["surface"] == ("׃" if policy == "consonants-maqqef-sof-pasuq" else "")
+    assert first[1]["source_surface"] == "כִּי"
+
+
 def test_many_short_run_in_verses_fill_a_page(source_state, tmp_path, tex_available):
     # Synthetic layout stress case derived from one fixture token. This is not
     # source scripture: it checks that the planner has no verse-per-line cap.

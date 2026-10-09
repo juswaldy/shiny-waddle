@@ -69,6 +69,8 @@ with (OUTPUT / "server.log").open("w") as log:
             page.locator("#paper-height").fill("230.25")
             expect(page.locator("#verse-layout")).to_have_value("continuous")
             page.locator("#verse-layout").select_option("verse-per-line")
+            expect(page.locator("#cantillation")).to_have_value("hide")
+            page.locator("#cantillation").select_option("consonants")
             page.get_by_role("button", name="Save settings", exact=True).click()
             expect(page.locator("#notice")).to_have_text("Edition settings saved")
             row = page.locator('[data-anchor="20qg1:0"]')
@@ -80,6 +82,7 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(page.locator("#paper-width")).to_have_value("160.5")
             expect(page.locator("#paper-height")).to_have_value("230.25")
             expect(page.locator("#verse-layout")).to_have_value("verse-per-line")
+            expect(page.locator("#cantillation")).to_have_value("consonants")
             expect(page.locator('[data-anchor="20qg1:0"] textarea')).to_have_value(
                 "Editorial browser test gloss"
             )
@@ -102,6 +105,7 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(page.locator("#custom-paper")).to_be_hidden()
             expect(page.locator("#paper-height")).to_be_disabled()
             page.locator("#verse-layout").select_option("continuous")
+            page.locator("#cantillation").select_option("consonants-maqqef-sof-pasuq")
             previous_pdf = page.locator("#download-pdf").get_attribute("href")
             page.locator("#build").click()
             expect(page.locator("#download-pdf")).not_to_have_attribute("href", previous_pdf, timeout=90_000)
@@ -114,6 +118,10 @@ with (OUTPUT / "server.log").open("w") as log:
                 "verse-per-line",
             }
             assert {j["config"]["layout"]["paper"] for j in successful_builds} == {"reader", "custom"}
+            assert {j["config"]["cantillation"] for j in successful_builds} == {
+                "consonants",
+                "consonants-maqqef-sof-pasuq",
+            }
             default_pdf = page.request.get(url + page.locator("#download-pdf").get_attribute("href"))
             (OUTPUT / "default-reader.pdf").write_bytes(default_pdf.body())
             for pdf_page in PdfReader(OUTPUT / "default-reader.pdf").pages:
@@ -158,6 +166,7 @@ with (OUTPUT / "server.log").open("w") as log:
                         "edit",
                         "persist",
                         "verse layout selection, reload, and both PDF builds",
+                        "consonant policy selection, reload, and both PDF builds",
                         "default/custom paper selection, validation, persistence, and actual PDF dimensions",
                         "real PDF build",
                         "PDF and bundle download",
