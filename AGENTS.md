@@ -33,9 +33,10 @@ supported environments and limits. The original v1 renderer is compatibility cod
   Do not invent scholarly content to fill gaps or infer a sense from spelling alone.
 - Hebrew/Aramaic runs are RTL; Greek/English runs are LTR. Store logical Unicode
   order, never visually reverse strings. Test mixed-script markers and notes.
-- The final reader flows continuously with inline verse numbers and reuses semantic help labels
-  within a chapter. Notes are unique per page and grouped by chapter. The v1 demo's
-  per-occurrence numbering and passage-end notes are not the final product contract.
+- The final reader offers continuous text or separate verse starts and reuses
+  semantic help labels within a chapter. Notes are unique per page and grouped by
+  chapter. The v1 demo's per-occurrence numbering and passage-end notes are not the
+  final product contract.
 - Keep imported text, annotations, lexica, fonts, and reference images under
   their own terms. The root MIT license applies to our code, not every input.
 
@@ -64,6 +65,7 @@ Use the matching skill when doing these workflows:
 | Import or update text, morphology, or lexicon data | [.agents/skills/import-bible-source/SKILL.md](.agents/skills/import-bible-source/SKILL.md) |
 | Join tokens to lexical entries or choose glosses | [.agents/skills/align-reader-lexicon/SKILL.md](.agents/skills/align-reader-lexicon/SKILL.md) |
 | Change LaTeX, RTL layout, fonts, pagination, or PDF builds | [.agents/skills/typeset-bible-reader/SKILL.md](.agents/skills/typeset-bible-reader/SKILL.md) |
+| Review code changes or request an independent PR review | [.agents/skills/code-review-agent/SKILL.md](.agents/skills/code-review-agent/SKILL.md) |
 
 ## Verification
 

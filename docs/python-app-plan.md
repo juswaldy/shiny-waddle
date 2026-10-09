@@ -2,9 +2,10 @@
 
 Status: original design plan, retained as design history; local release 0.2.0
 implemented on 2026-10-02. The print target is [the Proverbs reference-page specification](reference-page-spec.md).
-The 2026-10-09 layout update replaces separate verse starts with continuous RTL
-paragraphs and inline verse numbers, following `bereshit002.jpg`; verse boundaries
-remain pagination units. Earlier verse-layout descriptions below are design history.
+The 2026-10-09 layout update adds a per-project choice between continuous RTL
+paragraphs with inline verse numbers, following `bereshit002.jpg`, and the original
+separate verse starts. Continuous is the default; verse boundaries remain pagination
+units in both modes. Earlier fixed verse-layout descriptions below are design history.
 For actual commands and modules use [README](../README.md) and
 [architecture](architecture.md); for completed checks and limitations use
 [release validation](release-validation.md) and [operations](operations.md).

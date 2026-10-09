@@ -1,11 +1,12 @@
 # Reader page specification: Proverbs 1:29–2:12
 
 Status: implementation target, based on direct inspection of `mishle002.jpg`,
-with scripture flow updated on 2026-10-09 to follow `bereshit002.jpg`.
+with a scripture layout choice added on 2026-10-09: continuous flow following
+`bereshit002.jpg` or separately started verses following the original Proverbs scan.
 Companion: [Python application plan](python-app-plan.md). This specification
-retains the Proverbs apparatus and chapter-opening design while using continuous
-scripture paragraphs with inline verse numbers. The Proverbs scan coordinates
-below document the original observation, rather than the new paragraph line count.
+retains the Proverbs apparatus and chapter-opening design in both modes. Continuous
+is the default. The Proverbs scan coordinates below document the separate-verse
+observation, rather than the continuous paragraph line count.
 Implementation evidence and current limitations are recorded separately in
 [release-validation.md](release-validation.md).
 
@@ -75,16 +76,22 @@ order and is shaped by TeX.
 
 ## 3. Scripture typography
 
-**R01 — Continuous scripture.** Flow consecutive verses through a justified RTL
+**R01 — Scripture layout choice.** Store `layout.verse_layout` as `continuous`
+(default) or `verse-per-line`, exposed in the app as **Verse layout**. In continuous
+mode, flow consecutive verses through a justified RTL
 paragraph, as in `bereshit002.jpg`. Verse numbers appear inline; adjacent verses
 may share a line and longer verses wrap naturally without repeating the number.
 The final line is right-aligned. Start a new paragraph at each chapter opening or
 page boundary. Preserve source section signs. Verse boundaries remain explicit
 in source records and page plans, even though they no longer force line breaks.
+In verse-per-line mode, start each verse in its own RTL paragraph with a shared
+right edge and ragged left edge. Long verses may wrap without repeating the number.
+The selected mode applies to both measured candidates and final pages.
 
-**R02 — Verse numbers.** Render Arabic digits in a smaller Latin serif face inline
-before the verse's first word, keeping the number attached to that word. Keep
-digits LTR inside the RTL context.
+**R02 — Verse numbers.** Render Arabic digits in a smaller Latin serif face. In
+continuous mode, place them inline before the verse's first word and keep the
+number attached to that word. In verse-per-line mode use a controlled right-side
+gutter. Keep digits LTR inside the RTL context.
 Verse 1 at a chapter opening has no separate printed `1` in the sample; the chapter
 box introduces it. Verse 2 has its own number beside the inset text.
 
@@ -107,10 +114,11 @@ move to an adjacent word because of bidirectional punctuation. Multi-digit label
 such as `104` must remain internally LTR and must not collide with Hebrew marks.
 
 **R06 — Chapter opening.** Introduce chapter 2 mid-page with a large Latin `2`
-inside two fine square outlines. Reserve space on the right beside the first two
-lines of the continuous chapter paragraph. The text returns to full width after
-those two lines. Treat the opening and its first two verses as a measured page
-group; the box is not an independent floating object. Reserve two lines even for
+inside two fine square outlines. In continuous mode reserve space on the right
+beside the first two lines of the chapter paragraph, then return to full width.
+In verse-per-line mode, inset the first two verse blocks beside the box; the
+third verse returns to full width. Treat the opening and its first two verses as
+a measured page group; the box is not an independent floating object. Reserve two lines even for
 a passage containing only a short verse 1, so the box remains inside the measured
 scripture area.
 
@@ -272,8 +280,8 @@ details panels, not between routine reading/export actions.
 | Passage coverage | Exactly 1:29–33 and 2:1–12, in order, without missing or extra tokens |
 | Source fidelity | Text/marks/readings match the selected source and documented display policy |
 | Reference header | Correct passage, centered Hebrew book title, configurable folio |
-| Verse layout | Continuous justified RTL flow, inline LTR digits attached to first words, stable wrapping and punctuation |
-| Chapter opening | Double-boxed 2, no redundant verse-1 digit, room beside first two paragraph lines |
+| Verse layout | Selected continuous flow or separate verse starts, LTR digits, stable wrapping and punctuation |
+| Chapter opening | Double-boxed 2, no redundant verse-1 digit, room beside two paragraph lines or two verse blocks |
 | Shared notes | Labels 4 and 9 are demonstrably reused in the reference fixture |
 | Reference apparatus | Two paragraphs with 15 and 22 unique entries when using the reference topology |
 | Page membership | Every marker resolves on that page to exactly one chapter-qualified help |

@@ -134,6 +134,49 @@ class Compiler:
         return log
 
 
+def scripture_macros(layout: dict) -> str:
+    if layout.get("verse_layout", "continuous") == "verse-per-line":
+        return rf"""\newcommand{{\Scripture}}[1]{{#1}}
+\newcommand{{\Verse}}[2]{{%
+  \noindent\hbox to\linewidth{{%
+    \vtop{{\hsize=\dimexpr\linewidth-6mm\relax
+      \setRTL\hebrewfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
+      \parindent=0pt\leftskip=0pt plus 1fil\rightskip=0pt\parfillskip=0pt
+      \noindent\strut #2\par}}%
+    \hskip2mm\vtop{{\hsize=4mm\raggedleft\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont\strut #1\par}}%
+  }}\par\vskip2pt
+}}
+\newcommand{{\ChapterOpen}}[4]{{%
+  \vskip7pt\noindent\hbox to\linewidth{{%
+    \vtop{{\hsize=\dimexpr\linewidth-14mm\relax\linewidth=\hsize\vskip0pt
+      \Verse{{}}{{#2}}\Verse{{#3}}{{#4}}}}%
+    \hskip2mm\vtop{{\hsize=12mm\vskip0pt
+      \hbox{{\fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont #1}}}}}}}}}}
+  }}\par
+}}
+"""
+    return rf"""\newif\ifChapterParagraph
+\newcommand{{\EndScriptureParagraph}}{{%
+  \par\ifChapterParagraph\ifnum\prevgraf<2\vskip{layout["leading_pt"]}pt\fi\fi
+  \ChapterParagraphfalse
+}}
+\newcommand{{\Scripture}}[1]{{\begingroup
+  \setRTL\hebrewfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
+  \parindent=0pt\leftskip=0pt\rightskip=0pt\parfillskip=0pt plus 1fil
+  \tolerance=9999\emergencystretch=3em\noindent #1\EndScriptureParagraph\endgroup
+}}
+\newcommand{{\Verse}}[2]{{%
+  \strut\textenglish{{\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont #1}}\nobreak\hspace{{0.35em}}#2%
+}}
+\newcommand{{\ChapterOpen}}[1]{{%
+  \EndScriptureParagraph\vskip7pt\ChapterParagraphtrue\hangindent=-14mm\hangafter=-2\noindent
+  \textenglish{{\makebox[0pt][l]{{\hspace{{2mm}}\smash{{\raisebox{{-2mm}}{{%
+    \fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont #1}}}}}}%
+  }}}}}}}}%
+}}
+"""
+
+
 def preamble(layout: dict) -> str:
     width, height, margin = PAPERS[layout["paper"]]
     # Parameters are validated numeric values; external content is always escaped separately.
@@ -151,25 +194,7 @@ def preamble(layout: dict) -> str:
 \setlength{{\parskip}}{{0pt}}
 \setlength{{\fboxrule}}{{0.35pt}}
 \hfuzz=0.2pt
-\newif\ifChapterParagraph
-\newcommand{{\EndScriptureParagraph}}{{%
-  \par\ifChapterParagraph\ifnum\prevgraf<2\vskip{layout["leading_pt"]}pt\fi\fi
-  \ChapterParagraphfalse
-}}
-\newcommand{{\Scripture}}[1]{{\begingroup
-  \setRTL\hebrewfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
-  \parindent=0pt\leftskip=0pt\rightskip=0pt\parfillskip=0pt plus 1fil
-  \emergencystretch=3em\noindent #1\EndScriptureParagraph\endgroup
-}}
-\newcommand{{\Verse}}[2]{{%
-  \strut\textenglish{{\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont #1}}\nobreak\hspace{{0.35em}}#2%
-}}
-\newcommand{{\ChapterOpen}}[1]{{%
-  \EndScriptureParagraph\vskip7pt\ChapterParagraphtrue\hangindent=-14mm\hangafter=-2\noindent
-  \textenglish{{\makebox[0pt][l]{{\hspace{{2mm}}\smash{{\raisebox{{-2mm}}{{%
-    \fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont #1}}}}}}%
-  }}}}}}}}%
-}}
+{scripture_macros(layout)}
 \newcommand{{\HelpMarker}}[2]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{7}}{{8}}\selectfont\hyperlink{{#1}}{{#2}}}}}}}}
 \newcommand{{\ReadingMark}}[1]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{6}}{{7}}\selectfont #1}}}}}}
 \newcommand{{\Note}}[5]{{\hypertarget{{#1}}{{}}\mbox{{\textsuperscript{{#2}}\texthebrew{{#3}}}}\nobreak\hspace{{0.2em}}#4#5.\hspace{{0.9em}}}}
@@ -231,12 +256,28 @@ def blocks(document: ReaderDocument):
 def contents(groups: list, document: ReaderDocument, prefix: str):
     scripture = []
     verses = [v for group in groups for v in group]
-    for verse in verses:
-        content = verse_content(verse, document, prefix)
-        if verse["verse"] == 1:
-            scripture.append(rf"\ChapterOpen{{{verse['chapter']}}}" + content)
-        else:
-            scripture.append(rf"\Verse{{{verse['verse']}}}{{{content}}}")
+    if document.config["layout"].get("verse_layout", "continuous") == "verse-per-line":
+        for group in groups:
+            first = group[0]
+            if first["verse"] == 1:
+                second = group[1] if len(group) > 1 else None
+                scripture.append(
+                    rf"\ChapterOpen{{{first['chapter']}}}{{{verse_content(first, document, prefix)}}}"
+                    + "{"
+                    + (str(second["verse"]) if second else "")
+                    + "}{"
+                    + (verse_content(second, document, prefix) if second else "")
+                    + "}"
+                )
+            else:
+                scripture.append(rf"\Verse{{{first['verse']}}}{{{verse_content(first, document, prefix)}}}")
+    else:
+        for verse in verses:
+            content = verse_content(verse, document, prefix)
+            if verse["verse"] == 1:
+                scripture.append(rf"\ChapterOpen{{{verse['chapter']}}}" + content)
+            else:
+                scripture.append(rf"\Verse{{{verse['verse']}}}{{{content}}}")
     note_ids = sorted(
         {h for v in verses for t in v["tokens"] for h in t["helps"]},
         key=lambda h: (document.helps[h]["chapter"], document.helps[h]["label"]),

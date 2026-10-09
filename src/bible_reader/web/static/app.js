@@ -45,7 +45,7 @@ async function refreshProjects(selected) {
 function fillForm() {
   const c = current.config;
   const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max,
-    paper: c.layout.paper, "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
+    paper: c.layout.paper, "verse-layout": c.layout.verse_layout ?? "continuous", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
     "notes-pt": c.layout.notes_pt, folio: c.layout.first_folio, readings: c.readings, cantillation: c.cantillation};
   Object.entries(values).forEach(([id, value]) => { $(id).value = value; });
   $("frequency").disabled = c.selection !== "book-frequency";
@@ -63,7 +63,7 @@ function formConfig() {
   const c = structuredClone(current.config);
   Object.assign(c, {name: $("project-name").value, book: $("book").value, passage: $("passage").value.trim(), selection: $("selection").value,
     frequency_max: Number($("frequency").value), readings: $("readings").value, cantillation: $("cantillation").value});
-  Object.assign(c.layout, {paper: $("paper").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
+  Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
     leading_pt: Number($("leading-pt").value), notes_pt: Number($("notes-pt").value), first_folio: Number($("folio").value)});
   if (c.book !== current.config.book) c.decisions = {};
   return c;

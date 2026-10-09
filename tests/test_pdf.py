@@ -14,10 +14,11 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize("paper,pages", [("reference", 1), ("a5", 2), ("a4", 1), ("letter", 1)])
+@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
 def test_real_pdf_pagination_links_fonts_and_portable_bundle(
-    source_state, tmp_path, tex_available, paper, pages
+    source_state, tmp_path, tex_available, paper, pages, verse_layout
 ):
-    config = ProjectConfig(layout={"paper": paper, "first_folio": 1329})
+    config = ProjectConfig(layout={"paper": paper, "first_folio": 1329, "verse_layout": verse_layout})
     output = tmp_path / "edition"
     result = build(source_state, config, output)
     assert result["reader_pages"] == pages
@@ -28,8 +29,7 @@ def test_real_pdf_pagination_links_fonts_and_portable_bundle(
     assert sum(len(p["references"]) for p in plans) == 17
     assert all(p["text_height_sp"] + p["notes_height_sp"] <= p["budget_sp"] for p in plans)
     if paper == "reference":
-        # Inspect actual verse-digit baselines: these adjacent verses must run
-        # together, rather than merely using different macros in the TeX source.
+        # Inspect actual verse-digit baselines to distinguish the two layouts.
         digits = {}
 
         def collect_digits(text, cm, tm, font, size):
@@ -38,8 +38,12 @@ def test_real_pdf_pagination_links_fonts_and_portable_bundle(
 
         PdfReader(output / "reader.pdf").pages[0].extract_text(visitor_text=collect_digits)
         assert set(digits) == {"29", "30"}
-        assert digits["29"][1] == pytest.approx(digits["30"][1], abs=0.1)
-        assert digits["30"][0] < digits["29"][0]
+        if verse_layout == "continuous":
+            assert digits["29"][1] == pytest.approx(digits["30"][1], abs=0.1)
+            assert digits["30"][0] < digits["29"][0]
+        else:
+            assert digits["30"][1] < digits["29"][1] - 10
+            assert digits["29"][0] == pytest.approx(digits["30"][0], abs=0.1)
     assert "Sources and edition" in PdfReader(output / "reader.pdf").pages[-1].extract_text()
     manifest = json.loads((output / "manifest.json").read_text())
     for name, expected in manifest["artifacts"].items():
@@ -55,8 +59,9 @@ def test_real_pdf_pagination_links_fonts_and_portable_bundle(
             assert len(PdfReader(extracted / "reader.pdf").pages) == 2
 
 
-def test_reproducible_reader_document_and_layout(source_state, tmp_path, tex_available):
-    config = ProjectConfig()
+@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
+def test_reproducible_reader_document_and_layout(source_state, tmp_path, tex_available, verse_layout):
+    config = ProjectConfig(layout={"verse_layout": verse_layout})
     first, second = tmp_path / "one", tmp_path / "two"
     build(source_state, config, first)
     build(source_state, config, second)
@@ -75,8 +80,9 @@ def test_editorial_tex_is_escaped_and_long_gloss_paginated(source_state, tmp_pat
     assert r"\textbackslash{}input\{private\}" in latex
 
 
-def test_accents_and_single_verse_chapter_opening(source_state, tmp_path, tex_available):
-    config = ProjectConfig(passage="2:1", cantillation="preserve")
+@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
+def test_accents_and_single_verse_chapter_opening(source_state, tmp_path, tex_available, verse_layout):
+    config = ProjectConfig(passage="2:1", cantillation="preserve", layout={"verse_layout": verse_layout})
     result = build(source_state, config, tmp_path / "single")
     assert result["verse_count"] == 1
 
@@ -96,6 +102,17 @@ def test_many_short_run_in_verses_fill_a_page(source_state, tmp_path, tex_availa
     assert len(plans[0]["references"]) == 60
     log = compiler.compile("reader", final_tex(document, plans), passes=2)
     assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 60
+
+
+@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
+def test_large_type_on_a5_wraps_without_overflow(source_state, tmp_path, tex_available, verse_layout):
+    config = ProjectConfig(
+        layout={"paper": "a5", "verse_layout": verse_layout, "body_pt": 26.0, "leading_pt": 38.0}
+    )
+    result = build(source_state, config, tmp_path / "large-type")
+    assert result["verse_count"] == 17
+    assert result["reader_pages"] >= 2
+    assert result["pdf_marker_destinations"] == "verified"
 
 
 def test_compiler_cancellation_and_overflow_fail_explicitly(source_state, tmp_path, tex_available):
