@@ -43,6 +43,13 @@ requiring review even if it returns only one candidate. Known-word/frequency rul
 have explicit reasons. Frequency counts the selected whole source book, not the
 requested passage, and avoids counting both ketiv and qere as two occurrences.
 
+Name omission follows [OSHB noun type `Np`](https://hb.openscriptures.org/parsing/HebrewMorphologyCodes.html)
+and the pinned TBESH header's `N:` name classification (people, locations,
+gentilics, and titles including divine names). A STEP analysis is treated as a
+name only when every supplied morphology alternative is a name. A selected name
+entry, or an entirely name-classified candidate set, is omitted; mixed candidates
+retain their explicit alignment status. Raw text and lexical records are retained.
+
 Only numeric lexical components become help anchors. Prefix/suffix analysis remains
 in the source morphology and segmentation; this is not a full interlinear parser.
 Hebrew and Aramaic language tags are preserved. The stem abbreviation formatter

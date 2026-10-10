@@ -252,3 +252,32 @@ def test_page_api_rejects_empty_oversized_or_invalid_payloads(client, consonant_
     for edits in [[], [edit] * 201, [{**edit, "scope": "invalid"}]]:
         assert client.post(url + "/decisions/batch", json={"revision": 1, "edits": edits}).status_code == 422
         assert client.get(url).json() == project
+
+
+def test_name_inclusion_is_rejected_atomically_and_review_retains_omission_evidence(client, name_review):
+    project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    common = {"anchor": "common-by-source:0", "decision": {"entry_id": "step:test-common"}}
+    name = {"anchor": "name-by-source:0", "decision": {"entry_id": "step:test-common"}}
+    response = client.post(url + "/decisions/batch", json={"revision": 1, "edits": [common, name]})
+    assert response.status_code == 400 and "Names are excluded" in response.json()["detail"]
+    assert client.get(url).json() == project
+    assert client.post(url + "/decisions", json={"revision": 1, **name}).status_code == 400
+    assert client.get(url).json() == project
+    review = client.get(url + "/review").json()
+    row = next(row for row in review["rows"] if row["anchor"] == "name-by-source:0")
+    assert not row["selected"] and row["name_excluded"]
+    assert row["reason"] == "Proper name omitted (OSHB Np morphology)"
+    assert row["candidates"] and row["source_surface"] == "שָׁם"
+    assert review["coverage"]["excluded"] == 5
+
+
+def test_chosen_name_entry_is_rejected_for_inclusion_with_mixed_source_candidates(client, name_review):
+    project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    response = client.post(
+        url + "/decisions",
+        json={"revision": 1, "anchor": "common-by-source:0", "decision": {"entry_id": "step:test-name"}},
+    )
+    assert response.status_code == 400 and "Names are excluded" in response.json()["detail"]
+    assert client.get(url).json() == project

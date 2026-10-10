@@ -80,3 +80,43 @@ def consonant_review(source_state, monkeypatch):
     monkeypatch.setattr(editorial, "load_book", lambda *_: book)
     monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
     return book
+
+
+@pytest.fixture
+def name_review(source_state, monkeypatch):
+    """Synthetic source classifications; no proposed biblical readings or lexical senses."""
+    entries = {
+        identity: Entry(identity, "", "", morphology, "Synthetic classification gloss", "")
+        for identity, morphology in [
+            ("step:test-common", "H:N-M"),
+            ("step:test-name", "N:N-M-P"),
+            ("step:test-other-name", "N:N--L"),
+        ]
+    }
+    crosswalk = {
+        "H1001": ["step:test-common", "step:test-name"],
+        "H1002": ["step:test-name", "step:test-other-name"],
+        "H1003": ["step:test-name"],
+        "H1004": ["step:test-common"],
+    }
+    book = [
+        Verse(
+            "Prov",
+            1,
+            1,
+            (
+                Token("name-by-source", "שָׁם", "1001", "HNp"),
+                Token("common-by-source", "שָׁם", "1001", "HNcmsa"),
+                Token("unmatched-name", "שֵׁם", "9999", "HNp"),
+                Token("unmatched-common", "שֵׁם", "9998", "HNcmsa"),
+                Token("lexicon-name", "שֵׁם", "1002", "HNcmsa"),
+                Token("chosen-name", "שָׁם", "1001", "HNcmsa"),
+                Token("segmented-name", "דָּבָר/שֵׁם", "1004/1003", "HNcmsc/Np"),
+                Token("normal-spelling", "שָׁם", "1004", "HNcmsa"),
+                Token("arc-prefixed-name", "בְּ/שָׁם", "b/1004", "AR/Np", language="arc"),
+            ),
+        )
+    ]
+    monkeypatch.setattr(editorial, "load_book", lambda *_: book)
+    monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
+    return book

@@ -78,6 +78,13 @@ source book. `known_entries` and per-anchor `decisions` support exclusions and
 reviewed glosses. Ambiguous or unmatched selected helps must be resolved or
 explicitly omitted before a build succeeds.
 
+Names are automatically omitted from lexical helps in every selection mode,
+including existing saved inclusion decisions. The rule uses OSHB proper-name
+morphology and STEP name metadata, including personal, place, and divine names.
+It does not infer names from spelling or capitalization. **Show omitted words**
+retains their source candidates and omission reasons; their inclusion checkboxes
+are disabled, and **Include page** skips them. Source scripture stays intact.
+
 In lexical review, **Apply to** defaults to **This occurrence**. Select **All
 occurrences in this book (consonants only)** and **Save all** to apply the source
 entry, gloss, and inclusion choice to matching words throughout the selected

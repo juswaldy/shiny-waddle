@@ -11,6 +11,7 @@ from bible_reader.editorial import (
     consonant_key,
     display_surface,
     edit_decision,
+    is_name_morphology,
     require_resolved,
 )
 from bible_reader.models import Decision, Layout, ProjectConfig, ReaderError, parse_passage
@@ -194,6 +195,113 @@ def test_frequency_known_words_and_decisions(source_state):
     assert next(r for r in build_document(source_state, config).review if r["anchor"] == row["anchor"])[
         "selected"
     ]
+
+
+@pytest.mark.parametrize("selection", ["all", "book-frequency"])
+def test_genuine_names_are_omitted_and_retained_in_review(source_state, selection):
+    config = ProjectConfig(passage="1:1", selection=selection, frequency_max=100000)
+    document = build_document(source_state, config)
+    rows = {row["anchor"]: row for row in document.review}
+    for anchor in ["20Nvk:0", "20vuQ:0", "20k5P:0"]:
+        row = rows[anchor]
+        assert row["name_excluded"] and row["candidates"]
+        assert not row["selected"]
+        assert row["reason"] == "Proper name omitted (OSHB Np morphology)"
+        assert row["label"] is None and row["help_id"] is None
+        assert not next(token for token in document.verses[0]["tokens"] if token["id"] == row["token_id"])[
+            "helps"
+        ]
+        assert all(help["entry_id"] != row["entry_id"] for help in document.helps.values())
+    assert any(row["selected"] and not row["name_excluded"] for row in rows.values())
+    assert [token["source_surface"] for token in document.verses[0]["tokens"]] == [
+        token.surface for token in editorial.load_book(source_state, "Prov")[0].tokens
+    ]
+
+
+def test_existing_inclusion_does_not_reintroduce_names(source_state):
+    config = ProjectConfig(
+        passage="1:1",
+        selection="all",
+        decisions={"20Nvk:0": Decision(entry_id="step:H8010", gloss="Synthetic name override")},
+    )
+    before = config.model_dump()
+    document = build_document(source_state, config)
+    name = next(row for row in document.review if row["anchor"] == "20Nvk:0")
+    assert not name["selected"] and name["name_excluded"]
+    assert name["gloss"] == "Synthetic name override"
+    assert not any(help["entry_id"] == "step:H8010" for help in document.helps.values())
+    assert config.model_dump() == before
+
+
+@pytest.mark.parametrize(
+    "morphology,expected",
+    [
+        ("N:N-M-P", True),
+        ("N:N--L", True),
+        ("N:N--T", True),
+        ("N:N--LG / N:N-M-P", True),
+        ("H:N-M / N:N--T", False),
+        ("H:N-M/F", False),
+        ("A:N-F", False),
+        ("", False),
+    ],
+)
+def test_name_metadata_never_guesses_from_gloss_or_spelling(morphology, expected):
+    assert is_name_morphology(morphology) is expected
+
+
+def test_name_exclusion_preserves_ambiguities_missing_matches_and_component_identity(
+    source_state, name_review
+):
+    raw = [verse.json() for verse in name_review]
+    config = ProjectConfig(
+        passage="1:1",
+        selection="all",
+        decisions={"chosen-name:0": Decision(entry_id="step:test-name")},
+    )
+    document = build_document(source_state, config)
+    rows = {row["anchor"]: row for row in document.review}
+    for anchor in [
+        "name-by-source:0",
+        "unmatched-name:0",
+        "lexicon-name:0",
+        "chosen-name:0",
+        "segmented-name:1",
+        "arc-prefixed-name:0",
+    ]:
+        assert rows[anchor]["name_excluded"] and not rows[anchor]["selected"]
+        assert rows[anchor]["label"] is None and rows[anchor]["help_id"] is None
+    assert rows["unmatched-name:0"]["status"] == "unmatched"
+    assert rows["lexicon-name:0"]["status"] == "ambiguous"
+    assert rows["common-by-source:0"]["selected"] and rows["common-by-source:0"]["status"] == "ambiguous"
+    assert rows["unmatched-common:0"]["selected"] and rows["unmatched-common:0"]["status"] == "unmatched"
+    assert rows["segmented-name:0"]["selected"] and not rows["segmented-name:0"]["name_excluded"]
+    assert rows["segmented-name:0"]["lexical_morphology"] == "HNcmsc"
+    assert rows["segmented-name:1"]["lexical_morphology"] == "HNp"
+    assert rows["normal-spelling:0"]["selected"]
+    with pytest.raises(ReaderError, match="unresolved"):
+        require_resolved(document)
+    config.decisions.update(
+        {
+            row["anchor"]: Decision(action="exclude")
+            for row in document.review
+            if row["selected"] and row["status"] != "resolved"
+        }
+    )
+    require_resolved(build_document(source_state, config))
+    assert [verse.json() for verse in name_review] == raw
+
+
+def test_book_inclusion_skips_source_name_homographs(source_state, name_review):
+    config = ProjectConfig(passage="1:1", selection="all")
+    changed, report = edit_decision(
+        source_state, config, "common-by-source:0", Decision(entry_id="step:test-common"), "book"
+    )
+    assert "name-by-source:0" not in changed.decisions
+    assert {item["anchor"]: item["reason"] for item in report["skipped"]}["name-by-source:0"] == (
+        "Names are excluded from lexical helps"
+    )
+    assert set(report["applied"]) == {"common-by-source:0", "chosen-name:0", "normal-spelling:0"}
 
 
 @pytest.mark.parametrize(

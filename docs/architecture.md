@@ -72,6 +72,18 @@ include action, optional supported entry ID, optional editorial gloss, and reaso
 An exclusion is explicit and remains in the report. Missing source anchors or
 incompatible entry choices fail rather than silently discarding stale decisions.
 
+Names are excluded after alignment and editorial choices, before chapter help
+registration, in every selection mode. OSHB noun type `Np` identifies proper
+names; STEP's `N:` classification identifies names independently of language.
+Parallel OSHB slash-separated lemma/morphology segments identify individual
+lexical components where possible, so a neighboring common component retains
+its help. Mixed name/common candidates remain ambiguous until an entry is chosen;
+all-name candidate sets can be omitted without choosing between named identities.
+Review rows retain raw morphology, component morphology, candidates, alignment
+status, and explicit name-omission evidence. Existing inclusion decisions remain
+inspectable history but cannot restore name helps. New inclusion attempts fail,
+and book-wide inclusions report and skip name occurrences.
+
 Lexical review can expand a decision to every matching word in the selected book.
 A separate consonant key removes Hebrew marks/punctuation and slash segmentation
 from the raw surface; prefixes/suffixes, logical order, and source Unicode remain

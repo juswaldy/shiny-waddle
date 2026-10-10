@@ -234,5 +234,30 @@ def test_grid_page_entry_drafts_shortcuts_atomic_saves_and_mobile(review_server,
         expect(first.locator("textarea")).to_have_value("Synthetic stale-tab draft")
         expect(page.locator("#notice")).to_contain_text("another tab")
         page.locator("#discard-page").click()
+
+        # Genuine names stay visible as scripture and inspectable omissions, with inclusion disabled.
+        latest = page.request.get(url + f"/api/projects/{identity}").json()
+        latest["config"]["passage"] = "1:1"
+        assert page.request.put(
+            url + f"/api/projects/{identity}",
+            headers={"X-Reader-Token": csrf},
+            data={"revision": latest["revision"], "config": latest["config"]},
+        ).ok
+        page.reload()
+        expect(page.locator(".help-row")).to_have_count(3)
+        expect(page.locator("#coverage")).to_contain_text("NAMES OMITTED")
+        page.locator("#show-all").check()
+        expect(page.locator(".help-row")).to_have_count(6)
+        for anchor in ["20Nvk:0", "20vuQ:0", "20k5P:0"]:
+            name = page.locator(f"[data-anchor='{anchor}']")
+            expect(name.get_by_role("checkbox")).not_to_be_checked()
+            expect(name.get_by_role("checkbox")).to_be_disabled()
+            expect(name.locator(".row-status")).to_have_text("name omitted")
+            name.get_by_role("button", name=f"Verse context for {anchor}", exact=True).click()
+            expect(page.locator(".verse-context-highlight")).to_have_count(1)
+            page.locator("#close-verse-context").click()
+        page.locator("#include-page").click()
+        expect(page.locator("#draft-count")).to_have_text("3 unsaved edits on this page")
+        page.locator("#discard-page").click()
         assert errors == [], errors
         browser.close()

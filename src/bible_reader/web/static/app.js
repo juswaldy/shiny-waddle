@@ -176,7 +176,8 @@ async function refreshReview() {
     if (version !== requestVersion) return;
     reviewData = data;
     const unresolved = (data.coverage.ambiguous || 0) + (data.coverage.unmatched || 0);
-    $("coverage").replaceChildren(...[[data.verse_count, "VERSES"], [data.help_count, "DISTINCT HELPS"], [unresolved, "TO REVIEW"]].map(([value, label]) => {const node = el("div", undefined, "metric"); node.append(el("b", String(value)), el("span", label)); return node;}));
+    const names = data.rows.filter(row => row.name_excluded).length;
+    $("coverage").replaceChildren(...[[data.verse_count, "VERSES"], [data.help_count, "DISTINCT HELPS"], [unresolved, "TO REVIEW"], [names, "NAMES OMITTED"]].map(([value, label]) => {const node = el("div", undefined, "metric"); node.append(el("b", String(value)), el("span", label)); return node;}));
     $("review-intro").textContent = unresolved ? `${unresolved} selected helps need a source-entry choice or explicit omission before export.` : "Every selected help resolves to a source entry. Review wording and meaning in context before publishing your edition.";
     $("review-intro").className = unresolved ? "info-card error" : "info-card";
     renderReview();
@@ -193,6 +194,11 @@ function initialEdit(row) {
   return {included: row.selected, entry_id: row.entry_id || "", gloss: row.gloss, scope: "occurrence"};
 }
 function rowEdit(row) { return reviewDrafts.get(row.anchor) || initialEdit(row); }
+function nameExcluded(row, edit = rowEdit(row)) {
+  const morphology = row.candidates.find(candidate => candidate.id === edit.entry_id)?.morphology || "";
+  const analyses = morphology.split("/").map(part => part.trim()).filter(Boolean);
+  return Boolean(row.fixed_name_reason) || (analyses.length > 0 && analyses.every(part => part.startsWith("N:")));
+}
 function requireSavedReview() {
   if (reviewSaving) throw new Error("Wait for the lexical page to finish saving.");
   if (reviewDrafts.size) throw new Error("Save or discard your lexical review edits before changing edition settings, switching projects, or building.");
@@ -238,12 +244,12 @@ function showEditResult(result, show) {
   const outcome = $("review-edit-result"); outcome.replaceChildren(el("span", message)); outcome.hidden = !show;
   if (result.skipped.length) {
     outcome.hidden = false;
-    outcome.append(el("p", `${result.skipped.length} word references stayed unchanged because the chosen entry is not a source candidate:`));
+    outcome.append(el("p", `${result.skipped.length} word references stayed unchanged:`));
     const list = el("ul");
     result.skipped.forEach(item => {
       const li = el("li"); li.append(el("span", `${item.reference.replaceAll(".", " ")} · `));
       const surface = el("bdi", item.source_surface.replaceAll("/", "")); surface.dir = "rtl";
-      li.append(surface, el("span", ` · ${item.anchor}`)); list.append(li);
+      li.append(surface, el("span", ` · ${item.anchor} · ${item.reason}`)); list.append(li);
     });
     outcome.append(list);
   }
@@ -330,7 +336,11 @@ function createReviewEditor(row, grid) {
   const save = el("button", "Save help", "secondary"); save.type = "button"; actions.append(save);
   const record = () => setDraft(row, {included: include.checked, entry_id: choice.value, gloss: gloss.value, scope: scope.value});
   include.addEventListener("change", record); gloss.addEventListener("input", record); scope.addEventListener("change", record);
-  choice.addEventListener("change", () => {gloss.value = row.candidates.find(candidate => candidate.id === choice.value)?.gloss || ""; record();});
+  choice.addEventListener("change", () => {
+    gloss.value = row.candidates.find(candidate => candidate.id === choice.value)?.gloss || "";
+    if (nameExcluded(row, {entry_id: choice.value})) include.checked = false;
+    record();
+  });
   resetSource.addEventListener("click", () => {gloss.value = row.candidates.find(candidate => candidate.id === choice.value)?.gloss || ""; record(); gloss.focus();});
   undo.addEventListener("click", () => {reviewDrafts.delete(row.anchor); renderReview();});
   gloss.addEventListener("keydown", event => {
@@ -374,7 +384,8 @@ function createReviewEditor(row, grid) {
     include.checked = value.included; choice.value = value.entry_id; gloss.value = value.gloss; scope.value = value.scope;
     headword.textContent = entry?.headword || "—";
     card.classList.toggle("dirty", reviewDrafts.has(row.anchor));
-    status.textContent = reviewDrafts.has(row.anchor) ? "unsaved" : row.selected ? row.status : "omitted";
+    const excludedName = nameExcluded(row, value);
+    status.textContent = reviewDrafts.has(row.anchor) ? "unsaved" : excludedName ? "name omitted" : row.selected ? row.status : "omitted";
     status.classList.toggle("unresolved", value.included && !value.entry_id);
     scopeHint.hidden = value.scope !== "book"; save.textContent = value.scope === "book" ? "Save all" : "Save help";
     provenance.textContent = !entry ? "Choose a source entry" : value.gloss.trim() && value.gloss.trim() !== entry.gloss ? "Editorial wording · STEP source entry" : "STEP source gloss";
@@ -382,6 +393,8 @@ function createReviewEditor(row, grid) {
     undo.disabled = reviewSaving || !reviewDrafts.has(row.anchor);
     save.disabled = reviewSaving;
     for (const field of [include, choice, gloss, scope]) field.disabled = reviewSaving;
+    include.disabled = reviewSaving || excludedName;
+    include.title = excludedName ? "Names are excluded from lexical helps" : "";
   }};
   visibleEditors.set(row.anchor, editor); editor.update(); return editor;
 }
@@ -499,7 +512,9 @@ $("save-page").onclick = guard(() => saveReviewPage());
 $("save-next").onclick = guard(() => saveReviewPage(true));
 $("discard-page").onclick = () => {visibleRows.forEach(row => reviewDrafts.delete(row.anchor)); renderReview();};
 for (const [id, included] of [["include-page", true], ["omit-page", false]]) $(id).onclick = () => {
-  visibleRows.forEach(row => setDraft(row, {...rowEdit(row), included}, true));
+  visibleRows.forEach(row => {
+    if (!nameExcluded(row)) setDraft(row, {...rowEdit(row), included}, true);
+  });
 };
 $("review-panel").addEventListener("keydown", guard(async event => {
   if (!event.isComposing && (event.ctrlKey || event.metaKey) && event.key === "Enter") {
