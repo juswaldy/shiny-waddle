@@ -89,6 +89,32 @@ candidates do not support the chosen entry remain unchanged and are listed for
 separate review. Source text remains intact; saved decisions and build snapshots
 still identify every affected source anchor.
 
+Choose **View → Grid** in lexical review to edit a page in a table. **Save page**
+submits all edited rows on that review page in one update; **Save & next** saves
+and advances. Choose 20, 40, 80, or 160 rows per page. Each row retains its own
+**Apply to** scope, source details, and verse popup. Invalid choices or a stale
+project revision reject the whole submission and retain your drafts; conflicting
+book-wide edits must be reconciled or saved separately.
+
+Data-entry shortcuts and controls work alongside individual row saves:
+
+- Enter / Shift+Enter in a gloss moves to the next / previous gloss; Tab moves
+  between fields. Ctrl/Cmd+Enter saves the edited rows on the current page.
+- Ctrl/Cmd+D copies the previous row's gloss when both rows use the same chosen
+  source entry. In grid mode, paste one spreadsheet column to fill consecutive
+  glosses on the current page; choose source entries first.
+- **Source gloss** restores the chosen entry's STEP gloss; **Undo row** restores
+  the saved row. Custom wording remains an editorial override.
+- **Include page** / **Omit page** stages explicit inclusion choices for all
+  visible rows. **Discard page edits** restores the page without saving.
+- **Unsaved edits** finds pending rows, including omitted words. The edit count
+  reports pending work on other pages.
+
+Drafts survive paging, filtering, view changes, review refreshes, and saving
+another row. Save or discard them before changing edition settings, switching
+projects, or building. Drafts live in the open tab; closing or reloading it warns
+about unsaved work. Only submitted decisions are persisted with the project.
+
 Select **Rework resolved helps** to revisit source entries that already resolve.
 Change the gloss, choose another available source candidate, or change inclusion,
 then use **Save help** for one occurrence or **Save all** for matching words in the
@@ -142,6 +168,7 @@ make pdf         # Real default reference reader in a new build directory
 make serve
 PLAYWRIGHT_BROWSERS_PATH=.tools/browsers .venv/bin/playwright install --with-deps chromium
 make browser     # Real server, worker, browser, edit, build, export, failure, cancellation
+READER_BROWSER_TESTS=1 .venv/bin/pytest -q tests/test_browser_review.py  # Grid editing, offline fixtures
 uv build         # Wheel and source distribution
 ```
 

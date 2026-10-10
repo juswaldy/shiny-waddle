@@ -12,3 +12,31 @@
 .verse-context-token{white-space:nowrap}
 .verse-context-highlight{color:#b3261e;font-weight:700;font-size:1.35em}
 .verse-context-reading{font:10px/1.4 system-ui,sans-serif;color:var(--muted);margin-inline:4px;vertical-align:middle}
+/* Page editing shares the same controls and source context in cards and grid. */
+.review-options{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:8px}
+.review-options>label:not(.check-label){display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+.review-options select{width:auto;min-height:32px;padding:4px 8px;font-size:12px}
+.review-shortcuts{margin:8px 0 14px}
+.review-savebar{position:sticky;top:0;z-index:4;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 0;background:var(--paper);border-bottom:1px solid var(--line)}
+#draft-count{flex:1;min-width:130px;font-size:12px;color:var(--muted)}
+.help-row.dirty{background:#f0f1e966;box-shadow:inset 3px 0 var(--accent)}
+.gloss-tools{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+.gloss-tools button{font-size:10px}
+.gloss-provenance{font-size:10px;color:var(--muted)}
+.review-grid-scroll{max-width:100%;overflow:auto;border:1px solid var(--line);border-top:0}
+.review-grid{width:100%;min-width:870px;border-collapse:collapse;table-layout:fixed;font-size:12px}
+.review-grid caption{text-align:left;padding:10px;color:var(--muted);font-size:11px}
+.review-grid th{text-align:left;padding:9px;background:var(--cream);font-size:10px;color:var(--muted);font-weight:600}
+.review-grid .help-row{display:table-row}
+.review-grid td{padding:10px 9px;border-top:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.review-grid th:nth-child(1){width:50px}.review-grid th:nth-child(2){width:145px}.review-grid th:nth-child(3){width:190px}.review-grid th:nth-child(5){width:140px}.review-grid th:nth-child(6){width:95px}
+.review-grid .help-word{font-size:25px;margin:0;min-height:30px}
+.review-grid select{font-size:11px;min-height:32px;padding:4px 6px}
+.review-grid textarea{min-height:55px;height:55px;resize:vertical;padding:6px 8px;font-size:12px}
+.review-grid .row-source{flex-wrap:wrap;margin-bottom:4px}
+.review-grid .note-label{font-size:18px;margin:0}
+.review-grid .help-actions{display:table-cell;text-align:right}
+.review-grid details{margin:4px 0}
+.review-grid summary{font-size:10px}
+#review-list[aria-busy=true]{opacity:.65;pointer-events:none}
+@media(max-width:760px){.review-savebar{gap:8px}.review-savebar #draft-count{flex-basis:100%}.review-options{gap:10px}.review-grid-scroll{overscroll-behavior-x:contain}}

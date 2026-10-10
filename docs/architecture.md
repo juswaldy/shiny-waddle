@@ -83,6 +83,17 @@ Review rows include the key and whole-book word count independently of lemma
 frequency. The API saves the expanded configuration in one revision-checked update;
 existing build snapshots remain immutable.
 
+The lexical review grid and cards share per-anchor draft editors. Page submission
+uses `POST /api/projects/{id}/decisions/batch`, with a project revision and up to
+200 explicit anchor/decision/scope edits (the UI offers up to 160 rows per page).
+The editorial service loads the pinned sources once for expansion, validates the
+combined document, and saves one project revision. Duplicate anchors and
+conflicting overlapping book/occurrence choices fail before persistence. Applied
+and unsupported anchors are reported once each. Unresolved choices remain
+explicit, and existing immutable build snapshots retain their saved decisions.
+Browser drafts remain in memory across paging, filters, view switches, review
+refreshes, and other row saves; they are never committed implicitly by a build.
+
 The chapter registry is computed before filtering the requested passage, from the
 same selected chapters and settings. General help identity includes lexical entry,
 stem, and gloss. The reference fixture supplies separate observed slots where the

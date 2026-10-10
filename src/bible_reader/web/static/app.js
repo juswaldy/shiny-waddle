@@ -2,7 +2,9 @@
 const $ = id => document.getElementById(id);
 const csrf = document.querySelector('meta[name="reader-token"]').content;
 let current, sourceInfo, reviewData, allJobs = [], page = 0, requestVersion = 0, noticeTimer, viewedJob;
-const pageSize = 40;
+let pageSize = 40, reviewSaving = false;
+const reviewDrafts = new Map(), visibleEditors = new Map();
+let visibleRows = [], filteredRows = [];
 let contextRow, contextReference, contextPinned = false, contextHideTimer, suppressContextFocus = false;
 
 async function api(path, method = "GET", body) {
@@ -133,6 +135,7 @@ function updatePaperFields() {
   $("paper-width").disabled = $("paper-height").disabled = !custom;
 }
 async function loadProject(identity) {
+  try {requireSavedReview();} catch (error) {if (current) $("project-picker").value = current.id; throw error;}
   closeVerseContext();
   viewedJob = undefined;
   $("review-edit-result").hidden = true;
@@ -157,6 +160,7 @@ function formConfig() {
 }
 async function saveConfig(config) {
   if (JSON.stringify(config) !== JSON.stringify(current.config)) {
+    requireSavedReview();
     current = await api(`/projects/${current.id}`, "PUT", {revision: current.revision, config});
     const option = $("project-picker").selectedOptions[0]; if (option) option.textContent = config.name;
   }
@@ -179,78 +183,241 @@ async function refreshReview() {
   } catch (error) {
     if (version !== requestVersion) return;
     closeVerseContext();
-    reviewData = null; $("review-list").replaceChildren(el("p", "Open Sources to install this book, then refresh the review.", "empty"));
+    reviewData = null; visibleRows = []; filteredRows = []; visibleEditors.clear();
+    $("review-list").replaceChildren(el("p", "Open Sources to install this book, then refresh the review.", "empty"));
     $("review-intro").textContent = error.message; $("review-intro").className = "info-card error"; $("coverage").replaceChildren();
+    updateReviewActions();
   }
+}
+function initialEdit(row) {
+  return {included: row.selected, entry_id: row.entry_id || "", gloss: row.gloss, scope: "occurrence"};
+}
+function rowEdit(row) { return reviewDrafts.get(row.anchor) || initialEdit(row); }
+function requireSavedReview() {
+  if (reviewSaving) throw new Error("Wait for the lexical page to finish saving.");
+  if (reviewDrafts.size) throw new Error("Save or discard your lexical review edits before changing edition settings, switching projects, or building.");
+}
+function setDraft(row, value, explicit = false) {
+  if (!explicit && JSON.stringify(value) === JSON.stringify(initialEdit(row))) reviewDrafts.delete(row.anchor);
+  else reviewDrafts.set(row.anchor, value);
+  visibleEditors.get(row.anchor)?.update();
+  updateReviewActions();
+}
+function updateReviewActions() {
+  const count = visibleRows.filter(row => reviewDrafts.has(row.anchor)).length;
+  const elsewhere = reviewDrafts.size - count;
+  $("draft-count").textContent = reviewSaving ? "Saving page…" : reviewDrafts.size ? `${count} unsaved edit${count === 1 ? "" : "s"} on this page${elsewhere ? ` · ${elsewhere} elsewhere` : ""}` : "No unsaved edits";
+  $("save-page").disabled = reviewSaving || !count;
+  $("save-next").disabled = reviewSaving || !count || (page + 1) * pageSize >= filteredRows.length;
+  $("discard-page").disabled = reviewSaving || !count;
+  $("include-page").disabled = $("omit-page").disabled = reviewSaving || !visibleRows.length;
+  $("previous").disabled = reviewSaving || page === 0;
+  $("next").disabled = reviewSaving || (page + 1) * pageSize >= filteredRows.length;
+}
+function decisionPayload(row) {
+  const edit = rowEdit(row), entry = row.candidates.find(candidate => candidate.id === edit.entry_id);
+  const gloss = edit.gloss.trim();
+  return {anchor: row.anchor, scope: edit.scope, decision: {
+    action: edit.included ? "include" : "exclude", entry_id: edit.entry_id || null,
+    gloss: gloss && gloss !== entry?.gloss ? gloss : null,
+    reason: edit.scope === "book" ? `Edited all occurrences of ${row.consonants} by consonants in ${current.config.book}, from ${row.anchor}` : "Edited in lexical review"
+  }};
+}
+function validateReviewEdits(rows) {
+  for (const row of rows) {
+    const edit = rowEdit(row);
+    if (edit.gloss.length > 1200) throw new Error(`Gloss for ${row.anchor} must be at most 1200 characters.`);
+    if ((edit.included || edit.gloss.trim()) && !edit.entry_id) {
+      visibleEditors.get(row.anchor)?.choice.focus();
+      throw new Error(`Choose a source entry for ${row.reference.replaceAll(".", " ")} (${row.anchor}), or omit the word and leave its gloss empty.`);
+    }
+  }
+}
+function showEditResult(result, show) {
+  const message = `Saved ${result.applied.length} lexical decision${result.applied.length === 1 ? "" : "s"}`;
+  const outcome = $("review-edit-result"); outcome.replaceChildren(el("span", message)); outcome.hidden = !show;
+  if (result.skipped.length) {
+    outcome.hidden = false;
+    outcome.append(el("p", `${result.skipped.length} word references stayed unchanged because the chosen entry is not a source candidate:`));
+    const list = el("ul");
+    result.skipped.forEach(item => {
+      const li = el("li"); li.append(el("span", `${item.reference.replaceAll(".", " ")} · `));
+      const surface = el("bdi", item.source_surface.replaceAll("/", "")); surface.dir = "rtl";
+      li.append(surface, el("span", ` · ${item.anchor}`)); list.append(li);
+    });
+    outcome.append(list);
+  }
+  return message;
+}
+async function submitReview(rows, {batch = false, next = false} = {}) {
+  if (reviewSaving || !rows.length) return;
+  validateReviewEdits(rows);
+  const edits = rows.map(decisionPayload);
+  // Locate the following page by source anchor: resolved/omitted rows may leave the filter after saving.
+  const nextAnchor = next ? filteredRows[(page + 1) * pageSize]?.anchor : null;
+  reviewSaving = true; updateReviewActions();
+  $("review-list").setAttribute("aria-busy", "true");
+  const controls = [...document.querySelectorAll("#review-panel input, #review-panel select, #review-panel textarea, #review-panel button")];
+  const disabled = controls.map(control => control.disabled);
+  controls.forEach(control => {control.disabled = true;});
+  try {
+    const result = await api(`/projects/${current.id}/decisions${batch ? "/batch" : ""}`, "POST",
+      batch ? {revision: current.revision, edits} : {revision: current.revision, ...edits[0]});
+    current = result.project;
+    rows.forEach(row => reviewDrafts.delete(row.anchor));
+    fillForm(); await refreshReview(); renderJobs();
+    if (nextAnchor) {
+      const index = filteredRows.findIndex(row => row.anchor === nextAnchor);
+      if (index >= 0) {page = Math.floor(index / pageSize); renderReview();}
+    }
+    const message = showEditResult(result, batch || edits.some(edit => edit.scope === "book"));
+    notice(batch || edits[0].scope === "book" ? message : "Lexical decision saved");
+    if (next) {
+      visibleEditors.values().next().value?.gloss.focus();
+      $("review-list").scrollIntoView({block: "start"});
+    }
+  } finally {
+    reviewSaving = false;
+    controls.forEach((control, index) => {if (control.isConnected) control.disabled = disabled[index];});
+    // Refresh replaces row controls; release both the old and newly rendered editors.
+    visibleEditors.forEach(editor => editor.update());
+    $("review-list").setAttribute("aria-busy", "false"); updateReviewActions();
+  }
+}
+function saveReviewPage(next = false) {
+  return submitReview(visibleRows.filter(row => reviewDrafts.has(row.anchor)), {batch: true, next});
+}
+function moveGloss(anchor, offset) {
+  const index = visibleRows.findIndex(row => row.anchor === anchor);
+  const target = visibleEditors.get(visibleRows[index + offset]?.anchor)?.gloss;
+  if (target) {target.focus(); target.select();}
+}
+function createReviewEditor(row, grid) {
+  const card = el(grid ? "tr" : "article", undefined, "help-row"); card.dataset.anchor = row.anchor;
+  const include = el("input"); include.type = "checkbox"; include.setAttribute("aria-label", `Include ${row.reference} ${row.surface}`);
+  const word = el("div"); const reference = verseReference(row); word.append(reference);
+  const surface = el("div", row.surface, "help-word"); surface.lang = "he"; surface.dir = "rtl"; word.append(surface);
+  const source = el("div");
+  const sourceLine = el("div", undefined, "row-source");
+  const headword = el("span", "", "headword"); headword.lang = "he"; headword.dir = "rtl";
+  sourceLine.append(headword, el("small", row.reading === "normal" ? row.lemma : `${row.lemma} · ${row.reading}`)); source.append(sourceLine);
+  const choice = el("select"); choice.setAttribute("aria-label", `Source entry for ${row.anchor}`);
+  const blank = el("option", "Choose a source entry…"); blank.value = ""; choice.append(blank);
+  row.candidates.forEach(candidate => {const option = el("option", `${candidate.gloss} · ${candidate.id}`); option.value = candidate.id; choice.append(option);});
+  if (grid || row.candidates.length > 1 || !row.entry_id) source.append(choice);
+  const details = el("details"); details.append(el("summary", "Source & selection"));
+  details.append(el("div", `${row.reason} · ${row.method} · ${row.morphology} · ${row.book_frequency} occurrences in this book · anchor ${row.anchor}`, "source-detail")); source.append(details);
+  const glossBox = el("div", undefined, "help-edit");
+  const gloss = el("textarea"); gloss.maxLength = 1200; gloss.rows = 2; gloss.setAttribute("aria-label", `Gloss for ${row.anchor}`); glossBox.append(gloss);
+  const tools = el("div", undefined, "gloss-tools");
+  const resetSource = el("button", "Source gloss", "text-button"); resetSource.type = "button"; resetSource.setAttribute("aria-label", `Use source gloss for ${row.anchor}`);
+  const undo = el("button", "Undo row", "text-button"); undo.type = "button"; undo.setAttribute("aria-label", `Undo edits for ${row.anchor}`);
+  tools.append(resetSource, undo); glossBox.append(tools);
+  const provenance = el("div", undefined, "gloss-provenance"); glossBox.append(provenance);
+  const scopeBox = el("div");
+  const scopeLabel = el("label", "Apply to", "source-detail");
+  const scope = el("select"); scope.setAttribute("aria-label", `Apply to for ${row.anchor}`);
+  for (const [value, text] of [["occurrence", "This occurrence"], ["book", `All ${row.word_occurrences} occurrences in this book (consonants only)`]]) {
+    const option = el("option", text); option.value = value; scope.append(option);
+  }
+  scopeLabel.append(scope); scopeBox.append(scopeLabel);
+  const scopeHint = el("p", undefined, "hint"); scopeHint.append(el("span", "Matches "));
+  const key = el("bdi", row.consonants); key.dir = "rtl"; key.lang = "he"; scopeHint.append(key);
+  scopeHint.append(el("span", " across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged.")); scopeBox.append(scopeHint);
+  const actions = el(grid ? "td" : "div", undefined, "help-actions");
+  actions.append(el("span", row.label === null ? "—" : String(row.label), "note-label"));
+  const status = el("span", "", "row-status"); actions.append(status);
+  const save = el("button", "Save help", "secondary"); save.type = "button"; actions.append(save);
+  const record = () => setDraft(row, {included: include.checked, entry_id: choice.value, gloss: gloss.value, scope: scope.value});
+  include.addEventListener("change", record); gloss.addEventListener("input", record); scope.addEventListener("change", record);
+  choice.addEventListener("change", () => {gloss.value = row.candidates.find(candidate => candidate.id === choice.value)?.gloss || ""; record();});
+  resetSource.addEventListener("click", () => {gloss.value = row.candidates.find(candidate => candidate.id === choice.value)?.gloss || ""; record(); gloss.focus();});
+  undo.addEventListener("click", () => {reviewDrafts.delete(row.anchor); renderReview();});
+  gloss.addEventListener("keydown", event => {
+    if (event.isComposing) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+      event.preventDefault();
+      const previous = visibleRows[visibleRows.findIndex(item => item.anchor === row.anchor) - 1];
+      if (!previous || !choice.value || rowEdit(previous).entry_id !== choice.value) {
+        notice("Copy previous gloss needs two rows with the same chosen source entry.", true); return;
+      }
+      gloss.value = rowEdit(previous).gloss; record();
+    } else if (event.key === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault(); moveGloss(row.anchor, event.shiftKey ? -1 : 1);
+    }
+  });
+  gloss.addEventListener("paste", event => {
+    const text = event.clipboardData?.getData("text/plain") || "";
+    if (!grid || !/[\r\n]/.test(text)) return;
+    event.preventDefault();
+    const values = text.replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
+    const index = visibleRows.findIndex(item => item.anchor === row.anchor);
+    const targets = visibleRows.slice(index, index + values.length);
+    if (values.some(value => value.includes("\t") || value.length > 1200) || targets.length !== values.length) {
+      notice("Paste one column of glosses, at most 1200 characters each, into rows on the current page.", true); return;
+    }
+    if (targets.some((target, offset) => values[offset].trim() && !rowEdit(target).entry_id)) {
+      notice("Choose a source entry for each destination row before pasting glosses.", true); return;
+    }
+    targets.forEach((target, offset) => setDraft(target, {...rowEdit(target), gloss: values[offset]}));
+    notice(`Pasted ${values.length} glosses. Review them, then save the page.`);
+  });
+  save.addEventListener("click", guard(() => submitReview([row])));
+  if (grid) {
+    for (const node of [include, word, source, glossBox, scopeBox]) {const cell = el("td"); cell.append(node); card.append(cell);}
+    card.append(actions);
+  } else {
+    const edit = el("div", undefined, "help-edit"); edit.append(source, glossBox, scopeBox); card.append(include, word, edit, actions);
+  }
+  const editor = {card, choice, gloss, reference, update() {
+    const value = rowEdit(row), entry = row.candidates.find(candidate => candidate.id === value.entry_id);
+    include.checked = value.included; choice.value = value.entry_id; gloss.value = value.gloss; scope.value = value.scope;
+    headword.textContent = entry?.headword || "—";
+    card.classList.toggle("dirty", reviewDrafts.has(row.anchor));
+    status.textContent = reviewDrafts.has(row.anchor) ? "unsaved" : row.selected ? row.status : "omitted";
+    status.classList.toggle("unresolved", value.included && !value.entry_id);
+    scopeHint.hidden = value.scope !== "book"; save.textContent = value.scope === "book" ? "Save all" : "Save help";
+    provenance.textContent = !entry ? "Choose a source entry" : value.gloss.trim() && value.gloss.trim() !== entry.gloss ? "Editorial wording · STEP source entry" : "STEP source gloss";
+    resetSource.disabled = reviewSaving || !entry || value.gloss === entry.gloss;
+    undo.disabled = reviewSaving || !reviewDrafts.has(row.anchor);
+    save.disabled = reviewSaving;
+    for (const field of [include, choice, gloss, scope]) field.disabled = reviewSaving;
+  }};
+  visibleEditors.set(row.anchor, editor); editor.update(); return editor;
 }
 function renderReview() {
   if (!reviewData) return;
   if (!contextPinned) closeVerseContext();
   let pinnedReference;
   const query = $("search").value.toLowerCase();
-  const rows = reviewData.rows.filter(r => ($("show-all").checked || r.selected) && (!$("unresolved-only").checked || (r.selected && r.status !== "resolved")) && (!$("resolved-only").checked || r.status === "resolved") && `${r.surface} ${r.gloss} ${r.reference} ${r.lemma}`.toLowerCase().includes(query));
-  page = Math.max(0, Math.min(page, Math.ceil(rows.length / pageSize) - 1));
+  const editedOnly = $("edited-only").checked;
+  filteredRows = reviewData.rows.filter(row => (editedOnly ? reviewDrafts.has(row.anchor) :
+    ($("show-all").checked || row.selected) && (!$("unresolved-only").checked || (row.selected && row.status !== "resolved")) && (!$("resolved-only").checked || row.status === "resolved")) &&
+    `${row.surface} ${row.gloss} ${row.reference} ${row.lemma} ${row.entry_id || ""} ${rowEdit(row).gloss}`.toLowerCase().includes(query));
+  page = Math.max(0, Math.min(page, Math.ceil(filteredRows.length / pageSize) - 1));
+  visibleRows = filteredRows.slice(page * pageSize, (page + 1) * pageSize);
+  visibleEditors.clear();
+  const grid = $("review-view").value === "grid";
   const fragment = document.createDocumentFragment();
-  for (const row of rows.slice(page * pageSize, (page + 1) * pageSize)) {
-    const card = el("article", undefined, "help-row"); card.dataset.anchor = row.anchor;
-    const include = el("input"); include.type = "checkbox"; include.checked = row.selected; include.setAttribute("aria-label", `Include ${row.reference} ${row.surface}`);
-    const word = el("div"); const reference = verseReference(row); word.append(reference);
-    if (contextPinned && contextRow?.anchor === row.anchor) pinnedReference = {row, reference};
-    const surface = el("div", row.surface, "help-word"); surface.lang = "he"; surface.dir = "rtl"; word.append(surface);
-    const edit = el("div", undefined, "help-edit");
-    const source = el("div", undefined, "row-source");
-    const chosen = row.candidates.find(c => c.id === row.entry_id);
-    const headword = el("span", chosen?.headword || "—", "headword"); headword.lang = "he"; headword.dir = "rtl";
-    source.append(headword, el("small", row.reading === "normal" ? row.lemma : `${row.lemma} · ${row.reading}`)); edit.append(source);
-    const choice = el("select"); choice.setAttribute("aria-label", `Source entry for ${row.anchor}`);
-    const blank = el("option", "Choose a source entry…"); blank.value = ""; choice.append(blank);
-    row.candidates.forEach(c => { const o = el("option", `${c.gloss} · ${c.id}`); o.value = c.id; choice.append(o); });
-    choice.value = row.entry_id || ""; if (row.candidates.length > 1 || !row.entry_id) edit.append(choice);
-    const gloss = el("textarea"); gloss.value = row.gloss; gloss.maxLength = 1200; gloss.setAttribute("aria-label", `Gloss for ${row.anchor}`); edit.append(gloss);
-    choice.addEventListener("change", () => {const c = row.candidates.find(c => c.id === choice.value); gloss.value = c?.gloss || ""; headword.textContent = c?.headword || "—";});
-    const details = el("details"); details.append(el("summary", "Source & selection")); details.append(el("div", `${row.reason} · ${row.method} · ${row.morphology} · ${row.book_frequency} occurrences in this book · anchor ${row.anchor}`, "source-detail")); edit.append(details);
-    const scopeLabel = el("label", "Apply to", "source-detail");
-    const scope = el("select"); scope.setAttribute("aria-label", `Apply to for ${row.anchor}`);
-    for (const [value, text] of [["occurrence", "This occurrence"], ["book", `All ${row.word_occurrences} occurrences in this book (consonants only)`]]) {
-      const option = el("option", text); option.value = value; scope.append(option);
-    }
-    scopeLabel.append(scope); edit.append(scopeLabel);
-    const scopeHint = el("p", undefined, "hint"); scopeHint.hidden = true;
-    scopeHint.append(el("span", "Matches "));
-    const key = el("bdi", row.consonants); key.dir = "rtl"; key.lang = "he"; scopeHint.append(key);
-    scopeHint.append(el("span", " across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged.")); edit.append(scopeHint);
-    const actions = el("div", undefined, "help-actions"); actions.append(el("span", row.label === null ? "—" : String(row.label), "note-label"));
-    actions.append(el("span", row.selected ? row.status : "omitted", `row-status${row.selected && row.status !== "resolved" ? " unresolved" : ""}`));
-    const save = el("button", "Save help", "secondary");
-    scope.addEventListener("change", () => {scopeHint.hidden = scope.value !== "book"; save.textContent = scope.value === "book" ? "Save all" : "Save help";});
-    save.addEventListener("click", guard(async () => {
-      const entry = row.candidates.find(c => c.id === choice.value);
-      const decision = {action: include.checked ? "include" : "exclude", entry_id: choice.value || null,
-        gloss: gloss.value.trim() && gloss.value.trim() !== entry?.gloss ? gloss.value.trim() : null,
-        reason: scope.value === "book" ? `Edited all occurrences of ${row.consonants} by consonants in ${current.config.book}, from ${row.anchor}` : "Edited in lexical review"};
-      save.disabled = true;
-      try {
-        const result = await api(`/projects/${current.id}/decisions`, "POST", {revision: current.revision, anchor: row.anchor, decision, scope: scope.value});
-        current = result.project; fillForm(); await refreshReview(); renderJobs();
-        const message = `Saved ${result.applied.length} lexical decision${result.applied.length === 1 ? "" : "s"}`;
-        const outcome = $("review-edit-result"); outcome.replaceChildren(el("span", message)); outcome.hidden = scope.value !== "book";
-        if (result.skipped.length) {
-          outcome.append(el("p", `${result.skipped.length} word references stayed unchanged because the chosen entry is not a source candidate:`));
-          const list = el("ul");
-          result.skipped.forEach(item => {const li = el("li"); li.append(el("span", `${item.reference.replaceAll(".", " ")} · `)); const surface = el("bdi", item.source_surface.replaceAll("/", "")); surface.dir = "rtl"; li.append(surface, el("span", ` · ${item.anchor}`)); list.append(li);});
-          outcome.append(list);
-        }
-        notice(scope.value === "book" ? message : "Lexical decision saved");
-      } finally { save.disabled = false; }
-    }));
-    actions.append(save); card.append(include, word, edit, actions); fragment.append(card);
+  const table = grid ? el("table", undefined, "review-grid") : null;
+  const body = grid ? el("tbody") : fragment;
+  if (grid) {
+    table.append(el("caption", "Lexical review · edited rows are saved together with Save page"));
+    const header = el("thead"), line = el("tr");
+    for (const title of ["Include", "Word / verse", "Source entry", "Gloss", "Apply to", "Help / save"]) {const cell = el("th", title); cell.scope = "col"; line.append(cell);}
+    header.append(line); table.append(header, body);
   }
-  if (!rows.length) fragment.append(el("p", "No helps match these filters.", "empty"));
+  for (const row of visibleRows) {
+    const editor = createReviewEditor(row, grid); body.append(editor.card);
+    if (contextPinned && contextRow?.anchor === row.anchor) pinnedReference = {row, reference: editor.reference};
+  }
+  if (grid && visibleRows.length) {const scroll = el("div", undefined, "review-grid-scroll"); scroll.append(table); fragment.append(scroll);}
+  if (!filteredRows.length) fragment.append(el("p", "No helps match these filters.", "empty"));
   $("review-list").replaceChildren(fragment);
   if (pinnedReference) showVerseContext(pinnedReference.row, pinnedReference.reference, true);
   else closeVerseContext();
-  $("row-count").textContent = rows.length ? `${page * pageSize + 1}–${Math.min((page + 1) * pageSize, rows.length)} of ${rows.length} word references` : "0 word references";
-  $("previous").disabled = page === 0; $("next").disabled = (page + 1) * pageSize >= rows.length;
+  $("row-count").textContent = filteredRows.length ? `Page ${page + 1} of ${Math.ceil(filteredRows.length / pageSize)} · ${page * pageSize + 1}–${Math.min((page + 1) * pageSize, filteredRows.length)} of ${filteredRows.length} word references` : "0 word references";
+  updateReviewActions();
 }
 function showBuild(job) {
   const result = job.result;
@@ -314,15 +481,32 @@ $("project-form").onsubmit = guard(async event => {event.preventDefault(); await
 $("selection").onchange = () => { $("frequency").disabled = $("selection").value !== "book-frequency"; };
 $("paper").onchange = updatePaperFields;
 $("book").onchange = () => {if ($("book").value !== "Prov") {$("selection").value = "book-frequency"; $("passage").value = "1:1-10"; $("frequency").disabled = false;}};
-$("new-project").onclick = guard(async () => {const config = structuredClone(current.config); config.name = "New reader edition"; const project = await api("/projects", "POST", config); await refreshProjects(project.id);});
-$("build").onclick = guard(async () => {viewedJob = undefined; await saveConfig(formConfig()); const job = await api(`/projects/${current.id}/builds`, "POST"); allJobs.unshift(job); tab("preview"); renderJobs();});
+$("new-project").onclick = guard(async () => {requireSavedReview(); const config = structuredClone(current.config); config.name = "New reader edition"; const project = await api("/projects", "POST", config); await refreshProjects(project.id);});
+$("build").onclick = guard(async () => {requireSavedReview(); viewedJob = undefined; await saveConfig(formConfig()); const job = await api(`/projects/${current.id}/builds`, "POST"); allJobs.unshift(job); tab("preview"); renderJobs();});
 $("import-source").onclick = guard(async () => {const job = await api("/sources/import", "POST", {book: $("import-book").value}); allJobs.unshift(job); renderJobs(); notice("Source import queued");});
 $("check-environment").onclick = guard(async () => { $("environment").textContent = JSON.stringify(await api("/doctor"), null, 2); });
 $("reload-review").onclick = guard(refreshReview);
-for (const id of ["search", "show-all", "unresolved-only", "resolved-only"]) $(id).addEventListener("input", () => {
+for (const id of ["search", "show-all", "unresolved-only", "resolved-only", "edited-only"]) $(id).addEventListener("input", () => {
   if (id === "unresolved-only" && $(id).checked) $("resolved-only").checked = false;
   if (id === "resolved-only" && $(id).checked) $("unresolved-only").checked = false;
   page = 0; renderReview();
 });
 $("previous").onclick = () => {page--; renderReview();}; $("next").onclick = () => {page++; renderReview();};
+$("review-view").onchange = () => {localStorage.setItem("reader-review-view", $("review-view").value); renderReview();};
+$("review-view").value = localStorage.getItem("reader-review-view") === "grid" ? "grid" : "cards";
+$("review-page-size").onchange = () => {pageSize = Number($("review-page-size").value); page = 0; renderReview();};
+$("save-page").onclick = guard(() => saveReviewPage());
+$("save-next").onclick = guard(() => saveReviewPage(true));
+$("discard-page").onclick = () => {visibleRows.forEach(row => reviewDrafts.delete(row.anchor)); renderReview();};
+for (const [id, included] of [["include-page", true], ["omit-page", false]]) $(id).onclick = () => {
+  visibleRows.forEach(row => setDraft(row, {...rowEdit(row), included}, true));
+};
+$("review-panel").addEventListener("keydown", guard(async event => {
+  if (!event.isComposing && (event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault(); await saveReviewPage();
+  }
+}));
+window.addEventListener("beforeunload", event => {
+  if (reviewDrafts.size || reviewSaving) {event.preventDefault(); event.returnValue = "";}
+});
 (async () => {try {await refreshSources(); await refreshProjects(localStorage.getItem("reader-project")); await poll();} catch (error) {notice(error.message, true);}})();

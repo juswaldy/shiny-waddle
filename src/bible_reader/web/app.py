@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from ..editorial import edit_decision
+from ..editorial import edit_decision, edit_decisions
 from ..models import Decision, ProjectConfig, ReaderError, StrictModel
 from ..service import doctor, inspect_project
 from ..sources import catalog
@@ -33,11 +33,19 @@ class ImportSource(StrictModel):
     book: str
 
 
-class EditDecision(StrictModel):
-    revision: int = Field(ge=1)
+class DecisionEdit(StrictModel):
     anchor: str = Field(min_length=1, max_length=100)
     decision: Decision
     scope: Literal["occurrence", "book"] = "occurrence"
+
+
+class EditDecision(DecisionEdit):
+    revision: int = Field(ge=1)
+
+
+class EditDecisionPage(StrictModel):
+    revision: int = Field(ge=1)
+    edits: list[DecisionEdit] = Field(min_length=1, max_length=200)
 
 
 def create_app(state: Path | None = None, *, start_worker=True):
@@ -162,6 +170,26 @@ def create_app(state: Path | None = None, *, start_worker=True):
         )
         saved = store.save_project(identity, value.revision, config)
         return {"project": saved, **report}
+
+    @app.post("/api/projects/{identity}/decisions/batch")
+    def save_decision_page(identity: str, value: EditDecisionPage):
+        project = store.project(identity)
+        if value.revision != project["revision"]:
+            raise ReaderError("Project changed in another tab. Reload before saving.")
+        config, reports = edit_decisions(
+            state,
+            ProjectConfig.model_validate(project["config"]),
+            [(edit.anchor, edit.decision, edit.scope) for edit in value.edits],
+        )
+        saved = store.save_project(identity, value.revision, config)
+        applied = list(dict.fromkeys(anchor for report in reports for anchor in report["applied"]))
+        skipped = {
+            item["anchor"]: item
+            for report in reports
+            for item in report["skipped"]
+            if item["anchor"] not in applied
+        }
+        return {"project": saved, "applied": applied, "skipped": list(skipped.values())}
 
     @app.post("/api/projects/{identity}/builds", status_code=202)
     def queue_build(identity: str):

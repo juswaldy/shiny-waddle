@@ -57,8 +57,16 @@ def lexical_candidates(lemma: str, crosswalk: dict[str, list[str]]) -> list[str]
 
 def edit_decision(state: Path, config: ProjectConfig, anchor: str, decision: Decision, scope: str):
     """Expand an explicit reader choice to source-supported anchors in this book."""
-    if scope not in {"occurrence", "book"}:
-        raise ReaderError("Choose this occurrence or all occurrences in this book.")
+    updated, reports = edit_decisions(state, config, [(anchor, decision, scope)])
+    return updated, reports[0]
+
+
+def edit_decisions(state: Path, config: ProjectConfig, edits: list[tuple[str, Decision, str]]):
+    """Validate a review page together, without partially applying or overwriting choices."""
+    if not edits:
+        raise ReaderError("Choose at least one lexical decision to save.")
+    if len({anchor for anchor, _, _ in edits}) != len(edits):
+        raise ReaderError("A review page cannot submit the same source anchor twice.")
     book = load_book(state, config.book)
     _, crosswalk = load_lexicon(state)
     anchors = {
@@ -68,47 +76,61 @@ def edit_decision(state: Path, config: ProjectConfig, anchor: str, decision: Dec
         if token.kind == "word"
         for index, lemma in enumerate(lemma_keys(token.lemma))
     }
-    if anchor not in anchors:
-        raise ReaderError("Editorial decision refers to a missing source anchor.")
-    _, origin, origin_lemma = anchors[anchor]
-    origin_candidates = lexical_candidates(origin_lemma, crosswalk)
-    if decision.entry_id and decision.entry_id not in origin_candidates:
-        raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
-    if (
-        decision.gloss
-        and not decision.entry_id
-        and not (origin_lemma in crosswalk and len(origin_candidates) == 1)
-    ):
-        raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
-    if scope == "book" and (decision.action == "include" or decision.gloss) and not decision.entry_id:
-        raise ReaderError("Choose a source entry before applying a help to all occurrences.")
-    key = consonant_key(origin.surface)
-    if scope == "book" and not key:
-        raise ReaderError("This source word has no consonants to match.")
     decisions = dict(config.decisions)
-    applied, skipped = [], []
-    for target, (verse, token, lemma) in anchors.items():
-        if scope == "occurrence":
-            if target != anchor:
+    pending: dict[str, Decision] = {}
+    reports = []
+    for anchor, decision, scope in edits:
+        if scope not in {"occurrence", "book"}:
+            raise ReaderError("Choose this occurrence or all occurrences in this book.")
+        if anchor not in anchors:
+            raise ReaderError(f"Editorial decision refers to a missing source anchor: {anchor}")
+        _, origin, origin_lemma = anchors[anchor]
+        origin_candidates = lexical_candidates(origin_lemma, crosswalk)
+        if decision.entry_id and decision.entry_id not in origin_candidates:
+            raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
+        if (
+            decision.gloss
+            and not decision.entry_id
+            and not (origin_lemma in crosswalk and len(origin_candidates) == 1)
+        ):
+            raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
+        if scope == "book" and (decision.action == "include" or decision.gloss) and not decision.entry_id:
+            raise ReaderError(f"Choose a source entry before applying a help to all occurrences: {anchor}")
+        key = consonant_key(origin.surface)
+        if scope == "book" and not key:
+            raise ReaderError("This source word has no consonants to match.")
+        applied, skipped = [], []
+        targets = anchors.items() if scope == "book" else [(anchor, anchors[anchor])]
+        for target, (verse, token, lemma) in targets:
+            if scope == "book" and (token.language != origin.language or consonant_key(token.surface) != key):
                 continue
-        elif token.language != origin.language or consonant_key(token.surface) != key:
-            continue
-        if decision.entry_id and decision.entry_id not in lexical_candidates(lemma, crosswalk):
-            skipped.append(
-                {
-                    "anchor": target,
-                    "reference": verse.reference,
-                    "source_surface": token.surface,
-                    "reason": "Chosen entry is not a source candidate for this occurrence",
-                }
-            )
-            continue
-        decisions[target] = decision.model_dump()
-        applied.append(target)
+            if decision.entry_id and decision.entry_id not in lexical_candidates(lemma, crosswalk):
+                skipped.append(
+                    {
+                        "anchor": target,
+                        "reference": verse.reference,
+                        "source_surface": token.surface,
+                        "reason": "Chosen entry is not a source candidate for this occurrence",
+                    }
+                )
+                continue
+            earlier = pending.get(target)
+            if earlier and (earlier.action, earlier.entry_id, earlier.gloss) != (
+                decision.action,
+                decision.entry_id,
+                decision.gloss,
+            ):
+                raise ReaderError(
+                    f"Conflicting page edits affect {target}. Use matching choices or save them separately."
+                )
+            pending[target] = decision
+            applied.append(target)
+        reports.append({"consonants": key, "applied": applied, "skipped": skipped})
+    decisions.update({anchor: decision.model_dump() for anchor, decision in pending.items()})
     updated = ProjectConfig.model_validate({**config.model_dump(), "decisions": decisions})
     # Check gloss/source compatibility and the existing project before saving anything.
     build_document(state, updated)
-    return updated, {"consonants": key, "applied": applied, "skipped": skipped}
+    return updated, reports
 
 
 def reference_map():

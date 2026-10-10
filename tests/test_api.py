@@ -156,3 +156,99 @@ def test_single_decision_api_defaults_and_validation_do_not_save_partial_edits(c
         assert client.get(url).json() == project
     saved = client.post(url + "/decisions", json=payload).json()
     assert saved["applied"] == ["test-origin:0"] and not saved["skipped"]
+
+
+def test_review_page_is_one_revision_with_editorial_glosses_and_immutable_builds(client, consonant_review):
+    project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    before = client.post(url + "/builds").json()
+    source_verses = client.get(url + "/review").json()["verses"]
+    payload = {
+        "revision": 1,
+        "edits": [
+            {
+                "anchor": "test-origin:0",
+                "decision": {"entry_id": "step:test-choice", "gloss": "Synthetic page gloss"},
+            },
+            {"anchor": "test-prefix:0", "decision": {"action": "exclude"}},
+        ],
+    }
+    response = client.post(url + "/decisions/batch", json=payload)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["project"]["revision"] == 2
+    assert result["applied"] == ["test-origin:0", "test-prefix:0"]
+    assert result["skipped"] == []
+    assert client.get(url).json() == result["project"]
+    review = client.get(url + "/review").json()
+    rows = {r["anchor"]: r for r in review["rows"]}
+    assert rows["test-origin:0"]["gloss"] == "Synthetic page gloss"
+    assert rows["test-origin:0"]["status"] == "resolved"
+    assert not rows["test-prefix:0"]["selected"]
+    assert [t["source_surface"] for t in review["verses"][0]["tokens"]] == [
+        t["source_surface"] for t in source_verses[0]["tokens"]
+    ]
+    assert client.get(f"/api/jobs/{before['id']}").json()["config"]["decisions"] == {}
+    assert (
+        client.post(url + "/builds").json()["config"]["decisions"] == result["project"]["config"]["decisions"]
+    )
+    assert client.post(url + "/decisions/batch", json=payload).status_code == 409
+    assert client.get(url).json() == result["project"]
+
+
+@pytest.mark.parametrize(
+    "second",
+    [
+        {"anchor": "missing:0", "decision": {}},
+        {"anchor": "test-prefix:0", "decision": {"entry_id": "step:test-other"}},
+        {"anchor": "test-prefix:0", "decision": {"gloss": "Synthetic unsupported gloss"}},
+        {"anchor": "test-origin:0", "decision": {"entry_id": "step:test-choice"}},
+        {"anchor": "test-repeat:0", "decision": {"action": "exclude"}, "scope": "book"},
+    ],
+)
+def test_invalid_or_conflicting_page_does_not_save_any_rows(client, consonant_review, second):
+    project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    first = {"anchor": "test-origin:0", "decision": {"entry_id": "step:test-choice"}}
+    response = client.post(url + "/decisions/batch", json={"revision": 1, "edits": [first, second]})
+    assert response.status_code == 400
+    assert client.get(url).json() == project
+
+
+def test_page_book_scopes_report_unsupported_components_and_merge_compatible_edits(client, consonant_review):
+    project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    response = client.post(
+        url + "/decisions/batch",
+        json={
+            "revision": 1,
+            "edits": [
+                {
+                    "anchor": anchor,
+                    "scope": "book",
+                    "decision": {"entry_id": "step:test-choice", "reason": f"Edited from {anchor}"},
+                }
+                for anchor in ["test-origin:0", "test-repeat:0"]
+            ],
+        },
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["project"]["revision"] == 2
+    assert len(result["applied"]) == 5
+    assert {item["anchor"] for item in result["skipped"]} == {
+        "test-segmented:1",
+        "test-homograph:0",
+        "test-unmatched:0",
+    }
+    assert len(result["project"]["config"]["decisions"]) == 5
+    assert "test-aramaic:0" not in result["project"]["config"]["decisions"]
+
+
+def test_page_api_rejects_empty_oversized_or_invalid_payloads(client, consonant_review):
+    project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    edit = {"anchor": "test-origin:0", "decision": {"entry_id": "step:test-choice"}}
+    for edits in [[], [edit] * 201, [{**edit, "scope": "invalid"}]]:
+        assert client.post(url + "/decisions/batch", json={"revision": 1, "edits": edits}).status_code == 422
+        assert client.get(url).json() == project
