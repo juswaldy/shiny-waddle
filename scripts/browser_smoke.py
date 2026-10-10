@@ -161,7 +161,53 @@ with (OUTPUT / "server.log").open("w") as log:
             page.locator("#cancel-build").click()
             expect(page.locator("#build-status")).to_contain_text("cancelled", timeout=20_000)
             page.locator('[data-tab="review"]').click()
+            # Resolve repeated, differently pointed spellings throughout the actual pinned book.
+            page.locator("#selection").select_option("all")
+            page.get_by_role("button", name="Save settings", exact=True).click()
+            expect(page.locator("#notice")).to_have_text("Edition settings saved")
+            page.locator("#unresolved-only").check()
+            repeated = page.locator('[data-anchor="207mS:0"]')
+            scope = repeated.get_by_role("combobox", name="Apply to for 207mS:0", exact=True)
+            expect(scope).to_have_value("occurrence")
+            scope.select_option("book")
+            expect(repeated.locator(".hint")).to_contain_text("תחת")
+            repeated.get_by_role("button", name="Save all", exact=True).click()
+            expect(page.locator("#notice")).to_contain_text("Choose a source entry")
+            repeated.get_by_role("combobox", name="Source entry for 207mS:0", exact=True).select_option(
+                "step:H8478H"
+            )
+            with page.expect_response(
+                lambda response: response.url.endswith("/decisions") and response.request.method == "POST"
+            ) as saving:
+                repeated.get_by_role("button", name="Save all", exact=True).click()
+            bulk = saving.value.json()
+            assert saving.value.ok
+            assert len(bulk["applied"]) == 5
+            assert [r["anchor"] for r in bulk["skipped"]] == ["20aQh:0"]
+            expect(page.locator("#review-edit-result")).to_contain_text("Saved 5 lexical decisions")
+            expect(page.locator("#review-edit-result")).to_contain_text("Prov 17 10")
+            expect(repeated).to_have_count(0)  # Resolved rows leave the Needs review filter.
+            identity = page.locator("#project-picker").input_value()
+            saved = page.request.get(url + f"/api/projects/{identity}").json()
+            assert all(saved["config"]["decisions"][a]["entry_id"] == "step:H8478H" for a in bulk["applied"])
+            assert "20aQh:0" not in saved["config"]["decisions"]
+            # A later passage loads the decisions saved outside the original review.
+            page.locator("#unresolved-only").uncheck()
+            page.locator("#passage").fill("17:13")
+            page.get_by_role("button", name="Save settings", exact=True).click()
+            expect(page.locator("#notice")).to_have_text("Edition settings saved")
+            page.reload()
+            elsewhere = page.locator('[data-anchor="20NTZ:0"]')
+            expect(
+                elsewhere.get_by_role("combobox", name="Source entry for 20NTZ:0", exact=True)
+            ).to_have_value("step:H8478H")
+            expect(elsewhere.locator(".row-status")).to_have_text("resolved")
+            expect(elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True)).to_have_value(
+                "occurrence"
+            )
             page.set_viewport_size({"width": 390, "height": 844})
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True).select_option("book")
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             page.screenshot(path=str(OUTPUT / "review-mobile.png"), full_page=True)
             assert errors == [], errors
@@ -174,6 +220,7 @@ with (OUTPUT / "server.log").open("w") as log:
                         "review",
                         "edit",
                         "persist",
+                        "bulk consonant ambiguity resolution, unsupported matches, filters, and later-passage persistence",
                         "verse layout selection, reload, and both PDF builds",
                         "consonant policy selection, reload, and all three PDF builds",
                         "default/custom paper selection, validation, persistence, and actual PDF dimensions",

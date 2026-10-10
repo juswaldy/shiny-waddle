@@ -106,3 +106,53 @@ def test_consonant_policy_is_saved_reviewed_and_snapshotted(client, policy):
     project["config"]["cantillation"] = "preserve"
     assert client.put(url, json={"revision": 2, "config": project["config"]}).status_code == 200
     assert client.get(f"/api/jobs/{queued['id']}").json()["config"]["cantillation"] == policy
+
+
+@pytest.mark.parametrize("scope,count", [("occurrence", 1), ("book", 5)])
+def test_decision_scope_is_saved_atomically_with_report_and_build_snapshot(
+    client, consonant_review, scope, count
+):
+    project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    before = client.post(url + "/builds").json()
+    payload = {
+        "revision": project["revision"],
+        "anchor": "test-origin:0",
+        "scope": scope,
+        "decision": {"entry_id": "step:test-choice", "gloss": "Synthetic API gloss", "reason": "API test"},
+    }
+    response = client.post(url + "/decisions", json=payload)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["project"]["revision"] == 2
+    assert len(result["applied"]) == count
+    assert len(result["skipped"]) == (3 if scope == "book" else 0)
+    saved = client.get(url).json()
+    assert saved == result["project"]
+    assert len(saved["config"]["decisions"]) == count
+    assert saved["config"]["passage"] == "1:1"
+    review = client.get(url + "/review").json()
+    origin = next(r for r in review["rows"] if r["anchor"] == "test-origin:0")
+    assert origin["status"] == "resolved" and origin["gloss"] == "Synthetic API gloss"
+    after = client.post(url + "/builds").json()
+    assert after["config"]["decisions"] == saved["config"]["decisions"]
+    assert client.get(f"/api/jobs/{before['id']}").json()["config"]["decisions"] == {}
+    assert client.post(url + "/decisions", json=payload).status_code == 409
+    assert client.get(url).json() == saved
+
+
+def test_single_decision_api_defaults_and_validation_do_not_save_partial_edits(client, consonant_review):
+    project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    payload = {"revision": 1, "anchor": "test-origin:0", "decision": {"entry_id": "step:test-choice"}}
+    for changes, status in [
+        ({"anchor": "missing:0"}, 400),
+        ({"decision": {"entry_id": "step:test-other"}}, 400),
+        ({"scope": "book", "decision": {}}, 400),
+        ({"decision": {"gloss": "Synthetic proposal"}}, 400),
+        ({"scope": "invalid"}, 422),
+    ]:
+        assert client.post(url + "/decisions", json={**payload, **changes}).status_code == status
+        assert client.get(url).json() == project
+    saved = client.post(url + "/decisions", json=payload).json()
+    assert saved["applied"] == ["test-origin:0"] and not saved["skipped"]

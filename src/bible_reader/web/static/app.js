@@ -62,6 +62,7 @@ function updatePaperFields() {
 }
 async function loadProject(identity) {
   viewedJob = undefined;
+  $("review-edit-result").hidden = true;
   current = await api(`/projects/${identity}`); page = 0; fillForm();
   localStorage.setItem("reader-project", identity);
   await refreshReview(); renderJobs();
@@ -131,15 +132,39 @@ function renderReview() {
     const gloss = el("textarea"); gloss.value = row.gloss; gloss.maxLength = 1200; gloss.setAttribute("aria-label", `Gloss for ${row.anchor}`); edit.append(gloss);
     choice.addEventListener("change", () => {const c = row.candidates.find(c => c.id === choice.value); gloss.value = c?.gloss || ""; headword.textContent = c?.headword || "—";});
     const details = el("details"); details.append(el("summary", "Source & selection")); details.append(el("div", `${row.reason} · ${row.method} · ${row.morphology} · ${row.book_frequency} occurrences in this book · anchor ${row.anchor}`, "source-detail")); edit.append(details);
+    const scopeLabel = el("label", "Apply to", "source-detail");
+    const scope = el("select"); scope.setAttribute("aria-label", `Apply to for ${row.anchor}`);
+    for (const [value, text] of [["occurrence", "This occurrence"], ["book", `All ${row.word_occurrences} occurrences in this book (consonants only)`]]) {
+      const option = el("option", text); option.value = value; scope.append(option);
+    }
+    scopeLabel.append(scope); edit.append(scopeLabel);
+    const scopeHint = el("p", undefined, "hint"); scopeHint.hidden = true;
+    scopeHint.append(el("span", "Matches "));
+    const key = el("bdi", row.consonants); key.dir = "rtl"; key.lang = "he"; scopeHint.append(key);
+    scopeHint.append(el("span", " across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged.")); edit.append(scopeHint);
     const actions = el("div", undefined, "help-actions"); actions.append(el("span", row.label === null ? "—" : String(row.label), "note-label"));
     actions.append(el("span", row.selected ? row.status : "omitted", `row-status${row.selected && row.status !== "resolved" ? " unresolved" : ""}`));
     const save = el("button", "Save help", "secondary");
+    scope.addEventListener("change", () => {scopeHint.hidden = scope.value !== "book"; save.textContent = scope.value === "book" ? "Save all" : "Save help";});
     save.addEventListener("click", guard(async () => {
-      const config = structuredClone(current.config); const entry = row.candidates.find(c => c.id === choice.value);
-      config.decisions[row.anchor] = {action: include.checked ? "include" : "exclude", entry_id: choice.value || null,
-        gloss: gloss.value.trim() && gloss.value.trim() !== entry?.gloss ? gloss.value.trim() : null, reason: "Edited in lexical review"};
+      const entry = row.candidates.find(c => c.id === choice.value);
+      const decision = {action: include.checked ? "include" : "exclude", entry_id: choice.value || null,
+        gloss: gloss.value.trim() && gloss.value.trim() !== entry?.gloss ? gloss.value.trim() : null,
+        reason: scope.value === "book" ? `Edited all occurrences of ${row.consonants} by consonants in ${current.config.book}, from ${row.anchor}` : "Edited in lexical review"};
       save.disabled = true;
-      try { await saveConfig(config); notice("Lexical decision saved"); } finally { save.disabled = false; }
+      try {
+        const result = await api(`/projects/${current.id}/decisions`, "POST", {revision: current.revision, anchor: row.anchor, decision, scope: scope.value});
+        current = result.project; fillForm(); await refreshReview(); renderJobs();
+        const message = `Saved ${result.applied.length} lexical decision${result.applied.length === 1 ? "" : "s"}`;
+        const outcome = $("review-edit-result"); outcome.replaceChildren(el("span", message)); outcome.hidden = scope.value !== "book";
+        if (result.skipped.length) {
+          outcome.append(el("p", `${result.skipped.length} word references stayed unchanged because the chosen entry is not a source candidate:`));
+          const list = el("ul");
+          result.skipped.forEach(item => {const li = el("li"); li.append(el("span", `${item.reference.replaceAll(".", " ")} · `)); const surface = el("bdi", item.source_surface.replaceAll("/", "")); surface.dir = "rtl"; li.append(surface, el("span", ` · ${item.anchor}`)); list.append(li);});
+          outcome.append(list);
+        }
+        notice(scope.value === "book" ? message : "Lexical decision saved");
+      } finally { save.disabled = false; }
     }));
     actions.append(save); card.append(include, word, edit, actions); fragment.append(card);
   }

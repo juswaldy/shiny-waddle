@@ -78,6 +78,17 @@ source book. `known_entries` and per-anchor `decisions` support exclusions and
 reviewed glosses. Ambiguous or unmatched selected helps must be resolved or
 explicitly omitted before a build succeeds.
 
+In lexical review, **Apply to** defaults to **This occurrence**. Select **All
+occurrences in this book (consonants only)** and **Save all** to apply the source
+entry, gloss, and inclusion choice to matching words throughout the selected
+book, including occurrences outside the current passage and both written/read
+forms. Matching ignores Hebrew vowel points, accents, punctuation, and slash
+segmentation, retains prefixes/suffixes, and stays within the word's language.
+This replaces earlier decisions on matching anchors. Occurrences whose source
+candidates do not support the chosen entry remain unchanged and are listed for
+separate review. Source text remains intact; saved decisions and build snapshots
+still identify every affected source anchor.
+
 `--emit tex` still needs XeLaTeX to measure page contents. Output directories must
 be empty, preserving earlier editions. Every successful build includes the reader
 JSON, alignment report, source lock, note registry, page plan, TeX, credits, checks,

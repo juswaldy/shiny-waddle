@@ -7,6 +7,7 @@ import sys
 from contextlib import asynccontextmanager
 from importlib.resources import files
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -15,7 +16,8 @@ from fastapi.templating import Jinja2Templates
 from pydantic import Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from ..models import ProjectConfig, ReaderError, StrictModel
+from ..editorial import edit_decision
+from ..models import Decision, ProjectConfig, ReaderError, StrictModel
 from ..service import doctor, inspect_project
 from ..sources import catalog
 from ..store import Store
@@ -29,6 +31,13 @@ class SaveProject(StrictModel):
 
 class ImportSource(StrictModel):
     book: str
+
+
+class EditDecision(StrictModel):
+    revision: int = Field(ge=1)
+    anchor: str = Field(min_length=1, max_length=100)
+    decision: Decision
+    scope: Literal["occurrence", "book"] = "occurrence"
 
 
 def create_app(state: Path | None = None, *, start_worker=True):
@@ -142,6 +151,17 @@ def create_app(state: Path | None = None, *, start_worker=True):
     def review(identity: str):
         config = ProjectConfig.model_validate(store.project(identity)["config"])
         return inspect_project(state, config)
+
+    @app.post("/api/projects/{identity}/decisions")
+    def save_decision(identity: str, value: EditDecision):
+        project = store.project(identity)
+        if value.revision != project["revision"]:
+            raise ReaderError("Project changed in another tab. Reload before saving.")
+        config, report = edit_decision(
+            state, ProjectConfig.model_validate(project["config"]), value.anchor, value.decision, value.scope
+        )
+        saved = store.save_project(identity, value.revision, config)
+        return {"project": saved, **report}
 
     @app.post("/api/projects/{identity}/builds", status_code=202)
     def queue_build(identity: str):

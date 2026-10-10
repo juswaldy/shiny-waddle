@@ -72,6 +72,17 @@ include action, optional supported entry ID, optional editorial gloss, and reaso
 An exclusion is explicit and remains in the report. Missing source anchors or
 incompatible entry choices fail rather than silently discarding stale decisions.
 
+Lexical review can expand a decision to every matching word in the selected book.
+A separate consonant key removes Hebrew marks/punctuation and slash segmentation
+from the raw surface; prefixes/suffixes, logical order, and source Unicode remain
+intact. Matching stays within a language and includes both K/Q records and words
+outside the current passage. Each compatible lexical component receives an
+ordinary per-anchor decision, replacing earlier edits. Components without the
+chosen entry in their pinned crosswalk candidates are reported and left unchanged.
+Review rows include the key and whole-book word count independently of lemma
+frequency. The API saves the expanded configuration in one revision-checked update;
+existing build snapshots remain immutable.
+
 The chapter registry is computed before filtering the requested passage, from the
 same selected chapters and settings. General help identity includes lexical entry,
 stem, and gloss. The reference fixture supplies separate observed slots where the

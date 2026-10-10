@@ -6,7 +6,13 @@ import pytest
 from pydantic import ValidationError
 
 from bible_reader import editorial
-from bible_reader.editorial import build_document, display_surface, require_resolved
+from bible_reader.editorial import (
+    build_document,
+    consonant_key,
+    display_surface,
+    edit_decision,
+    require_resolved,
+)
 from bible_reader.models import Decision, Layout, ProjectConfig, ReaderError, parse_passage
 from bible_reader.tex import verse_content
 
@@ -188,6 +194,100 @@ def test_frequency_known_words_and_decisions(source_state):
     assert next(r for r in build_document(source_state, config).review if r["anchor"] == row["anchor"])[
         "selected"
     ]
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [("שָׁ/מַ֖ר", "שמר"), ("שֻׂמֵּֽר־׃", "שמר"), ("וְ/שָׁמַר", "ושמר"), ("מֶלֶךְ", "מלך"), ("α\u0301", "α\u0301")],
+)
+def test_consonant_key_uses_whole_spelling_without_normalizing_other_scripts(raw, expected):
+    assert consonant_key(raw) == expected
+
+
+def test_edit_defaults_to_one_anchor_without_mutating_config(source_state, consonant_review):
+    config = ProjectConfig(passage="1:1", selection="all")
+    decision = Decision(entry_id="step:test-choice")
+    changed, report = edit_decision(source_state, config, "test-origin:0", decision, "occurrence")
+    assert changed.decisions == {"test-origin:0": decision}
+    assert not config.decisions
+    assert report == {"consonants": "שמר", "applied": ["test-origin:0"], "skipped": []}
+    rows = {r["anchor"]: r for r in build_document(source_state, changed).review}
+    assert rows["test-origin:0"]["status"] == "resolved"
+    assert rows["test-origin:0"]["word_occurrences"] == 7
+    assert rows["test-prefix:0"]["status"] == "ambiguous"
+
+
+def test_bulk_edit_matches_whole_book_and_preserves_unsupported_source_choices(
+    source_state, consonant_review
+):
+    original_sources = [verse.json() for verse in consonant_review]
+    preserved = Decision(entry_id="step:test-other", gloss="Synthetic existing gloss")
+    config = ProjectConfig(
+        passage="1:1",
+        selection="all",
+        readings="qere",
+        decisions={
+            "test-repeat:0": Decision(action="exclude"),
+            "test-homograph:0": preserved,
+        },
+    )
+    decision = Decision(entry_id="step:test-choice", gloss="Synthetic editorial gloss", reason="Bulk test")
+    changed, report = edit_decision(source_state, config, "test-origin:0", decision, "book")
+    expected = {"test-origin:0", "test-repeat:0", "test-ketiv:0", "test-qere:0", "test-segmented:0"}
+    assert set(report["applied"]) == expected
+    assert {r["anchor"] for r in report["skipped"]} == {
+        "test-segmented:1",
+        "test-homograph:0",
+        "test-unmatched:0",
+    }
+    assert all(changed.decisions[anchor] == decision for anchor in expected)
+    assert changed.decisions["test-homograph:0"] == preserved
+    assert set(changed.decisions) == expected | {"test-homograph:0"}
+    assert config.decisions["test-repeat:0"].action == "exclude"
+    assert [verse.json() for verse in consonant_review] == original_sources
+    assert changed.passage == "1:1" and changed.readings == "qere"
+    changed.passage = "1:1-3:1"
+    document = build_document(source_state, changed)
+    rows = {r["anchor"]: r for r in document.review}
+    assert "test-ketiv:0" not in rows
+    assert all(rows[a]["status"] == "resolved" and rows[a]["selected"] for a in expected - {"test-ketiv:0"})
+    assert rows["test-unmatched:0"]["status"] == "unmatched"
+    assert rows["test-homograph:0"]["gloss"] == preserved.gloss
+    assert document.helps[rows["test-repeat:0"]["help_id"]]["editorial"]
+    with pytest.raises(ReaderError, match="unresolved"):
+        require_resolved(document)
+
+
+def test_bulk_omission_can_explicitly_exclude_unmatched_and_ambiguous_words(source_state, consonant_review):
+    config = ProjectConfig(passage="1:1", selection="all")
+    changed, report = edit_decision(source_state, config, "test-origin:0", Decision(action="exclude"), "book")
+    assert len(report["applied"]) == 8
+    assert not report["skipped"]
+    changed.passage = "1:1-3:1"
+    rows = build_document(source_state, changed).review
+    assert all(
+        not r["selected"] for r in rows if r["consonants"] == "שמר" and r["anchor"] != "test-aramaic:0"
+    )
+    assert next(r for r in rows if r["anchor"] == "test-aramaic:0")["selected"]
+
+
+@pytest.mark.parametrize(
+    "anchor,decision,scope,message",
+    [
+        ("absent:0", Decision(entry_id="step:test-choice"), "book", "missing source anchor"),
+        ("test-origin:0", Decision(entry_id="step:test-other"), "book", "incompatible"),
+        ("test-origin:0", Decision(), "book", "Choose a source entry"),
+        ("test-origin:0", Decision(gloss="Synthetic proposal"), "occurrence", "Choose a source entry"),
+        ("test-origin:0", Decision(), "invalid", "Choose this occurrence"),
+    ],
+)
+def test_invalid_bulk_choices_do_not_change_config(
+    source_state, consonant_review, anchor, decision, scope, message
+):
+    config = ProjectConfig(passage="1:1", selection="all")
+    with pytest.raises(ReaderError, match=message):
+        edit_decision(source_state, config, anchor, decision, scope)
+    assert not config.decisions
 
 
 def test_stale_decisions_and_missing_verses_fail(source_state):

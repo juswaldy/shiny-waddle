@@ -8,7 +8,7 @@ from dataclasses import asdict
 from importlib.resources import files
 from pathlib import Path
 
-from .models import ProjectConfig, ReaderDocument, ReaderError, digest, parse_passage
+from .models import Decision, ProjectConfig, ReaderDocument, ReaderError, digest, parse_passage
 from .sources import catalog, lemma_keys, load_book, load_lexicon
 
 STEMS = {"q": "Qal", "N": "Nif", "p": "Piel", "P": "Pual", "h": "Hif", "H": "Hof", "t": "Hitp"}
@@ -46,6 +46,71 @@ def stem_label(morph: str) -> str:
     return STEMS.get(match.group(1)[1:], "") if match else ""
 
 
+def consonant_key(raw: str) -> str:
+    """A separate spelling key; source and display surfaces remain untouched."""
+    return display_surface(raw, "consonants-only")
+
+
+def lexical_candidates(lemma: str, crosswalk: dict[str, list[str]]) -> list[str]:
+    return crosswalk.get(lemma, crosswalk.get(lemma[:5], []))
+
+
+def edit_decision(state: Path, config: ProjectConfig, anchor: str, decision: Decision, scope: str):
+    """Expand an explicit reader choice to source-supported anchors in this book."""
+    if scope not in {"occurrence", "book"}:
+        raise ReaderError("Choose this occurrence or all occurrences in this book.")
+    book = load_book(state, config.book)
+    _, crosswalk = load_lexicon(state)
+    anchors = {
+        f"{token.id}:{index}": (verse, token, lemma)
+        for verse in book
+        for token in verse.tokens
+        if token.kind == "word"
+        for index, lemma in enumerate(lemma_keys(token.lemma))
+    }
+    if anchor not in anchors:
+        raise ReaderError("Editorial decision refers to a missing source anchor.")
+    _, origin, origin_lemma = anchors[anchor]
+    origin_candidates = lexical_candidates(origin_lemma, crosswalk)
+    if decision.entry_id and decision.entry_id not in origin_candidates:
+        raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
+    if (
+        decision.gloss
+        and not decision.entry_id
+        and not (origin_lemma in crosswalk and len(origin_candidates) == 1)
+    ):
+        raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
+    if scope == "book" and (decision.action == "include" or decision.gloss) and not decision.entry_id:
+        raise ReaderError("Choose a source entry before applying a help to all occurrences.")
+    key = consonant_key(origin.surface)
+    if scope == "book" and not key:
+        raise ReaderError("This source word has no consonants to match.")
+    decisions = dict(config.decisions)
+    applied, skipped = [], []
+    for target, (verse, token, lemma) in anchors.items():
+        if scope == "occurrence":
+            if target != anchor:
+                continue
+        elif token.language != origin.language or consonant_key(token.surface) != key:
+            continue
+        if decision.entry_id and decision.entry_id not in lexical_candidates(lemma, crosswalk):
+            skipped.append(
+                {
+                    "anchor": target,
+                    "reference": verse.reference,
+                    "source_surface": token.surface,
+                    "reason": "Chosen entry is not a source candidate for this occurrence",
+                }
+            )
+            continue
+        decisions[target] = decision.model_dump()
+        applied.append(target)
+    updated = ProjectConfig.model_validate({**config.model_dump(), "decisions": decisions})
+    # Check gloss/source compatibility and the existing project before saving anything.
+    build_document(state, updated)
+    return updated, {"consonants": key, "applied": applied, "skipped": skipped}
+
+
 def reference_map():
     return json.loads(files("bible_reader").joinpath("resources/reference-helps.json").read_text())
 
@@ -69,6 +134,12 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
         for token in verse.tokens
         if token.kind == "word" and token.reading != "ketiv"
         for key in lemma_keys(token.lemma)
+    )
+    word_counts = Counter(
+        (token.language, consonant_key(token.surface))
+        for verse in book
+        for token in verse.tokens
+        if token.kind == "word" and lemma_keys(token.lemma)
     )
     registries: dict[int, dict[str, int]] = defaultdict(dict)
     helps = {}
@@ -102,7 +173,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
             for index, lemma in enumerate(lemma_keys(token.lemma)):
                 anchor = f"{token.id}:{index}"
                 exact = lemma in crosswalk
-                candidate_ids = crosswalk.get(lemma, crosswalk.get(lemma[:5], []))
+                candidate_ids = lexical_candidates(lemma, crosswalk)
                 candidates = [asdict(entries[c]) for c in candidate_ids]
                 decision = config.decisions.get(anchor)
                 if decision:
@@ -190,6 +261,8 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "chapter": verse.chapter,
                             "surface": surface,
                             "source_surface": token.surface,
+                            "consonants": consonant_key(token.surface),
+                            "word_occurrences": word_counts[(token.language, consonant_key(token.surface))],
                             "lemma": lemma,
                             "morphology": token.morph,
                             "reading": token.reading,
