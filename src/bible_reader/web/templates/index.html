@@ -51,7 +51,7 @@
         <div class="summary-row"><div id="coverage" class="metrics"></div><button id="reload-review" class="text-button">Refresh review ↻</button></div>
         <div id="review-intro" class="info-card">Import your sources to begin. Original text and editorial choices stay separate.</div>
         <div id="review-edit-result" class="info-card" role="status" hidden></div>
-        <div class="review-toolbar"><input id="search" type="search" placeholder="Find a word, gloss, or reference…" aria-label="Search lexical helps"><label class="check-label"><input id="show-all" type="checkbox"> Show omitted words</label><label class="check-label"><input id="unresolved-only" type="checkbox"> Needs review</label></div>
+        <div class="review-toolbar"><input id="search" type="search" placeholder="Find a word, gloss, or reference…" aria-label="Search lexical helps"><label class="check-label"><input id="show-all" type="checkbox"> Show omitted words</label><label class="check-label"><input id="unresolved-only" type="checkbox"> Needs review</label><label class="check-label"><input id="resolved-only" type="checkbox"> Rework resolved helps</label></div>
         <div id="review-list" aria-live="polite"></div><div class="pagination"><button id="previous" class="secondary">← Previous</button><span id="row-count"></span><button id="next" class="secondary">Next →</button></div>
       </section>
       <section id="preview-panel" class="panel" hidden>
@@ -68,6 +68,10 @@
       </section>
     </main>
   </div>
+  <aside id="verse-context" class="verse-context" role="dialog" aria-labelledby="verse-context-reference" hidden>
+    <div class="verse-context-heading"><strong id="verse-context-reference"></strong><span id="verse-context-state"></span><button id="close-verse-context" type="button" aria-label="Close verse context">×</button></div>
+    <div id="verse-context-text" class="verse-context-text" dir="rtl" lang="he"></div>
+  </aside>
   <footer>Made for reading the text. Built from sources you can inspect.</footer>
 </body>
 </html>

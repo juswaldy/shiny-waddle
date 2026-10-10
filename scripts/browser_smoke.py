@@ -29,6 +29,73 @@ with socket.socket() as sock:
 url = f"http://127.0.0.1:{port}"
 os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
 errors = []
+
+
+def check_verse_context(page, source_row, verse, *, screenshot=None):
+    """Inspect real source Unicode and the popup's hover, pin, and keyboard behavior."""
+    article = page.locator(f"[data-anchor='{source_row['anchor']}'].help-row")
+    reference = article.get_by_role("button", name=f"Verse context for {source_row['anchor']}", exact=True)
+    popup = page.locator("#verse-context")
+    reference.hover()
+    expect(popup).to_be_visible()
+    expect(popup).to_have_attribute("data-pinned", "false")
+    expect(reference).to_have_attribute("aria-expanded", "true")
+    tokens = popup.locator(".verse-context-token")
+    assert tokens.evaluate_all("nodes => nodes.map(n => n.dataset.tokenId)") == [
+        t["id"] for t in verse["tokens"] if t["source_surface"].replace("/", "")
+    ]
+    assert tokens.all_text_contents() == [
+        t["source_surface"].replace("/", "") for t in verse["tokens"] if t["source_surface"].replace("/", "")
+    ]
+    highlight = popup.locator(".verse-context-highlight")
+    expect(highlight).to_have_count(1)
+    expect(highlight).to_have_attribute("data-token-id", source_row["token_id"])
+    expect(highlight).to_have_text(source_row["source_surface"].replace("/", ""))
+    assert highlight.evaluate(
+        "node => {const s = getComputedStyle(node); const rgb = s.color.match(/\\d+/g).map(Number); "
+        "return Number(s.fontWeight) >= 700 && parseFloat(s.fontSize) > parseFloat(getComputedStyle(node.parentElement).fontSize) "
+        "&& rgb[0] > rgb[1] && rgb[0] > rgb[2];}"
+    )
+    assert popup.locator("#verse-context-text").evaluate("node => getComputedStyle(node).direction") == "rtl"
+    assert popup.locator(".verse-context-reading").all_text_contents() == [
+        t["reading"] for t in verse["tokens"] if t["reading"] in {"ketiv", "qere"}
+    ]
+    page.mouse.move(0, 0)
+    expect(popup).to_be_hidden()
+    reference.focus()
+    expect(popup).to_be_visible()
+    reference.press("Enter")
+    expect(popup).to_have_attribute("data-pinned", "true")
+    page.mouse.move(0, 0)
+    article.locator("textarea").focus()
+    expect(popup).to_be_visible()  # Editing must leave the pinned context in view.
+    if screenshot:
+        page.screenshot(path=str(OUTPUT / screenshot), full_page=False)
+    page.keyboard.press("Escape")
+    expect(popup).to_be_hidden()
+    expect(reference).to_have_attribute("aria-expanded", "false")
+    reference.click()
+    expect(popup).to_have_attribute("data-pinned", "true")
+    other = next(
+        r
+        for r in page.locator(".verse-reference").all()
+        if r.get_attribute("aria-label") != f"Verse context for {source_row['anchor']}"
+    )
+    other.hover()
+    expect(popup).to_have_attribute("data-review-anchor", source_row["anchor"])
+    other.click()
+    expect(popup).to_have_attribute(
+        "data-review-anchor", other.evaluate("node => node.closest('.help-row').dataset.anchor")
+    )
+    expect(popup).to_have_attribute("data-pinned", "true")
+    popup.get_by_role("button", name="Close verse context", exact=True).click()
+    expect(popup).to_be_hidden()
+    reference.click()
+    expect(popup).to_be_visible()
+    reference.click()
+    expect(popup).to_be_hidden()
+
+
 with (OUTPUT / "server.log").open("w") as log:
     server = subprocess.Popen(
         [sys.executable, "-m", "bible_reader", "--state", str(STATE), "serve", "--port", str(port)],
@@ -76,7 +143,10 @@ with (OUTPUT / "server.log").open("w") as log:
             page.locator("#cantillation").select_option(label="Consonants only")
             page.get_by_role("button", name="Save settings", exact=True).click()
             expect(page.locator("#notice")).to_have_text("Edition settings saved")
+            page.get_by_role("checkbox", name="Rework resolved helps", exact=True).check()
             row = page.locator('[data-anchor="20qg1:0"]')
+            expect(row.locator(".row-status")).to_have_text("resolved")
+            assert page.locator(".row-status.unresolved").count() == 0
             row.locator("textarea").fill("Editorial browser test gloss")
             row.get_by_role("button", name="Save help").click()
             expect(row.locator(".note-label")).to_have_text("23")
@@ -165,8 +235,16 @@ with (OUTPUT / "server.log").open("w") as log:
             page.locator("#selection").select_option("all")
             page.get_by_role("button", name="Save settings", exact=True).click()
             expect(page.locator("#notice")).to_have_text("Edition settings saved")
+            page.get_by_role("checkbox", name="Rework resolved helps", exact=True).check()
             page.locator("#unresolved-only").check()
+            expect(page.locator("#resolved-only")).not_to_be_checked()
             repeated = page.locator('[data-anchor="207mS:0"]')
+            identity = page.locator("#project-picker").input_value()
+            review = page.request.get(url + f"/api/projects/{identity}/review").json()
+            source_row = next(r for r in review["rows"] if r["anchor"] == "207mS:0")
+            verse = next(v for v in review["verses"] if v["reference"] == source_row["reference"])
+            assert source_row["surface"] == "תחת" and source_row["source_surface"] == "תַּ֭חַת"
+            check_verse_context(page, source_row, verse, screenshot="verse-context-desktop.png")
             scope = repeated.get_by_role("combobox", name="Apply to for 207mS:0", exact=True)
             expect(scope).to_have_value("occurrence")
             scope.select_option("book")
@@ -205,11 +283,80 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True)).to_have_value(
                 "occurrence"
             )
+            # Two spellings of the same consonants in one verse must retain distinct highlights.
+            review = page.request.get(url + f"/api/projects/{identity}/review").json()
+            repeated_in_verse = next(r for r in review["rows"] if r["anchor"] == "20kxp:0")
+            check_verse_context(page, repeated_in_verse, review["verses"][0])
+            # Rework a resolved help without hiding its editor or changing other saved occurrences.
+            page.locator("#unresolved-only").check()
+            expect(elsewhere).to_have_count(0)
+            page.get_by_role("checkbox", name="Rework resolved helps", exact=True).check()
+            expect(page.locator("#unresolved-only")).not_to_be_checked()
+            expect(elsewhere).to_have_count(1)
+            assert page.locator(".row-status.unresolved").count() == 0
+            elsewhere.get_by_role("combobox", name="Source entry for 20NTZ:0", exact=True).select_option(
+                "step:H8478G"
+            )
+            elsewhere.locator("textarea").fill("Synthetic resolved-help rework gloss")
+            elsewhere.get_by_role("button", name="Verse context for 20NTZ:0", exact=True).click()
+            expect(page.locator("#verse-context")).to_have_attribute("data-pinned", "true")
+            elsewhere.get_by_role("button", name="Save help", exact=True).click()
+            expect(page.locator("#notice")).to_have_text("Lexical decision saved")
+            expect(
+                page.locator("#verse-context")
+            ).to_be_visible()  # Saving reattaches the pin to the new row.
+            page.keyboard.press("Escape")
+            reworked = page.request.get(url + f"/api/projects/{identity}").json()
+            assert reworked["config"]["decisions"]["20NTZ:0"]["entry_id"] == "step:H8478G"
+            assert (
+                reworked["config"]["decisions"]["20NTZ:0"]["gloss"] == "Synthetic resolved-help rework gloss"
+            )
+            assert all(
+                reworked["config"]["decisions"][a]["entry_id"] == "step:H8478H"
+                for a in bulk["applied"]
+                if a != "20NTZ:0"
+            )
+            # The same resolved help can then be reworked throughout the book.
+            elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True).select_option("book")
+            elsewhere.get_by_role("button", name="Save all", exact=True).click()
+            expect(page.locator("#review-edit-result")).to_contain_text("Saved 5 lexical decisions")
+            reworked = page.request.get(url + f"/api/projects/{identity}").json()
+            assert all(
+                reworked["config"]["decisions"][a]["entry_id"] == "step:H8478G"
+                and reworked["config"]["decisions"][a]["gloss"] == "Synthetic resolved-help rework gloss"
+                for a in bulk["applied"]
+            )
+            page.reload()
+            expect(elsewhere.locator("textarea")).to_have_value("Synthetic resolved-help rework gloss")
+            expect(elsewhere.locator(".row-status")).to_have_text("resolved")
+            page.get_by_role("checkbox", name="Rework resolved helps", exact=True).check()
+            # Explicit omissions can also be found again and re-included in the resolved view.
+            elsewhere.get_by_role("checkbox").uncheck()
+            elsewhere.get_by_role("button", name="Save help", exact=True).click()
+            expect(page.locator("#notice")).to_have_text("Lexical decision saved")
+            expect(elsewhere).to_have_count(0)
+            page.locator("#show-all").check()
+            expect(elsewhere.locator(".row-status")).to_have_text("omitted")
+            elsewhere.get_by_role("checkbox").check()
+            elsewhere.get_by_role("button", name="Save help", exact=True).click()
+            expect(page.locator("#notice")).to_have_text("Lexical decision saved")
+            expect(elsewhere.locator(".row-status")).to_have_text("resolved")
+            page.locator("#show-all").uncheck()
             page.set_viewport_size({"width": 390, "height": 844})
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True).select_option("book")
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             page.screenshot(path=str(OUTPUT / "review-mobile.png"), full_page=True)
+            elsewhere.get_by_role("button", name="Verse context for 20NTZ:0", exact=True).click()
+            expect(page.locator("#verse-context")).to_be_visible()
+            bounds = page.locator("#verse-context").bounding_box()
+            assert bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= 390
+            assert bounds["y"] >= 0 and bounds["y"] + bounds["height"] <= 844
+            page.screenshot(path=str(OUTPUT / "verse-context-mobile.png"), full_page=False)
+            page.locator("#verse-context").get_by_role(
+                "button", name="Close verse context", exact=True
+            ).click()
+            expect(page.locator("#verse-context")).to_be_hidden()
             assert errors == [], errors
             browser.close()
         (OUTPUT / "checks.json").write_text(
@@ -221,6 +368,8 @@ with (OUTPUT / "server.log").open("w") as log:
                         "edit",
                         "persist",
                         "bulk consonant ambiguity resolution, unsupported matches, filters, and later-passage persistence",
+                        "resolved-help filtering, individual and bulk reworking, persistence, and re-including omissions",
+                        "pointed/accented verse hover, exact occurrence highlight, K/Q forms, keyboard and click pinning, editing/save persistence, mobile popup bounds",
                         "verse layout selection, reload, and both PDF builds",
                         "consonant policy selection, reload, and all three PDF builds",
                         "default/custom paper selection, validation, persistence, and actual PDF dimensions",

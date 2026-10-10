@@ -3,6 +3,7 @@ const $ = id => document.getElementById(id);
 const csrf = document.querySelector('meta[name="reader-token"]').content;
 let current, sourceInfo, reviewData, allJobs = [], page = 0, requestVersion = 0, noticeTimer, viewedJob;
 const pageSize = 40;
+let contextRow, contextReference, contextPinned = false, contextHideTimer, suppressContextFocus = false;
 
 async function api(path, method = "GET", body) {
   const response = await fetch(`/api${path}`, {method, headers: {"Content-Type": "application/json", "X-Reader-Token": csrf}, body: body === undefined ? undefined : JSON.stringify(body)});
@@ -19,7 +20,78 @@ function notice(message, error = false) {
 }
 function guard(action) { return async event => { try { await action(event); } catch (error) { notice(error.message, true); } }; }
 function el(tag, text, className) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; return node; }
+function closeVerseContext(restoreFocus = false) {
+  clearTimeout(contextHideTimer);
+  const reference = contextReference;
+  reference?.setAttribute("aria-expanded", "false");
+  $("verse-context").hidden = true;
+  contextRow = contextReference = undefined; contextPinned = false;
+  if (restoreFocus && reference?.isConnected) {
+    suppressContextFocus = true; reference.focus({preventScroll: true}); suppressContextFocus = false;
+  }
+}
+function positionVerseContext() {
+  const popup = $("verse-context");
+  if (popup.hidden || !contextReference?.isConnected) return;
+  const reference = contextReference.getBoundingClientRect();
+  const bounds = popup.getBoundingClientRect();
+  const width = document.documentElement.clientWidth, height = window.innerHeight;
+  const above = reference.top - bounds.height - 10;
+  popup.style.left = `${Math.max(12, Math.min(reference.left, width - bounds.width - 12))}px`;
+  popup.style.top = `${Math.max(12, Math.min(above >= 12 ? above : reference.bottom + 10, height - bounds.height - 12))}px`;
+}
+function showVerseContext(row, reference, pinned = false) {
+  if (contextPinned && !pinned) return;
+  const verse = reviewData?.verses.find(v => v.reference === row.reference);
+  if (!verse) return;
+  clearTimeout(contextHideTimer);
+  contextReference?.setAttribute("aria-expanded", "false");
+  contextRow = row; contextReference = reference; contextPinned = pinned;
+  reference.setAttribute("aria-expanded", "true");
+  const popup = $("verse-context"); popup.dataset.reviewAnchor = row.anchor; popup.dataset.pinned = String(pinned);
+  $("verse-context-reference").textContent = row.reference.replaceAll(".", " ");
+  $("verse-context-state").textContent = pinned ? "Pinned" : "Click reference to pin";
+  const text = $("verse-context-text"); text.replaceChildren();
+  let previous;
+  for (const token of verse.tokens) {
+    const surface = token.source_surface.replaceAll("/", "");
+    if (!surface) continue;
+    const kind = token.kind;
+    if (previous !== undefined && !["x-maqqef", "x-sof-pasuq"].includes(kind) && previous !== "x-maqqef") text.append(" ");
+    const highlighted = token.id === row.token_id;
+    const word = el(highlighted ? "strong" : "span", surface, `verse-context-token${highlighted ? " verse-context-highlight" : ""}`);
+    word.dataset.tokenId = token.id; word.lang = {hbo: "he", arc: "arc", grc: "el"}[token.language] || token.language;
+    word.dir = ["hbo", "arc"].includes(token.language) ? "rtl" : "ltr";
+    text.append(word);
+    if (["ketiv", "qere"].includes(token.reading)) {
+      const reading = el("bdi", token.reading, "verse-context-reading"); reading.dir = "ltr"; reading.lang = "en"; text.append(reading);
+    }
+    previous = kind;
+  }
+  popup.hidden = false; positionVerseContext();
+}
+function scheduleVerseContextClose() {
+  clearTimeout(contextHideTimer);
+  contextHideTimer = setTimeout(() => {
+    const popup = $("verse-context");
+    if (!contextPinned && !contextReference?.matches(":hover, :focus") && !popup.matches(":hover") && !popup.contains(document.activeElement)) closeVerseContext();
+  }, 150);
+}
+function verseReference(row) {
+  const reference = el("button", row.reference.replaceAll(".", " "), "reference verse-reference"); reference.type = "button";
+  reference.setAttribute("aria-label", `Verse context for ${row.anchor}`); reference.setAttribute("aria-controls", "verse-context");
+  reference.setAttribute("aria-haspopup", "dialog"); reference.setAttribute("aria-expanded", "false");
+  reference.addEventListener("mouseenter", () => showVerseContext(row, reference));
+  reference.addEventListener("focus", () => {if (!suppressContextFocus) showVerseContext(row, reference);});
+  reference.addEventListener("mouseleave", scheduleVerseContextClose); reference.addEventListener("blur", scheduleVerseContextClose);
+  reference.addEventListener("click", () => {
+    if (contextPinned && contextRow?.anchor === row.anchor) closeVerseContext();
+    else showVerseContext(row, reference, true);
+  });
+  return reference;
+}
 function tab(name) {
+  if (name !== "review") closeVerseContext();
   for (const n of ["review", "preview", "sources"]) $(`${n}-panel`).hidden = n !== name;
   document.querySelectorAll("[data-tab]").forEach(button => button.classList.toggle("active", button.dataset.tab === name));
 }
@@ -61,6 +133,7 @@ function updatePaperFields() {
   $("paper-width").disabled = $("paper-height").disabled = !custom;
 }
 async function loadProject(identity) {
+  closeVerseContext();
   viewedJob = undefined;
   $("review-edit-result").hidden = true;
   current = await api(`/projects/${identity}`); page = 0; fillForm();
@@ -105,20 +178,24 @@ async function refreshReview() {
     renderReview();
   } catch (error) {
     if (version !== requestVersion) return;
+    closeVerseContext();
     reviewData = null; $("review-list").replaceChildren(el("p", "Open Sources to install this book, then refresh the review.", "empty"));
     $("review-intro").textContent = error.message; $("review-intro").className = "info-card error"; $("coverage").replaceChildren();
   }
 }
 function renderReview() {
   if (!reviewData) return;
+  if (!contextPinned) closeVerseContext();
+  let pinnedReference;
   const query = $("search").value.toLowerCase();
-  const rows = reviewData.rows.filter(r => ($("show-all").checked || r.selected) && (!$("unresolved-only").checked || (r.selected && r.status !== "resolved")) && `${r.surface} ${r.gloss} ${r.reference} ${r.lemma}`.toLowerCase().includes(query));
+  const rows = reviewData.rows.filter(r => ($("show-all").checked || r.selected) && (!$("unresolved-only").checked || (r.selected && r.status !== "resolved")) && (!$("resolved-only").checked || r.status === "resolved") && `${r.surface} ${r.gloss} ${r.reference} ${r.lemma}`.toLowerCase().includes(query));
   page = Math.max(0, Math.min(page, Math.ceil(rows.length / pageSize) - 1));
   const fragment = document.createDocumentFragment();
   for (const row of rows.slice(page * pageSize, (page + 1) * pageSize)) {
     const card = el("article", undefined, "help-row"); card.dataset.anchor = row.anchor;
     const include = el("input"); include.type = "checkbox"; include.checked = row.selected; include.setAttribute("aria-label", `Include ${row.reference} ${row.surface}`);
-    const word = el("div"); word.append(el("div", row.reference.replaceAll(".", " "), "reference"));
+    const word = el("div"); const reference = verseReference(row); word.append(reference);
+    if (contextPinned && contextRow?.anchor === row.anchor) pinnedReference = {row, reference};
     const surface = el("div", row.surface, "help-word"); surface.lang = "he"; surface.dir = "rtl"; word.append(surface);
     const edit = el("div", undefined, "help-edit");
     const source = el("div", undefined, "row-source");
@@ -170,6 +247,8 @@ function renderReview() {
   }
   if (!rows.length) fragment.append(el("p", "No helps match these filters.", "empty"));
   $("review-list").replaceChildren(fragment);
+  if (pinnedReference) showVerseContext(pinnedReference.row, pinnedReference.reference, true);
+  else closeVerseContext();
   $("row-count").textContent = rows.length ? `${page * pageSize + 1}–${Math.min((page + 1) * pageSize, rows.length)} of ${rows.length} word references` : "0 word references";
   $("previous").disabled = page === 0; $("next").disabled = (page + 1) * pageSize >= rows.length;
 }
@@ -222,6 +301,13 @@ async function poll() {
   setTimeout(poll, 1400);
 }
 document.querySelectorAll("[data-tab]").forEach(button => button.onclick = () => tab(button.dataset.tab));
+$("close-verse-context").onclick = () => closeVerseContext(true);
+$("verse-context").addEventListener("mouseenter", () => clearTimeout(contextHideTimer));
+$("verse-context").addEventListener("mouseleave", scheduleVerseContextClose);
+$("verse-context").addEventListener("focusout", scheduleVerseContextClose);
+document.addEventListener("keydown", event => {if (event.key === "Escape" && !$("verse-context").hidden) {event.preventDefault(); closeVerseContext(true);}});
+window.addEventListener("resize", positionVerseContext);
+document.addEventListener("scroll", positionVerseContext, true);
 $("show-sources").onclick = () => tab("sources");
 $("project-picker").onchange = guard(() => loadProject($("project-picker").value));
 $("project-form").onsubmit = guard(async event => {event.preventDefault(); await saveConfig(formConfig()); notice("Edition settings saved");});
@@ -233,6 +319,10 @@ $("build").onclick = guard(async () => {viewedJob = undefined; await saveConfig(
 $("import-source").onclick = guard(async () => {const job = await api("/sources/import", "POST", {book: $("import-book").value}); allJobs.unshift(job); renderJobs(); notice("Source import queued");});
 $("check-environment").onclick = guard(async () => { $("environment").textContent = JSON.stringify(await api("/doctor"), null, 2); });
 $("reload-review").onclick = guard(refreshReview);
-for (const id of ["search", "show-all", "unresolved-only"]) $(id).addEventListener("input", () => {page = 0; renderReview();});
+for (const id of ["search", "show-all", "unresolved-only", "resolved-only"]) $(id).addEventListener("input", () => {
+  if (id === "unresolved-only" && $(id).checked) $("resolved-only").checked = false;
+  if (id === "resolved-only" && $(id).checked) $("unresolved-only").checked = false;
+  page = 0; renderReview();
+});
 $("previous").onclick = () => {page--; renderReview();}; $("next").onclick = () => {page++; renderReview();};
 (async () => {try {await refreshSources(); await refreshProjects(localStorage.getItem("reader-project")); await poll();} catch (error) {notice(error.message, true);}})();

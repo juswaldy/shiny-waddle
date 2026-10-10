@@ -89,6 +89,19 @@ candidates do not support the chosen entry remain unchanged and are listed for
 separate review. Source text remains intact; saved decisions and build snapshots
 still identify every affected source anchor.
 
+Select **Rework resolved helps** to revisit source entries that already resolve.
+Change the gloss, choose another available source candidate, or change inclusion,
+then use **Save help** for one occurrence or **Save all** for matching words in the
+book. This filter and **Needs review** switch each other off; **Show omitted words**
+also exposes resolved entries currently excluded from the reader.
+
+Hover over a word's verse reference (or focus it with the keyboard) to see the
+whole verse with source vowel points and accents, regardless of the edition's
+cantillation setting. The word at that source occurrence is red, bold, and larger.
+Click the reference to pin the popup while editing; click it again, use the close
+button, or press Escape to dismiss it. Click another reference to switch the pinned
+verse. Written/read forms retain their ketiv/qere labels.
+
 `--emit tex` still needs XeLaTeX to measure page contents. Output directories must
 be empty, preserving earlier editions. Every successful build includes the reader
 JSON, alignment report, source lock, note registry, page plan, TeX, credits, checks,
