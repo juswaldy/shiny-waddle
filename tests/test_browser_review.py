@@ -46,6 +46,24 @@ def review_server(source_state):
             thread.join(timeout=10)
 
 
+def set_review_choice(row, field, value):
+    name = f"{field} for {row.get_attribute('data-anchor')}"
+    group = row.get_by_role("radiogroup", name=name, exact=True)
+    if group.count():
+        group.locator(f"input[value='{value}']").check()
+    else:
+        row.get_by_role("combobox", name=name, exact=True).select_option(value)
+
+
+def expect_review_choice(row, field, value):
+    name = f"{field} for {row.get_attribute('data-anchor')}"
+    group = row.get_by_role("radiogroup", name=name, exact=True)
+    if group.count():
+        expect(group.locator(f"input[value='{value}']")).to_be_checked()
+    else:
+        expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
+
+
 @pytest.mark.parametrize("view", ["cards", "grid"])
 @pytest.mark.parametrize("batch", [False, True], ids=["row-save", "page-save"])
 def test_review_defaults_to_book_scope_and_allows_occurrence_override(
@@ -67,15 +85,37 @@ def test_review_defaults_to_book_scope_and_allows_occurrence_override(
         page.goto(url)
         page.locator("#review-view").select_option(view)
         expect(page.locator(".help-row")).to_have_count(4)
-        for scope in page.locator(".help-row select[aria-label^='Apply to for ']").all():
-            expect(scope).to_have_value("book")
+        for row in page.locator(".help-row").all():
+            expect_review_choice(row, "Apply to", "book")
         expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
         origin = page.locator("[data-anchor='test-origin:0']")
         expect(origin.get_by_role("button", name="Save all", exact=True)).to_be_visible()
-        expect(origin.locator(".hint")).to_be_visible()
-        origin.get_by_role("combobox", name="Source entry for test-origin:0", exact=True).select_option(
-            "step:test-choice"
-        )
+        if view == "grid":
+            expect(origin.locator("select")).to_have_count(0)
+            expect(origin.locator(".hint")).to_have_count(0)
+            source = origin.get_by_role("radiogroup", name="Source entry for test-origin:0", exact=True)
+            expect(source.get_by_role("radio")).to_have_count(3)
+            expect_review_choice(origin, "Source entry", "")
+            scope = origin.get_by_role("radiogroup", name="Apply to for test-origin:0", exact=True)
+            scope.hover()
+            assert "שמר" in scope.get_attribute("title")
+            assert "Replaces earlier edits" in scope.get_attribute("title")
+        else:
+            expect(origin.locator(".hint")).to_be_visible()
+        set_review_choice(origin, "Source entry", "step:test-choice")
+        expect(origin.locator("textarea")).to_have_value("Synthetic step:test-choice")
+        if view == "grid":
+            # Native arrow-key selection changes only this row's source choice.
+            selected = source.locator("input[value='step:test-choice']")
+            selected.focus()
+            selected.press("ArrowDown")
+            expect_review_choice(origin, "Source entry", "step:test-alternate")
+            expect(origin.locator("textarea")).to_have_value("Synthetic step:test-alternate")
+            neighbor = page.locator("[data-anchor='test-prefix:0']")
+            expect_review_choice(neighbor, "Source entry", "")
+            expect_review_choice(neighbor, "Apply to", "book")
+            source.locator("input[value='step:test-alternate']").press("ArrowUp")
+            expect_review_choice(origin, "Source entry", "step:test-choice")
         origin.locator("textarea").fill("Synthetic default book gloss")
         endpoint = "/decisions/batch" if batch else "/decisions"
         with page.expect_response(lambda response: response.url.endswith(endpoint)) as response:
@@ -98,15 +138,15 @@ def test_review_defaults_to_book_scope_and_allows_occurrence_override(
         assert set(decisions) == applied
         assert all(decision["gloss"] == "Synthetic default book gloss" for decision in decisions.values())
         expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
-        scope = origin.get_by_role("combobox", name="Apply to for test-origin:0", exact=True)
-        expect(scope).to_have_value("book")
+        expect_review_choice(origin, "Apply to", "book")
 
         # An explicit narrower choice survives view switches and review refreshes.
-        scope.select_option("occurrence")
+        set_review_choice(origin, "Apply to", "occurrence")
         origin.locator("textarea").fill("Synthetic one occurrence gloss")
         page.locator("#review-view").select_option("grid" if view == "cards" else "cards")
         page.locator("#reload-review").click()
-        expect(scope).to_have_value("occurrence")
+        expect_review_choice(origin, "Apply to", "occurrence")
+        expect_review_choice(origin, "Source entry", "step:test-choice")
         expect(origin.locator(".hint")).to_be_hidden()
         expect(origin.get_by_role("button", name="Save help", exact=True)).to_be_visible()
         with page.expect_response(lambda response: response.url.endswith(endpoint)) as response:
@@ -121,7 +161,7 @@ def test_review_defaults_to_book_scope_and_allows_occurrence_override(
         assert saved["test-origin:0"]["gloss"] == "Synthetic one occurrence gloss"
         assert all(saved[anchor] == decisions[anchor] for anchor in applied - {"test-origin:0"})
         expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
-        expect(scope).to_have_value("book")
+        expect_review_choice(origin, "Apply to", "book")
         browser.close()
 
 
@@ -145,12 +185,8 @@ def test_grid_page_entry_drafts_shortcuts_atomic_saves_and_mobile(review_server,
         first = page.locator(f"[data-anchor='{first_anchor}']")
         second = page.locator(f"[data-anchor='{second_anchor}']")
         # These independent wording edits explicitly use the narrower scope.
-        first.get_by_role("combobox", name=f"Apply to for {first_anchor}", exact=True).select_option(
-            "occurrence"
-        )
-        second.get_by_role("combobox", name=f"Apply to for {second_anchor}", exact=True).select_option(
-            "occurrence"
-        )
+        set_review_choice(first, "Apply to", "occurrence")
+        set_review_choice(second, "Apply to", "occurrence")
         first.locator("textarea").fill("Synthetic grid first gloss")
         first.locator("textarea").press("Enter")
         expect(second.locator("textarea")).to_be_focused()
@@ -278,16 +314,16 @@ def test_grid_page_entry_drafts_shortcuts_atomic_saves_and_mobile(review_server,
         page.locator("#next").click()
         following = page.locator(".help-row").first.get_attribute("data-anchor")
         page.locator("#previous").click()
-        for scope in page.locator(".help-row select[aria-label^='Apply to for ']").all():
-            scope.select_option("occurrence")
+        for row in page.locator(".help-row").all():
+            set_review_choice(row, "Apply to", "occurrence")
         page.locator("#omit-page").click()
         expect(page.locator("#draft-count")).to_have_text("20 unsaved edits on this page")
         page.locator("#save-next").click()
         expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
         expect(page.locator(".help-row").first).to_have_attribute("data-anchor", following)
         page.locator("#show-all").check()
-        for scope in page.locator(".help-row select[aria-label^='Apply to for ']").all():
-            scope.select_option("occurrence")
+        for row in page.locator(".help-row").all():
+            set_review_choice(row, "Apply to", "occurrence")
         page.locator("#include-page").click()
         page.locator("#save-page").click()
         expect(page.locator("#draft-count")).to_have_text("No unsaved edits")

@@ -33,6 +33,10 @@
 .review-grid th:nth-child(1){width:50px}.review-grid th:nth-child(2){width:145px}.review-grid th:nth-child(3){width:190px}.review-grid th:nth-child(5){width:140px}.review-grid th:nth-child(6){width:95px}
 .review-grid .help-word{font-size:25px;margin:0;min-height:30px}
 .review-grid select{font-size:11px;min-height:32px;padding:4px 6px}
+.review-choice{min-width:0;margin:0;padding:0;border:0;display:grid;gap:6px}
+.review-radio{display:flex;align-items:flex-start;gap:7px;font-size:11px;line-height:1.5;cursor:pointer}
+.review-radio span{min-width:0}
+.review-radio input[type=radio]{flex-shrink:0;width:14px;min-height:14px;height:14px;margin:2px 0 0;padding:0;accent-color:var(--accent)}
 .review-grid textarea{min-height:55px;height:55px;resize:vertical;padding:6px 8px;font-size:12px}
 .review-grid .row-source{flex-wrap:wrap;margin-bottom:4px}
 .review-grid .note-label{font-size:18px;margin:0}

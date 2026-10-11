@@ -298,6 +298,27 @@ function moveGloss(anchor, offset) {
   const target = visibleEditors.get(visibleRows[index + offset]?.anchor)?.gloss;
   if (target) {target.focus(); target.select();}
 }
+function createReviewChoice(row, field, label, options, radio) {
+  const element = el(radio ? "fieldset" : "select", undefined, radio ? "review-choice" : undefined);
+  element.setAttribute("aria-label", `${label} for ${row.anchor}`);
+  const inputs = [];
+  if (radio) element.setAttribute("role", "radiogroup");
+  for (const [value, text] of options) {
+    if (radio) {
+      const option = el("label", undefined, "review-radio");
+      const input = el("input"); input.type = "radio"; input.name = `${field}-${row.anchor}`; input.value = value;
+      option.append(input, el("span", text)); element.append(option); inputs.push(input);
+    } else {
+      const option = el("option", text); option.value = value; element.append(option);
+    }
+  }
+  return {element,
+    get value() {return radio ? inputs.find(input => input.checked)?.value || "" : element.value;},
+    set value(value) {if (radio) inputs.forEach(input => {input.checked = input.value === value;}); else element.value = value;},
+    set disabled(value) {if (radio) inputs.forEach(input => {input.disabled = value;}); else element.disabled = value;},
+    focus() {(radio ? inputs.find(input => input.checked) || inputs[0] : element)?.focus();}
+  };
+}
 function createReviewEditor(row, grid) {
   const card = el(grid ? "tr" : "article", undefined, "help-row"); card.dataset.anchor = row.anchor;
   const include = el("input"); include.type = "checkbox"; include.setAttribute("aria-label", `Include ${row.reference} ${row.surface}`);
@@ -307,10 +328,9 @@ function createReviewEditor(row, grid) {
   const sourceLine = el("div", undefined, "row-source");
   const headword = el("span", "", "headword"); headword.lang = "he"; headword.dir = "rtl";
   sourceLine.append(headword, el("small", row.reading === "normal" ? row.lemma : `${row.lemma} · ${row.reading}`)); source.append(sourceLine);
-  const choice = el("select"); choice.setAttribute("aria-label", `Source entry for ${row.anchor}`);
-  const blank = el("option", "Choose a source entry…"); blank.value = ""; choice.append(blank);
-  row.candidates.forEach(candidate => {const option = el("option", `${candidate.gloss} · ${candidate.id}`); option.value = candidate.id; choice.append(option);});
-  if (grid || row.candidates.length > 1 || !row.entry_id) source.append(choice);
+  const choice = createReviewChoice(row, "source-entry", "Source entry",
+    [["", grid ? "No source entry selected" : "Choose a source entry…"], ...row.candidates.map(candidate => [candidate.id, `${candidate.gloss} · ${candidate.id}`])], grid);
+  if (grid || row.candidates.length > 1 || !row.entry_id) source.append(choice.element);
   const details = el("details"); details.append(el("summary", "Source & selection"));
   details.append(el("div", `${row.reason} · ${row.method} · ${row.morphology} · ${row.book_frequency} occurrences in this book · anchor ${row.anchor}`, "source-detail")); source.append(details);
   const glossBox = el("div", undefined, "help-edit");
@@ -321,22 +341,22 @@ function createReviewEditor(row, grid) {
   tools.append(resetSource, undo); glossBox.append(tools);
   const provenance = el("div", undefined, "gloss-provenance"); glossBox.append(provenance);
   const scopeBox = el("div");
-  const scopeLabel = el("label", "Apply to", "source-detail");
-  const scope = el("select"); scope.setAttribute("aria-label", `Apply to for ${row.anchor}`);
-  for (const [value, text] of [["occurrence", "This occurrence"], ["book", `All ${row.word_occurrences} occurrences in this book (consonants only)`]]) {
-    const option = el("option", text); option.value = value; scope.append(option);
-  }
-  scopeLabel.append(scope); scopeBox.append(scopeLabel);
+  const scope = createReviewChoice(row, "apply-to", "Apply to",
+    [["occurrence", "This occurrence"], ["book", `All ${row.word_occurrences} occurrences in this book (consonants only)`]], grid);
+  if (grid) scopeBox.append(scope.element);
+  else {const scopeLabel = el("label", "Apply to", "source-detail"); scopeLabel.append(scope.element); scopeBox.append(scopeLabel);}
   const scopeHint = el("p", undefined, "hint"); scopeHint.append(el("span", "Matches "));
   const key = el("bdi", row.consonants); key.dir = "rtl"; key.lang = "he"; scopeHint.append(key);
-  scopeHint.append(el("span", " across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged.")); scopeBox.append(scopeHint);
+  scopeHint.append(el("span", " across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged."));
+  if (grid) scope.element.title = `Matches \u2067${row.consonants}\u2069 across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged.`;
+  else scopeBox.append(scopeHint);
   const actions = el(grid ? "td" : "div", undefined, "help-actions");
   actions.append(el("span", row.label === null ? "—" : String(row.label), "note-label"));
   const status = el("span", "", "row-status"); actions.append(status);
   const save = el("button", "Save help", "secondary"); save.type = "button"; actions.append(save);
   const record = () => setDraft(row, {included: include.checked, entry_id: choice.value, gloss: gloss.value, scope: scope.value});
-  include.addEventListener("change", record); gloss.addEventListener("input", record); scope.addEventListener("change", record);
-  choice.addEventListener("change", () => {
+  include.addEventListener("change", record); gloss.addEventListener("input", record); scope.element.addEventListener("change", record);
+  choice.element.addEventListener("change", () => {
     gloss.value = row.candidates.find(candidate => candidate.id === choice.value)?.gloss || "";
     if (nameExcluded(row, {entry_id: choice.value})) include.checked = false;
     record();

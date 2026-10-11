@@ -100,9 +100,10 @@ Select **This occurrence** and **Save help** to edit just the current occurrence
 Choose **View → Grid** in lexical review to edit a page in a table. **Save page**
 submits all edited rows on that review page in one update; **Save & next** saves
 and advances. Choose 20, 40, 80, or 160 rows per page. Each row retains its own
-**Apply to** scope, source details, and verse popup. Invalid choices or a stale
-project revision reject the whole submission and retain your drafts; conflicting
-book-wide edits must be reconciled or saved separately.
+**Apply to** scope, source details, and verse popup. In the grid, **Source entry**
+and **Apply to** use radio buttons; hover over **Apply to** for the matching hint.
+Invalid choices or a stale project revision reject the whole submission and retain
+your drafts; conflicting book-wide edits must be reconciled or saved separately.
 
 Data-entry shortcuts and controls work alongside individual row saves:
 
