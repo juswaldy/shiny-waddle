@@ -8,7 +8,7 @@ from dataclasses import asdict
 from importlib.resources import files
 from pathlib import Path
 
-from .models import ProjectConfig, ReaderDocument, ReaderError, digest, parse_passage
+from .models import Decision, Entry, ProjectConfig, ReaderDocument, ReaderError, Token, digest, parse_passage
 from .sources import catalog, lemma_keys, load_book, load_lexicon
 
 STEMS = {"q": "Qal", "N": "Nif", "p": "Piel", "P": "Pual", "h": "Hif", "H": "Hof", "t": "Hitp"}
@@ -46,6 +46,145 @@ def stem_label(morph: str) -> str:
     return STEMS.get(match.group(1)[1:], "") if match else ""
 
 
+def consonant_key(raw: str) -> str:
+    """A separate spelling key; source and display surfaces remain untouched."""
+    return display_surface(raw, "consonants-only")
+
+
+def lexical_candidates(lemma: str, crosswalk: dict[str, list[str]]) -> list[str]:
+    return crosswalk.get(lemma, crosswalk.get(lemma[:5], []))
+
+
+def is_name_morphology(morphology: str) -> bool:
+    """STEP's N: language field identifies names; mixed name/common analyses stay explicit."""
+    analyses = [part.strip() for part in morphology.split("/") if part.strip()]
+    return bool(analyses) and all(part.startswith("N:") for part in analyses)
+
+
+def lexical_morphology(token: Token, index: int) -> str:
+    """Use parallel source slash segments when they identify one lexical component each."""
+    lemmas, morphs = token.lemma.split("/"), token.morph.split("/")
+    if len(lemmas) == len(morphs) and all(len(lemma_keys(part)) <= 1 for part in lemmas):
+        components = [morph for lemma, morph in zip(lemmas, morphs, strict=True) if lemma_keys(lemma)]
+        if index < len(components):
+            morph = components[index]
+            return morph if morph.startswith(("H", "A")) else token.morph[:1] + morph
+    return token.morph
+
+
+def name_omission_reason(morphology: str, candidates: list[Entry]) -> str | None:
+    """Use source classifications, including prefixed Hebrew/Aramaic proper names."""
+    if re.search(r"(?:^[HA]|/)Np(?:/|$)", morphology):
+        return "Proper name omitted (OSHB Np morphology)"
+    if candidates and all(is_name_morphology(entry.morphology) for entry in candidates):
+        return "Name omitted (STEP N: morphology)"
+    return None
+
+
+def edit_decision(state: Path, config: ProjectConfig, anchor: str, decision: Decision, scope: str):
+    """Expand an explicit reader choice to source-supported anchors in this book."""
+    updated, reports = edit_decisions(state, config, [(anchor, decision, scope)])
+    return updated, reports[0]
+
+
+def edit_decisions(state: Path, config: ProjectConfig, edits: list[tuple[str, Decision, str]]):
+    """Validate a review page together, without partially applying or overwriting choices."""
+    if not edits:
+        raise ReaderError("Choose at least one lexical decision to save.")
+    if len({anchor for anchor, _, _ in edits}) != len(edits):
+        raise ReaderError("A review page cannot submit the same source anchor twice.")
+    book = load_book(state, config.book)
+    entries, crosswalk = load_lexicon(state)
+    anchors = {
+        f"{token.id}:{index}": (verse, token, lemma, lexical_morphology(token, index))
+        for verse in book
+        for token in verse.tokens
+        if token.kind == "word"
+        for index, lemma in enumerate(lemma_keys(token.lemma))
+    }
+    decisions = dict(config.decisions)
+    pending: dict[str, Decision] = {}
+    reports = []
+    for anchor, decision, scope in edits:
+        if scope not in {"occurrence", "book"}:
+            raise ReaderError("Choose this occurrence or all occurrences in this book.")
+        if anchor not in anchors:
+            raise ReaderError(f"Editorial decision refers to a missing source anchor: {anchor}")
+        _, origin, origin_lemma, origin_morphology = anchors[anchor]
+        origin_candidates = lexical_candidates(origin_lemma, crosswalk)
+        if decision.entry_id and decision.entry_id not in origin_candidates:
+            raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
+        if decision.action == "include" and name_omission_reason(
+            origin_morphology,
+            [
+                entries[identity]
+                for identity in ([decision.entry_id] if decision.entry_id else origin_candidates)
+            ],
+        ):
+            raise ReaderError(f"Names are excluded from lexical helps: {anchor}")
+        if (
+            decision.gloss
+            and not decision.entry_id
+            and not (origin_lemma in crosswalk and len(origin_candidates) == 1)
+        ):
+            raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
+        if scope == "book" and (decision.action == "include" or decision.gloss) and not decision.entry_id:
+            raise ReaderError(f"Choose a source entry before applying a help to all occurrences: {anchor}")
+        key = consonant_key(origin.surface)
+        if scope == "book" and not key:
+            raise ReaderError("This source word has no consonants to match.")
+        applied, skipped = [], []
+        targets = anchors.items() if scope == "book" else [(anchor, anchors[anchor])]
+        for target, (verse, token, lemma, morphology) in targets:
+            if scope == "book" and (token.language != origin.language or consonant_key(token.surface) != key):
+                continue
+            if decision.entry_id and decision.entry_id not in lexical_candidates(lemma, crosswalk):
+                skipped.append(
+                    {
+                        "anchor": target,
+                        "reference": verse.reference,
+                        "source_surface": token.surface,
+                        "reason": "Chosen entry is not a source candidate for this occurrence",
+                    }
+                )
+                continue
+            if decision.action == "include" and name_omission_reason(
+                morphology,
+                [
+                    entries[identity]
+                    for identity in (
+                        [decision.entry_id] if decision.entry_id else lexical_candidates(lemma, crosswalk)
+                    )
+                ],
+            ):
+                skipped.append(
+                    {
+                        "anchor": target,
+                        "reference": verse.reference,
+                        "source_surface": token.surface,
+                        "reason": "Names are excluded from lexical helps",
+                    }
+                )
+                continue
+            earlier = pending.get(target)
+            if earlier and (earlier.action, earlier.entry_id, earlier.gloss) != (
+                decision.action,
+                decision.entry_id,
+                decision.gloss,
+            ):
+                raise ReaderError(
+                    f"Conflicting page edits affect {target}. Use matching choices or save them separately."
+                )
+            pending[target] = decision
+            applied.append(target)
+        reports.append({"consonants": key, "applied": applied, "skipped": skipped})
+    decisions.update({anchor: decision.model_dump() for anchor, decision in pending.items()})
+    updated = ProjectConfig.model_validate({**config.model_dump(), "decisions": decisions})
+    # Check gloss/source compatibility and the existing project before saving anything.
+    build_document(state, updated)
+    return updated, reports
+
+
 def reference_map():
     return json.loads(files("bible_reader").joinpath("resources/reference-helps.json").read_text())
 
@@ -69,6 +208,12 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
         for token in verse.tokens
         if token.kind == "word" and token.reading != "ketiv"
         for key in lemma_keys(token.lemma)
+    )
+    word_counts = Counter(
+        (token.language, consonant_key(token.surface))
+        for verse in book
+        for token in verse.tokens
+        if token.kind == "word" and lemma_keys(token.lemma)
     )
     registries: dict[int, dict[str, int]] = defaultdict(dict)
     helps = {}
@@ -102,8 +247,9 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
             for index, lemma in enumerate(lemma_keys(token.lemma)):
                 anchor = f"{token.id}:{index}"
                 exact = lemma in crosswalk
-                candidate_ids = crosswalk.get(lemma, crosswalk.get(lemma[:5], []))
-                candidates = [asdict(entries[c]) for c in candidate_ids]
+                candidate_ids = lexical_candidates(lemma, crosswalk)
+                candidate_entries = [entries[c] for c in candidate_ids]
+                candidates = [asdict(entry) for entry in candidate_entries]
                 decision = config.decisions.get(anchor)
                 if decision:
                     seen_decisions.add(anchor)
@@ -126,6 +272,13 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                         if decision.entry_id not in candidate_ids:
                             raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
                         choice = decision.entry_id
+                component_morphology = lexical_morphology(token, index)
+                fixed_name_reason = name_omission_reason(component_morphology, candidate_entries)
+                name_reason = fixed_name_reason or name_omission_reason(
+                    "", [entries[choice]] if choice else []
+                )
+                if name_reason:
+                    selected, reason = False, name_reason
                 status = "resolved" if choice else ("ambiguous" if candidate_ids else "unmatched")
                 stem = stem_label(token.morph)
                 gloss = (
@@ -190,14 +343,19 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "chapter": verse.chapter,
                             "surface": surface,
                             "source_surface": token.surface,
+                            "consonants": consonant_key(token.surface),
+                            "word_occurrences": word_counts[(token.language, consonant_key(token.surface))],
                             "lemma": lemma,
                             "morphology": token.morph,
+                            "lexical_morphology": component_morphology,
                             "reading": token.reading,
                             "candidates": candidates,
                             "entry_id": choice,
                             "gloss": gloss,
                             "status": status,
                             "selected": selected,
+                            "name_excluded": bool(name_reason),
+                            "fixed_name_reason": fixed_name_reason,
                             "reason": reason,
                             "label": label,
                             "help_id": help_id if selected else None,

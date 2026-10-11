@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from bible_reader import editorial, sources, tex
+from bible_reader.models import Entry, Token, Verse
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -34,3 +35,88 @@ def tex_available():
         return tex.engine_path()
     except sources.ReaderError:
         pytest.skip("Install XeLaTeX with scripts/bootstrap.sh to run PDF integration checks")
+
+
+@pytest.fixture
+def consonant_review(source_state, monkeypatch):
+    """Synthetic spellings/candidates for bulk editing, not evidence for biblical readings."""
+    entries = {
+        identity: Entry(identity, "", "", "", f"Synthetic {identity}", "")
+        for identity in ("step:test-choice", "step:test-alternate", "step:test-other")
+    }
+    candidates = ["step:test-choice", "step:test-alternate"]
+    crosswalk = {
+        "H1001": candidates,
+        "H1002": candidates,
+        "H1003": ["step:test-other", "step:test-alternate"],
+        "H2000": ["step:test-other"],
+    }
+    book = [
+        Verse(
+            "Prov",
+            1,
+            1,
+            (
+                Token("test-origin", "שָׁ/מַ֖ר", "1001"),
+                Token("test-prefix", "וְ/שָׁמַר", "1001"),
+                Token("test-different", "שָׁמְרוּ", "1001"),
+                Token("test-aramaic", "שָׁמַר", "1001", language="arc"),
+            ),
+        ),
+        Verse("Prov", 2, 1, (Token("test-repeat", "שֹׁמֵֽר", "1002"),)),
+        Verse(
+            "Prov",
+            3,
+            1,
+            (
+                Token("test-ketiv", "שַׁמֵּר", "1001", reading="ketiv"),
+                Token("test-qere", "שֻׂמַר", "1001", reading="qere"),
+                Token("test-segmented", "שָׁ/מַר", "1001 2000"),
+                Token("test-homograph", "שָׂמַר", "1003"),
+                Token("test-unmatched", "שְמֹר", "9999"),
+            ),
+        ),
+    ]
+    monkeypatch.setattr(editorial, "load_book", lambda *_: book)
+    monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
+    return book
+
+
+@pytest.fixture
+def name_review(source_state, monkeypatch):
+    """Synthetic source classifications; no proposed biblical readings or lexical senses."""
+    entries = {
+        identity: Entry(identity, "", "", morphology, "Synthetic classification gloss", "")
+        for identity, morphology in [
+            ("step:test-common", "H:N-M"),
+            ("step:test-name", "N:N-M-P"),
+            ("step:test-other-name", "N:N--L"),
+        ]
+    }
+    crosswalk = {
+        "H1001": ["step:test-common", "step:test-name"],
+        "H1002": ["step:test-name", "step:test-other-name"],
+        "H1003": ["step:test-name"],
+        "H1004": ["step:test-common"],
+    }
+    book = [
+        Verse(
+            "Prov",
+            1,
+            1,
+            (
+                Token("name-by-source", "שָׁם", "1001", "HNp"),
+                Token("common-by-source", "שָׁם", "1001", "HNcmsa"),
+                Token("unmatched-name", "שֵׁם", "9999", "HNp"),
+                Token("unmatched-common", "שֵׁם", "9998", "HNcmsa"),
+                Token("lexicon-name", "שֵׁם", "1002", "HNcmsa"),
+                Token("chosen-name", "שָׁם", "1001", "HNcmsa"),
+                Token("segmented-name", "דָּבָר/שֵׁם", "1004/1003", "HNcmsc/Np"),
+                Token("normal-spelling", "שָׁם", "1004", "HNcmsa"),
+                Token("arc-prefixed-name", "בְּ/שָׁם", "b/1004", "AR/Np", language="arc"),
+            ),
+        )
+    ]
+    monkeypatch.setattr(editorial, "load_book", lambda *_: book)
+    monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
+    return book

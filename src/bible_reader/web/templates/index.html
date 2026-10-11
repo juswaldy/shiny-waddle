@@ -50,7 +50,20 @@
       <section id="review-panel" class="panel">
         <div class="summary-row"><div id="coverage" class="metrics"></div><button id="reload-review" class="text-button">Refresh review ↻</button></div>
         <div id="review-intro" class="info-card">Import your sources to begin. Original text and editorial choices stay separate.</div>
-        <div class="review-toolbar"><input id="search" type="search" placeholder="Find a word, gloss, or reference…" aria-label="Search lexical helps"><label class="check-label"><input id="show-all" type="checkbox"> Show omitted words</label><label class="check-label"><input id="unresolved-only" type="checkbox"> Needs review</label></div>
+        <div id="review-edit-result" class="info-card" role="status" hidden></div>
+        <div class="review-toolbar"><input id="search" type="search" placeholder="Find a word, gloss, or reference…" aria-label="Search lexical helps"><label class="check-label"><input id="show-all" type="checkbox"> Show omitted words</label><label class="check-label"><input id="unresolved-only" type="checkbox"> Needs review</label><label class="check-label"><input id="resolved-only" type="checkbox"> Rework resolved helps</label></div>
+        <div class="review-options">
+          <label>View <select id="review-view"><option value="cards">Cards</option><option value="grid">Grid</option></select></label>
+          <label>Rows per page <select id="review-page-size"><option>20</option><option selected>40</option><option>80</option><option>160</option></select></label>
+          <label class="check-label"><input id="edited-only" type="checkbox"> Unsaved edits</label>
+          <button id="include-page" class="text-button">Include page</button><button id="omit-page" class="text-button">Omit page</button>
+        </div>
+        <p class="hint review-shortcuts">In a gloss: Enter / Shift+Enter moves to the next / previous row; Ctrl/Cmd+D copies the previous gloss when both rows use the same source entry. Paste one spreadsheet column into the grid to fill consecutive glosses. Ctrl/Cmd+Enter saves the page. Tab moves between fields.</p>
+        <div class="review-savebar">
+          <span id="draft-count" role="status" aria-live="polite">No unsaved edits</span>
+          <button id="discard-page" class="text-button" disabled>Discard page edits</button>
+          <button id="save-page" class="primary" disabled>Save page</button><button id="save-next" class="secondary" disabled>Save &amp; next →</button>
+        </div>
         <div id="review-list" aria-live="polite"></div><div class="pagination"><button id="previous" class="secondary">← Previous</button><span id="row-count"></span><button id="next" class="secondary">Next →</button></div>
       </section>
       <section id="preview-panel" class="panel" hidden>
@@ -67,6 +80,10 @@
       </section>
     </main>
   </div>
+  <aside id="verse-context" class="verse-context" role="dialog" aria-labelledby="verse-context-reference" hidden>
+    <div class="verse-context-heading"><strong id="verse-context-reference"></strong><span id="verse-context-state"></span><button id="close-verse-context" type="button" aria-label="Close verse context">×</button></div>
+    <div id="verse-context-text" class="verse-context-text" dir="rtl" lang="he"></div>
+  </aside>
   <footer>Made for reading the text. Built from sources you can inspect.</footer>
 </body>
 </html>
