@@ -85,9 +85,9 @@ It does not infer names from spelling or capitalization. **Show omitted words**
 retains their source candidates and omission reasons; their inclusion checkboxes
 are disabled, and **Include page** skips them. Source scripture stays intact.
 
-In lexical review, **Apply to** defaults to **This occurrence**. Select **All
-occurrences in this book (consonants only)** and **Save all** to apply the source
-entry, gloss, and inclusion choice to matching words throughout the selected
+In lexical review, **Apply to** defaults to **All occurrences in this book
+(consonants only)**. Choose **Save all** to apply the source entry, gloss, and
+inclusion choice to matching words throughout the selected
 book, including occurrences outside the current passage and both written/read
 forms. Matching ignores Hebrew vowel points, accents, punctuation, and slash
 segmentation, retains prefixes/suffixes, and stays within the word's language.
@@ -95,6 +95,7 @@ This replaces earlier decisions on matching anchors. Occurrences whose source
 candidates do not support the chosen entry remain unchanged and are listed for
 separate review. Source text remains intact; saved decisions and build snapshots
 still identify every affected source anchor.
+Select **This occurrence** and **Save help** to edit just the current occurrence.
 
 Choose **View → Grid** in lexical review to edit a page in a table. **Save page**
 submits all edited rows on that review page in one update; **Save & next** saves

@@ -191,7 +191,7 @@ async function refreshReview() {
   }
 }
 function initialEdit(row) {
-  return {included: row.selected, entry_id: row.entry_id || "", gloss: row.gloss, scope: "occurrence"};
+  return {included: row.selected, entry_id: row.entry_id || "", gloss: row.gloss, scope: "book"};
 }
 function rowEdit(row) { return reviewDrafts.get(row.anchor) || initialEdit(row); }
 function nameExcluded(row, edit = rowEdit(row)) {

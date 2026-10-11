@@ -147,6 +147,7 @@ with (OUTPUT / "server.log").open("w") as log:
             row = page.locator('[data-anchor="20qg1:0"]')
             expect(row.locator(".row-status")).to_have_text("resolved")
             assert page.locator(".row-status.unresolved").count() == 0
+            row.get_by_role("combobox", name="Apply to for 20qg1:0", exact=True).select_option("occurrence")
             row.locator("textarea").fill("Editorial browser test gloss")
             row.get_by_role("button", name="Save help").click()
             expect(row.locator(".note-label")).to_have_text("23")
@@ -246,8 +247,7 @@ with (OUTPUT / "server.log").open("w") as log:
             assert source_row["surface"] == "תחת" and source_row["source_surface"] == "תַּ֭חַת"
             check_verse_context(page, source_row, verse, screenshot="verse-context-desktop.png")
             scope = repeated.get_by_role("combobox", name="Apply to for 207mS:0", exact=True)
-            expect(scope).to_have_value("occurrence")
-            scope.select_option("book")
+            expect(scope).to_have_value("book")
             expect(repeated.locator(".hint")).to_contain_text("תחת")
             repeated.get_by_role("button", name="Save all", exact=True).click()
             expect(page.locator("#notice")).to_contain_text("Choose a source entry")
@@ -281,7 +281,7 @@ with (OUTPUT / "server.log").open("w") as log:
             ).to_have_value("step:H8478H")
             expect(elsewhere.locator(".row-status")).to_have_text("resolved")
             expect(elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True)).to_have_value(
-                "occurrence"
+                "book"
             )
             # Two spellings of the same consonants in one verse must retain distinct highlights.
             review = page.request.get(url + f"/api/projects/{identity}/review").json()
@@ -294,6 +294,9 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(page.locator("#unresolved-only")).not_to_be_checked()
             expect(elsewhere).to_have_count(1)
             assert page.locator(".row-status.unresolved").count() == 0
+            elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True).select_option(
+                "occurrence"
+            )
             elsewhere.get_by_role("combobox", name="Source entry for 20NTZ:0", exact=True).select_option(
                 "step:H8478G"
             )
@@ -331,12 +334,18 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(elsewhere.locator(".row-status")).to_have_text("resolved")
             page.get_by_role("checkbox", name="Rework resolved helps", exact=True).check()
             # Explicit omissions can also be found again and re-included in the resolved view.
+            elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True).select_option(
+                "occurrence"
+            )
             elsewhere.get_by_role("checkbox").uncheck()
             elsewhere.get_by_role("button", name="Save help", exact=True).click()
             expect(page.locator("#notice")).to_have_text("Lexical decision saved")
             expect(elsewhere).to_have_count(0)
             page.locator("#show-all").check()
             expect(elsewhere.locator(".row-status")).to_have_text("omitted")
+            elsewhere.get_by_role("combobox", name="Apply to for 20NTZ:0", exact=True).select_option(
+                "occurrence"
+            )
             elsewhere.get_by_role("checkbox").check()
             elsewhere.get_by_role("button", name="Save help", exact=True).click()
             expect(page.locator("#notice")).to_have_text("Lexical decision saved")

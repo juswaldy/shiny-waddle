@@ -46,6 +46,85 @@ def review_server(source_state):
             thread.join(timeout=10)
 
 
+@pytest.mark.parametrize("view", ["cards", "grid"])
+@pytest.mark.parametrize("batch", [False, True], ids=["row-save", "page-save"])
+def test_review_defaults_to_book_scope_and_allows_occurrence_override(
+    consonant_review, review_server, monkeypatch, view, batch
+):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, csrf = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page()
+        project_url = url + f"/api/projects/{identity}"
+        project = page.request.get(project_url).json()
+        project["config"]["passage"] = "1:1"
+        assert page.request.put(
+            project_url,
+            headers={"X-Reader-Token": csrf},
+            data={"revision": project["revision"], "config": project["config"]},
+        ).ok
+        page.goto(url)
+        page.locator("#review-view").select_option(view)
+        expect(page.locator(".help-row")).to_have_count(4)
+        for scope in page.locator(".help-row select[aria-label^='Apply to for ']").all():
+            expect(scope).to_have_value("book")
+        expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
+        origin = page.locator("[data-anchor='test-origin:0']")
+        expect(origin.get_by_role("button", name="Save all", exact=True)).to_be_visible()
+        expect(origin.locator(".hint")).to_be_visible()
+        origin.get_by_role("combobox", name="Source entry for test-origin:0", exact=True).select_option(
+            "step:test-choice"
+        )
+        origin.locator("textarea").fill("Synthetic default book gloss")
+        endpoint = "/decisions/batch" if batch else "/decisions"
+        with page.expect_response(lambda response: response.url.endswith(endpoint)) as response:
+            if batch:
+                page.locator("#save-page").click()
+            else:
+                origin.get_by_role("button", name="Save all", exact=True).click()
+        assert response.value.ok
+        payload = response.value.request.post_data_json
+        assert (payload["edits"][0] if batch else payload)["scope"] == "book"
+        result = response.value.json()
+        applied = {"test-origin:0", "test-repeat:0", "test-ketiv:0", "test-qere:0", "test-segmented:0"}
+        assert set(result["applied"]) == applied
+        assert {item["anchor"] for item in result["skipped"]} == {
+            "test-segmented:1",
+            "test-homograph:0",
+            "test-unmatched:0",
+        }
+        decisions = result["project"]["config"]["decisions"]
+        assert set(decisions) == applied
+        assert all(decision["gloss"] == "Synthetic default book gloss" for decision in decisions.values())
+        expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
+        scope = origin.get_by_role("combobox", name="Apply to for test-origin:0", exact=True)
+        expect(scope).to_have_value("book")
+
+        # An explicit narrower choice survives view switches and review refreshes.
+        scope.select_option("occurrence")
+        origin.locator("textarea").fill("Synthetic one occurrence gloss")
+        page.locator("#review-view").select_option("grid" if view == "cards" else "cards")
+        page.locator("#reload-review").click()
+        expect(scope).to_have_value("occurrence")
+        expect(origin.locator(".hint")).to_be_hidden()
+        expect(origin.get_by_role("button", name="Save help", exact=True)).to_be_visible()
+        with page.expect_response(lambda response: response.url.endswith(endpoint)) as response:
+            if batch:
+                page.locator("#save-page").click()
+            else:
+                origin.get_by_role("button", name="Save help", exact=True).click()
+        assert response.value.ok
+        result = response.value.json()
+        assert result["applied"] == ["test-origin:0"]
+        saved = page.request.get(project_url).json()["config"]["decisions"]
+        assert saved["test-origin:0"]["gloss"] == "Synthetic one occurrence gloss"
+        assert all(saved[anchor] == decisions[anchor] for anchor in applied - {"test-origin:0"})
+        expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
+        expect(scope).to_have_value("book")
+        browser.close()
+
+
 def test_grid_page_entry_drafts_shortcuts_atomic_saves_and_mobile(review_server, monkeypatch):
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
     url, identity, csrf = review_server
@@ -65,6 +144,13 @@ def test_grid_page_entry_drafts_shortcuts_atomic_saves_and_mobile(review_server,
         first_anchor, second_anchor = [rows.nth(i).get_attribute("data-anchor") for i in range(2)]
         first = page.locator(f"[data-anchor='{first_anchor}']")
         second = page.locator(f"[data-anchor='{second_anchor}']")
+        # These independent wording edits explicitly use the narrower scope.
+        first.get_by_role("combobox", name=f"Apply to for {first_anchor}", exact=True).select_option(
+            "occurrence"
+        )
+        second.get_by_role("combobox", name=f"Apply to for {second_anchor}", exact=True).select_option(
+            "occurrence"
+        )
         first.locator("textarea").fill("Synthetic grid first gloss")
         first.locator("textarea").press("Enter")
         expect(second.locator("textarea")).to_be_focused()
@@ -192,12 +278,16 @@ def test_grid_page_entry_drafts_shortcuts_atomic_saves_and_mobile(review_server,
         page.locator("#next").click()
         following = page.locator(".help-row").first.get_attribute("data-anchor")
         page.locator("#previous").click()
+        for scope in page.locator(".help-row select[aria-label^='Apply to for ']").all():
+            scope.select_option("occurrence")
         page.locator("#omit-page").click()
         expect(page.locator("#draft-count")).to_have_text("20 unsaved edits on this page")
         page.locator("#save-next").click()
         expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
         expect(page.locator(".help-row").first).to_have_attribute("data-anchor", following)
         page.locator("#show-all").check()
+        for scope in page.locator(".help-row select[aria-label^='Apply to for ']").all():
+            scope.select_option("occurrence")
         page.locator("#include-page").click()
         page.locator("#save-page").click()
         expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
