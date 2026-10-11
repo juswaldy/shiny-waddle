@@ -222,11 +222,12 @@ def preamble(layout: dict) -> str:
 {scripture_macros(layout)}
 \newcommand{{\HelpMarker}}[2]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{7}}{{8}}\selectfont\hyperlink{{#1}}{{#2}}}}}}}}
 \newcommand{{\ReadingMark}}[1]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{6}}{{7}}\selectfont #1}}}}}}
+\newcommand{{\NoteStem}}[1]{{\textenglish{{{{\fontsize{{{layout["notes_pt"] * 0.5}}}{{{layout["notes_pt"] * 1.35}}}\selectfont #1}}}}\enspace}}
 \newcommand{{\Note}}[5]{{\hypertarget{{#1}}{{}}\mbox{{\textsuperscript{{#2}}\texthebrew{{#3}}}}\nobreak\hspace{{0.2em}}#4#5.\hspace{{0.9em}}}}
 \newcommand{{\Notes}}[1]{{\begingroup\setLTR\fontsize{{{layout["notes_pt"]}}}{{{layout["notes_pt"] * 1.35}}}\selectfont
   \raggedright\emergencystretch=3em #1\par\endgroup}}
 \newcommand{{\Header}}[3]{{\hbox to\linewidth{{\rlap{{\fontsize{{10}}{{12}}\selectfont #1}}\hfil
-  {{\hebrewfont\fontsize{{18}}{{20}}\selectfont #2}}\hfil\llap{{\fontsize{{10}}{{12}}\selectfont #3}}}}\vskip3pt\hrule height0.35pt\vskip9pt}}
+  {{\ifodd#3\relax\fontsize{{18}}{{20}}\else\fontsize{{9}}{{10}}\fi\selectfont #2}}\hfil\llap{{\fontsize{{10}}{{12}}\selectfont #3}}}}\vskip3pt\hrule height0.35pt\vskip9pt}}
 \newbox\BodyBox
 \newbox\NotesBox
 \newbox\PageBox
@@ -323,7 +324,7 @@ def contents(groups: list, document: ReaderDocument, prefix: str):
         if chapter is not None and chapter != note["chapter"]:
             notes.append(r"\par\vskip7pt\noindent\hspace*{1em}")
         chapter = note["chapter"]
-        stem = (escape_latex(note["stem"]) + r"\enspace ") if note["stem"] else ""
+        stem = rf"\NoteStem{{{escape_latex(note['stem'].upper())}}}" if note["stem"] else ""
         headword = "".join(c for c in note["headword"] if not ("\u0591" <= c <= "\u05af"))
         gloss = note["gloss"].rstrip(". ")
         notes.append(
@@ -346,7 +347,12 @@ def page_tex(groups: list, document: ReaderDocument, prefix: str, folio: int):
     passage = f"{first[-2]}:{first[-1]}"
     if first != last:
         passage += f"–{last[-2]}:{last[-1]}"
-    title = escape_latex(catalog()["books"][document.config["book"]]["hebrew"])
+    book = catalog()["books"][document.config["book"]]
+    title = (
+        rf"\texthebrew{{{escape_latex(book['hebrew'])}}}"
+        if folio % 2
+        else rf"\textenglish{{{escape_latex(book['title'].upper())}}}"
+    )
     boxes = (
         "\\setbox\\BodyBox=\\vbox{\\hsize=\\linewidth\n" + scripture + "}\n"
         "\\setbox\\NotesBox=\\vbox{\\hsize=\\linewidth\n" + notes + "}\n"

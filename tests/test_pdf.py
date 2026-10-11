@@ -90,6 +90,59 @@ def test_reproducible_reader_document_and_layout(source_state, tmp_path, tex_ava
         assert (first / name).read_bytes() == (second / name).read_bytes(), name
 
 
+@pytest.mark.parametrize("first_folio,notes_pt", [(2, 9.0), (1329, 12.0)])
+def test_pdf_running_title_language_and_smaller_uppercase_stems(
+    source_state, tmp_path, tex_available, first_folio, notes_pt
+):
+    config = ProjectConfig(layout={"first_folio": first_folio, "notes_pt": notes_pt})
+    output = tmp_path / "formatting"
+    result = build(source_state, config, output)
+    assert result["reader_pages"] >= 2
+    document = json.loads((output / "reader.v2.json").read_text())
+    plans = json.loads((output / "page-plan.json").read_text())
+    pdf = PdfReader(output / "reader.pdf")
+    # PDF sizes use 72 points/inch; TeX sizes use 72.27 points/inch.
+    pdf_pt_per_tex_pt = 72 / 72.27
+    for page, plan in zip(pdf.pages[: len(plans)], plans, strict=True):
+        headings, stems = [], []
+        expected_stems = [
+            document["helps"][identity]["stem"].upper()
+            for identity in plan["help_ids"]
+            if document["helps"][identity]["stem"]
+        ]
+
+        def collect_formatting(
+            text,
+            cm,
+            tm,
+            font,
+            size,
+            headings=headings,
+            stems=stems,
+            expected_stems=expected_stems,
+            header_min_y=float(page.mediabox.top) - 60,
+            heading_size=(18.0 if plan["folio"] % 2 else 9.0) * pdf_pt_per_tex_pt,
+        ):
+            if not text.strip():
+                return
+            if size == pytest.approx(heading_size, abs=0.01) and cm[5] + tm[5] > header_min_y:
+                headings.append((text.strip(), font["/BaseFont"]))
+            if text.strip() in expected_stems:
+                stems.append(text.strip())
+                assert size == pytest.approx(notes_pt * 0.5 * pdf_pt_per_tex_pt, abs=0.01)
+
+        page.extract_text(visitor_text=collect_formatting)
+        assert len(headings) == 1
+        title, font_name = headings[0]
+        if plan["folio"] % 2:
+            assert "Ezra" in font_name
+            assert all("\u0590" <= char <= "\u05ff" for char in title)
+        else:
+            assert title == "PROVERBS"
+            assert "LMRoman" in font_name
+        assert sorted(stems) == sorted(expected_stems)
+
+
 def test_editorial_tex_is_escaped_and_long_gloss_paginated(source_state, tmp_path, tex_available):
     gloss = r"Test editorial wording: 50% & $ # _ {x} ~ ^ \input{private}. " + "Longer review wording. " * 20
     config = ProjectConfig(decisions={"20qg1:0": Decision(gloss=gloss)}, layout={"paper": "a5"})

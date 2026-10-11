@@ -139,8 +139,8 @@ numbers remain LTR. English glosses can wrap and hyphenate normally.
 
 Keep the note number with its headword, and preferably the headword with the first
 gloss word. Permit the rest of a long entry to wrap. Separate entries with modest
-horizontal space and punctuation. Optional labels use a smaller or small-cap
-Latin style; they come from a verified morphology/lexicon mapping.
+horizontal space and punctuation. Verb-stem labels use uppercase Latin letters
+at 50% of the gloss size; they come from a verified morphology/lexicon mapping.
 
 **R09 — Grouping.** Use one note paragraph per chapter represented on the page.
 This page has a chapter-1 paragraph followed by a chapter-2 paragraph, with a
@@ -216,7 +216,10 @@ and line/anchor-aware note assignment.
 
 **R18 — Header and whitespace.** Derive the running reference from the first and
 last visible verse on that page, not the full requested passage. Keep book title
-centered geometrically. Use a page-local, full-width apparatus separator. Place
+centered geometrically, in Hebrew on odd printed folios and English on even printed
+folios. English titles use uppercase letters at 9 pt; Hebrew titles use 18 pt.
+The alternation follows `layout.first_folio`, rather than the export's page
+index. Use a page-local, full-width apparatus separator. Place
 extra vertical space between text and apparatus when bottom-aligning the notes;
 do not stretch Hebrew baselines to fill the page.
 
@@ -287,7 +290,7 @@ details panels, not between routine reading/export actions.
 | --- | --- |
 | Passage coverage | Exactly 1:29–33 and 2:1–12, in order, without missing or extra tokens |
 | Source fidelity | Text/marks/readings match the selected source and documented display policy |
-| Reference header | Correct passage, centered Hebrew book title, configurable folio |
+| Reference header | Correct passage, centered book title (odd folio Hebrew, even folio English), configurable folio |
 | Verse layout | Selected continuous flow or separate verse starts, LTR digits, stable wrapping and punctuation |
 | Chapter opening | Double-boxed 2, no redundant verse-1 digit, room beside two paragraph lines or two verse blocks |
 | Shared notes | Labels 4 and 9 are demonstrably reused in the reference fixture |

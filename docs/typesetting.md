@@ -36,6 +36,11 @@ Reference dimensions are calibrated approximations; the photograph does not
 establish physical paper size. Defaults are Ezra SIL 18 pt / 23.5 pt leading and
 9 pt notes. Latin Modern is loaded by its TeX font filenames. Type sizes, leading,
 folio, accent policy, reading policy, and font choice are validated project settings.
+Verb-stem labels in lexical notes use uppercase Latin letters at 50% of the note
+size (4.5 pt with the default 9 pt notes). Running book titles alternate by printed
+folio: Hebrew on odd folios, English on even folios, including exports whose
+`layout.first_folio` starts on an even number. Hebrew book titles use 18 pt type;
+English book titles use uppercase letters at 9 pt.
 
 The planner measures each complete candidate page in TeX scaled points, in batches
 per page: its actual header, scripture box, separator spacing, and unique notes.
