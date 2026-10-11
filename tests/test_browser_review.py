@@ -64,6 +64,74 @@ def expect_review_choice(row, field, value):
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
 
 
+def test_word_colors_default_palette_customization_and_project_persistence(review_server, monkeypatch):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, _ = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(url)
+        expect(page.locator(".help-row").first).to_be_visible()
+        expect(page.locator("#edition-title")).to_have_text("Proverbs reader")
+        expect(page.locator("#word-colors")).to_have_value("auto")
+        expect(page.locator("#word-color-settings")).to_be_hidden()
+        page.get_by_text("Page & reading settings", exact=True).click()
+        page.locator("#word-colors").select_option("word-class")
+        page.get_by_text("Palette & class colors", exact=True).click()
+        expect(page.locator("#word-color-noun")).to_have_value("preset")
+        expect(page.locator("#word-color-custom-noun")).to_have_value("#245a81")
+        page.locator("#word-color-custom-noun").fill("#123abc")
+        expect(page.locator("#word-color-noun")).to_have_value("custom")
+        page.locator("#word-color-name").select_option("auto")
+        expect(page.locator("#word-color-custom-name")).to_be_disabled()
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        saved = page.request.get(url + f"/api/projects/{identity}").json()
+        assert saved["config"]["layout"]["word_color_overrides"] == {"noun": "#123ABC", "name": "auto"}
+        page.reload()
+        expect(page.locator(".help-row").first).to_be_visible()
+        expect(page.locator("#word-colors")).to_have_value("word-class")
+        page.get_by_text("Page & reading settings", exact=True).click()
+        page.get_by_text("Palette & class colors", exact=True).click()
+        expect(page.locator("#word-color-noun")).to_have_value("custom")
+        expect(page.locator("#word-color-custom-noun")).to_have_value("#123abc")
+        expect(page.locator("#word-color-name")).to_have_value("auto")
+        expect(page.locator("#word-color-verb")).to_have_value("preset")
+        page.set_viewport_size({"width": 390, "height": 900})
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        artifacts = ROOT / "test-results"
+        artifacts.mkdir(exist_ok=True)
+        page.locator("#word-color-settings").screenshot(path=str(artifacts / "word-color-settings.png"))
+        page.locator("#word-colors").select_option("auto")
+        expect(page.locator("#word-color-settings")).to_be_hidden()
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        page.reload()
+        expect(page.locator(".help-row").first).to_be_visible()
+        expect(page.locator("#word-colors")).to_have_value("auto")
+        page.get_by_text("Page & reading settings", exact=True).click()
+        page.locator("#word-colors").select_option("word-class")
+        page.get_by_text("Palette & class colors", exact=True).click()
+        expect(page.locator("#word-color-noun")).to_have_value("custom")
+        page.locator("#word-color-noun").select_option("preset")
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        saved = page.request.get(url + f"/api/projects/{identity}").json()
+        assert saved["config"]["layout"]["word_color_overrides"] == {"name": "auto"}
+        page.get_by_role("button", name="Build reader PDF", exact=False).click()
+        expect(page.locator("#preview-panel")).to_be_visible()
+        job = page.request.get(url + "/api/jobs").json()[0]
+        assert job["config"]["layout"] == saved["config"]["layout"]
+        assert job["project_revision"] == saved["revision"]
+        assert not errors
+        browser.close()
+
+
 @pytest.mark.parametrize("view", ["cards", "grid"])
 @pytest.mark.parametrize("batch", [False, True], ids=["row-save", "page-save"])
 def test_review_defaults_to_book_scope_and_allows_occurrence_override(

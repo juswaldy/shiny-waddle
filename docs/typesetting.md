@@ -1,7 +1,7 @@
 # Typesetting and PDF verification
 
 The print contract is the [reference-page specification](reference-page-spec.md).
-The implementation uses XeLaTeX, fontspec, polyglossia/bidi, hyperref, and geometry.
+The implementation uses XeLaTeX, fontspec, xcolor, polyglossia/bidi, hyperref, and geometry.
 Trusted macros live in `src/bible_reader/tex.py`; all external plain text is escaped
 once at the TeX boundary. Hebrew words are kept with their superscript markers.
 English note flow contains explicitly delimited Hebrew headwords.
@@ -41,6 +41,14 @@ size (4.5 pt with the default 9 pt notes). Running book titles alternate by prin
 folio: Hebrew on odd folios, English on even folios, including exports whose
 `layout.first_folio` starts on an even number. Hebrew book titles use 18 pt type;
 English book titles use uppercase letters at 9 pt.
+
+Word coloring defaults to `layout.word_colors = "auto"` (no color).
+`"word-class"` enables the preset palette with per-class hex/Auto overrides in
+`layout.word_color_overrides`. The app exposes both under **Word colors**.
+Color groups enclose only the escaped scripture surface; K/Q labels, lexical
+markers, punctuation, headers, and notes remain black. Measurement and final
+output use the same groups. Raw text, morphology, source-backed name evidence,
+and unclassified words remain inspectable in the reader JSON.
 
 The planner measures each complete candidate page in TeX scaled points, in batches
 per page: its actual header, scripture box, separator spacing, and unique notes.

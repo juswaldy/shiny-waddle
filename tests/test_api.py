@@ -90,6 +90,29 @@ def test_custom_paper_settings_and_build_snapshot(client):
     )
 
 
+def test_word_colors_are_saved_validated_and_snapshotted(client):
+    project = client.post("/api/projects", json={}).json()
+    assert project["config"]["layout"]["word_colors"] == "auto"
+    url = f"/api/projects/{project['id']}"
+    project["config"]["layout"].update(
+        word_colors="word-class", word_color_overrides={"noun": "#123abc", "name": "auto"}
+    )
+    saved = client.put(url, json={"revision": 1, "config": project["config"]})
+    assert saved.status_code == 200
+    layout = saved.json()["config"]["layout"]
+    assert layout["word_color_overrides"] == {"noun": "#123ABC", "name": "auto"}
+    assert client.get(url).json()["config"]["layout"] == layout
+    review = client.get(url + "/review").json()
+    assert any(t["word_class"] == "name" for v in review["verses"] for t in v["tokens"])
+    queued = client.post(url + "/builds").json()
+    project["config"]["layout"]["word_colors"] = "auto"
+    assert client.put(url, json={"revision": 2, "config": project["config"]}).status_code == 200
+    assert client.get(f"/api/jobs/{queued['id']}").json()["config"]["layout"] == layout
+    project["config"]["layout"]["word_color_overrides"]["noun"] = r"\input{x}"
+    assert client.put(url, json={"revision": 3, "config": project["config"]}).status_code == 422
+    assert client.get(url).json()["revision"] == 3
+
+
 @pytest.mark.parametrize("policy", ["consonants-only", "consonants", "consonants-maqqef-sof-pasuq"])
 def test_consonant_policy_is_saved_reviewed_and_snapshotted(client, policy):
     project = client.post("/api/projects", json={}).json()

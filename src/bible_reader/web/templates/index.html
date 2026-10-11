@@ -31,6 +31,18 @@
           </div>
           <label for="verse-layout">Verse layout</label><select id="verse-layout"><option value="continuous">Continuous text</option><option value="verse-per-line">One verse per line</option></select>
           <p class="hint">Long verses wrap in either layout.</p>
+          <label for="word-colors">Word colors</label><select id="word-colors" aria-describedby="word-colors-hint"><option value="auto">Auto (no color)</option><option value="word-class">Word class + names</option></select>
+          <p id="word-colors-hint" class="hint">Use the preset palette or adjust each class below. Unknown classes stay uncolored.</p>
+          <details id="word-color-settings" hidden><summary>Palette &amp; class colors</summary>
+            <p class="hint">Attached prefixes and suffixes share the main word’s color. Names use their own color.</p>
+            {% for category, (label, color) in word_classes.items() %}
+            <label for="word-color-{{ category }}">{{ label }}</label>
+            <div class="word-color-row" data-word-class="{{ category }}" data-preset-color="#{{ color }}">
+              <select id="word-color-{{ category }}" aria-label="Color for {{ label|lower }}"><option value="preset">Preset · #{{ color }}</option><option value="auto">Auto (no color)</option><option value="custom">Custom color</option></select>
+              <input id="word-color-custom-{{ category }}" type="color" value="#{{ color }}" aria-label="Custom color for {{ label|lower }}">
+            </div>
+            {% endfor %}
+          </details>
           <label for="hebrew-font">Hebrew typeface</label><select id="hebrew-font"><option>Ezra SIL</option><option>SBL Hebrew</option></select>
           <div class="paired"><div><label for="body-pt">Text size</label><input id="body-pt" type="number" min="12" max="26" step="0.5"></div><div><label for="leading-pt">Line spacing</label><input id="leading-pt" type="number" min="16" max="38" step="0.5"></div></div>
           <div class="paired"><div><label for="notes-pt">Note size</label><input id="notes-pt" type="number" min="7.5" max="14" step="0.5"></div><div><label for="folio">First page</label><input id="folio" type="number" min="1" max="99999"></div></div>

@@ -4,7 +4,7 @@ import pytest
 
 from bible_reader.editorial import build_document
 from bible_reader.models import ProjectConfig, ReaderDocument
-from bible_reader.tex import blocks, contents, page_tex
+from bible_reader.tex import blocks, contents, page_tex, word_tex
 
 
 @pytest.mark.parametrize(
@@ -35,3 +35,18 @@ def test_stem_capitalization_only_changes_tex_display(source_state):
         assert rf"\NoteStem{{{stem}}}" not in notes
     assert r"\NoteStem{}" not in notes
     assert document.json() == original
+
+
+def test_color_scope_preserves_markers_readings_punctuation_and_escaping(source_state):
+    document = build_document(source_state, ProjectConfig())
+    token = next(t for v in document.verses for t in v["tokens"] if t["helps"])
+    token = {**token, "surface": "א&ב", "word_class": "noun", "reading": "ketiv"}
+    plain = word_tex(token, document, "p1")
+    document.config["layout"].update(word_colors="word-class", word_color_overrides={"noun": "#123456"})
+    colored = word_tex(token, document, "p1")
+    assert colored.replace(r"\textcolor[HTML]{123456}{א\&ב}", r"א\&ב") == plain
+    assert r"{א\&ב}\ReadingMark{K}\HelpMarker" in colored
+    assert r"\textcolor" not in word_tex({**token, "kind": "x-maqqef"}, document, "p1")
+    assert r"\textcolor" not in word_tex({**token, "word_class": None}, document, "p1")
+    document.config["layout"]["word_color_overrides"]["noun"] = "auto"
+    assert word_tex(token, document, "p1") == plain

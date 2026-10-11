@@ -89,7 +89,7 @@ def main():
         with tarfile.open(acquire(directory, "bidi.tar.xz")) as archive:
             archive.extractall(distribution / "texmf-dist", filter="data")
         subprocess.run([str(binary / "mktexlsr")], check=True)
-    for name in ("fontspec.sty", "polyglossia.sty", "bidi.sty", "hyperref.sty", "geometry.sty"):
+    for name in ("fontspec.sty", "xcolor.sty", "polyglossia.sty", "bidi.sty", "hyperref.sty", "geometry.sty"):
         subprocess.run([str(binary / "kpsewhich"), name], check=True)
     print(f"XeLaTeX ready: {binary / 'xelatex'}")
 

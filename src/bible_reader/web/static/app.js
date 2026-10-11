@@ -120,9 +120,15 @@ function fillForm() {
   const c = current.config;
   const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max,
     paper: c.layout.paper, "paper-width": c.layout.paper_width_mm ?? 140, "paper-height": c.layout.paper_height_mm ?? 216,
-    "verse-layout": c.layout.verse_layout ?? "continuous", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
+    "verse-layout": c.layout.verse_layout ?? "continuous", "word-colors": c.layout.word_colors ?? "auto", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
     "notes-pt": c.layout.notes_pt, folio: c.layout.first_folio, readings: c.readings, cantillation: c.cantillation};
   Object.entries(values).forEach(([id, value]) => { $(id).value = value; });
+  document.querySelectorAll("[data-word-class]").forEach(row => {
+    const category = row.dataset.wordClass, override = c.layout.word_color_overrides?.[category];
+    $("word-color-" + category).value = override === "auto" ? "auto" : override ? "custom" : "preset";
+    $("word-color-custom-" + category).value = override && override !== "auto" ? override : row.dataset.presetColor;
+  });
+  updateWordColorFields();
   updatePaperFields();
   $("frequency").disabled = c.selection !== "book-frequency";
   $("edition-title").textContent = c.name;
@@ -133,6 +139,17 @@ function updatePaperFields() {
   const custom = $("paper").value === "custom";
   $("custom-paper").hidden = !custom;
   $("paper-width").disabled = $("paper-height").disabled = !custom;
+}
+function updateWordColorFields() {
+  const enabled = $("word-colors").value === "word-class";
+  $("word-color-settings").hidden = !enabled;
+  document.querySelectorAll("[data-word-class]").forEach(row => {
+    const category = row.dataset.wordClass, choice = $("word-color-" + category).value;
+    const picker = $("word-color-custom-" + category);
+    $("word-color-" + category).disabled = !enabled;
+    picker.disabled = !enabled || choice === "auto";
+    if (choice !== "custom") picker.value = choice === "auto" ? "#000000" : row.dataset.presetColor;
+  });
 }
 async function loadProject(identity) {
   try {requireSavedReview();} catch (error) {if (current) $("project-picker").value = current.id; throw error;}
@@ -147,8 +164,14 @@ function formConfig() {
   const c = structuredClone(current.config);
   Object.assign(c, {name: $("project-name").value, book: $("book").value, passage: $("passage").value.trim(), selection: $("selection").value,
     frequency_max: Number($("frequency").value), readings: $("readings").value, cantillation: $("cantillation").value});
-  Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
+  Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, word_colors: $("word-colors").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
     leading_pt: Number($("leading-pt").value), notes_pt: Number($("notes-pt").value), first_folio: Number($("folio").value)});
+  c.layout.word_color_overrides = {};
+  document.querySelectorAll("[data-word-class]").forEach(row => {
+    const category = row.dataset.wordClass, choice = $("word-color-" + category).value;
+    if (choice === "auto") c.layout.word_color_overrides[category] = "auto";
+    else if (choice === "custom") c.layout.word_color_overrides[category] = $("word-color-custom-" + category).value.toUpperCase();
+  });
   if (c.layout.paper === "custom") {
     if (!$("paper-width").reportValidity() || !$("paper-height").reportValidity()) {
       throw new Error("Enter a valid custom paper width and height in millimetres.");
@@ -513,6 +536,12 @@ $("project-picker").onchange = guard(() => loadProject($("project-picker").value
 $("project-form").onsubmit = guard(async event => {event.preventDefault(); await saveConfig(formConfig()); notice("Edition settings saved");});
 $("selection").onchange = () => { $("frequency").disabled = $("selection").value !== "book-frequency"; };
 $("paper").onchange = updatePaperFields;
+$("word-colors").onchange = updateWordColorFields;
+document.querySelectorAll("[data-word-class]").forEach(row => {
+  const category = row.dataset.wordClass;
+  $("word-color-" + category).onchange = updateWordColorFields;
+  $("word-color-custom-" + category).oninput = () => {$("word-color-" + category).value = "custom";};
+});
 $("book").onchange = () => {if ($("book").value !== "Prov") {$("selection").value = "book-frequency"; $("passage").value = "1:1-10"; $("frequency").disabled = false;}};
 $("new-project").onclick = guard(async () => {requireSavedReview(); const config = structuredClone(current.config); config.name = "New reader edition"; const project = await api("/projects", "POST", config); await refreshProjects(project.id);});
 $("build").onclick = guard(async () => {requireSavedReview(); viewedJob = undefined; await saveConfig(formConfig()); const job = await api(`/projects/${current.id}/builds`, "POST"); allJobs.unshift(job); tab("preview"); renderJobs();});

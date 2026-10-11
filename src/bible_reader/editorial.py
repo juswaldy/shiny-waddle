@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .models import Decision, Entry, ProjectConfig, ReaderDocument, ReaderError, Token, digest, parse_passage
 from .sources import catalog, lemma_keys, load_book, load_lexicon
+from .word_classes import word_class
 
 STEMS = {"q": "Qal", "N": "Nif", "p": "Piel", "P": "Pual", "h": "Hif", "H": "Hof", "t": "Hitp"}
 CONSONANT_PUNCTUATION = {"consonants-only": "", "consonants": "־", "consonants-maqqef-sof-pasuq": "־׃"}
@@ -242,6 +243,9 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                 "reading": token.reading,
                 "kind": token.kind,
                 "language": token.language,
+                "morph": token.morph,
+                "word_class": word_class(token.morph) if token.kind == "word" else None,
+                "word_class_source": "OSHB morphology" if token.kind == "word" else None,
                 "helps": [],
             }
             for index, lemma in enumerate(lemma_keys(token.lemma)):
@@ -279,6 +283,9 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                 )
                 if name_reason:
                     selected, reason = False, name_reason
+                    if token.kind == "word":
+                        record["word_class"] = "name"
+                        record["word_class_source"] = name_reason
                 status = "resolved" if choice else ("ambiguous" if candidate_ids else "unmatched")
                 stem = stem_label(token.morph)
                 gloss = (
