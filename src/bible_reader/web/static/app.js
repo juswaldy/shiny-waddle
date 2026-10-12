@@ -172,6 +172,7 @@ function formConfig() {
     if (choice === "auto") c.layout.word_color_overrides[category] = "auto";
     else if (choice === "custom") c.layout.word_color_overrides[category] = $("word-color-custom-" + category).value.toUpperCase();
   });
+  c.layout.word_color_overrides = Object.fromEntries(Object.entries(c.layout.word_color_overrides).sort(([a], [b]) => a.localeCompare(b)));
   if (c.layout.paper === "custom") {
     if (!$("paper-width").reportValidity() || !$("paper-height").reportValidity()) {
       throw new Error("Enter a valid custom paper width and height in millimetres.");
@@ -537,6 +538,11 @@ $("project-form").onsubmit = guard(async event => {event.preventDefault(); await
 $("selection").onchange = () => { $("frequency").disabled = $("selection").value !== "book-frequency"; };
 $("paper").onchange = updatePaperFields;
 $("word-colors").onchange = updateWordColorFields;
+$("word-colors-clear").onclick = () => {
+  document.querySelectorAll("[data-word-class]").forEach(row => {$("word-color-" + row.dataset.wordClass).value = "auto";});
+  updateWordColorFields();
+  notice("All word classes set to no color. Save settings to keep this palette.");
+};
 document.querySelectorAll("[data-word-class]").forEach(row => {
   const category = row.dataset.wordClass;
   $("word-color-" + category).onchange = updateWordColorFields;

@@ -123,6 +123,37 @@ def test_word_colors_default_palette_customization_and_project_persistence(revie
         expect(page.locator("#notice")).to_have_text("Edition settings saved")
         saved = page.request.get(url + f"/api/projects/{identity}").json()
         assert saved["config"]["layout"]["word_color_overrides"] == {"name": "auto"}
+        page.locator("#word-color-custom-noun").fill("#ab1234")
+        page.get_by_role("button", name="Set all to no color", exact=True).click()
+        expect(page.locator("#word-colors")).to_have_value("word-class")
+        categories = page.locator("[data-word-class]").evaluate_all(
+            "rows => rows.map(row => row.dataset.wordClass)"
+        )
+        assert "name" in categories
+        for category in categories:
+            expect(page.locator(f"#word-color-{category}")).to_have_value("auto")
+            expect(page.locator(f"#word-color-custom-{category}")).to_be_disabled()
+        assert page.request.get(url + f"/api/projects/{identity}").json() == saved
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        saved = page.request.get(url + f"/api/projects/{identity}").json()
+        assert saved["config"]["layout"]["word_color_overrides"] == dict.fromkeys(categories, "auto")
+        page.reload()
+        expect(page.locator(".help-row").first).to_be_visible()
+        page.get_by_text("Page & reading settings", exact=True).click()
+        page.get_by_text("Palette & class colors", exact=True).click()
+        for category in categories:
+            expect(page.locator(f"#word-color-{category}")).to_have_value("auto")
+        page.locator("#word-color-verb").select_option("preset")
+        expect(page.locator("#word-color-custom-verb")).to_be_enabled()
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        saved = page.request.get(url + f"/api/projects/{identity}").json()
+        assert saved["config"]["layout"]["word_color_overrides"] == {
+            category: "auto" for category in categories if category != "verb"
+        }
         page.get_by_role("button", name="Build reader PDF", exact=False).click()
         expect(page.locator("#preview-panel")).to_be_visible()
         job = page.request.get(url + "/api/jobs").json()[0]

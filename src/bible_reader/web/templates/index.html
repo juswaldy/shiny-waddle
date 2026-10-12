@@ -35,6 +35,7 @@
           <p id="word-colors-hint" class="hint">Use the preset palette or adjust each class below. Unknown classes stay uncolored.</p>
           <details id="word-color-settings" hidden><summary>Palette &amp; class colors</summary>
             <p class="hint">Attached prefixes and suffixes share the main word’s color. Names use their own color.</p>
+            <button id="word-colors-clear" type="button" class="text-button">Set all to no color</button>
             {% for category, (label, color) in word_classes.items() %}
             <label for="word-color-{{ category }}">{{ label }}</label>
             <div class="word-color-row" data-word-class="{{ category }}" data-preset-color="#{{ color }}">

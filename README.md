@@ -64,7 +64,9 @@ in either mode. Projects without this setting use continuous text.
 
 **Word colors** defaults to **Auto (no color)**. Choose **Word class + names**
 for a preset palette, then open **Palette & class colors** to pick a custom color
-or **Auto (no color)** for each class. Switching back to Auto keeps your overrides
+or **Auto (no color)** for each class. **Set all to no color** resets every class,
+including names, to Auto; you can then color individual classes. Use **Save settings**
+to keep the reset palette. Switching back to Auto keeps your overrides
 for later use. Scripture words use their source morphology; names also use the
 existing STEP name metadata. Attached prefixes and suffixes share the main word's
 color. Unknown or compound classes stay uncolored. Notes, markers, punctuation,
