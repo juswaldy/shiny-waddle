@@ -22,6 +22,7 @@ from ..service import doctor, inspect_project
 from ..sources import catalog
 from ..store import Store
 from ..tex import font_path
+from ..word_classes import WORD_CLASS_COLORS
 
 
 class SaveProject(StrictModel):
@@ -108,7 +109,9 @@ def create_app(state: Path | None = None, *, start_worker=True):
     def home(request: Request):
         if not store.projects():
             store.create_project(ProjectConfig())
-        return templates.TemplateResponse(request=request, name="index.html", context={"csrf": token})
+        return templates.TemplateResponse(
+            request=request, name="index.html", context={"csrf": token, "word_classes": WORD_CLASS_COLORS}
+        )
 
     @app.get("/font/ezra.ttf")
     def font():

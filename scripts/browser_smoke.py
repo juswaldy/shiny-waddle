@@ -122,7 +122,7 @@ with (OUTPUT / "server.log").open("w") as log:
             expect(page.locator(".help-row")).to_have_count(40)
             expect(page.locator("#coverage")).to_contain_text("37")
             page.screenshot(path=str(OUTPUT / "review-desktop.png"), full_page=False)
-            page.locator("#project-form summary").click()
+            page.get_by_text("Page & reading settings", exact=True).click()
             expect(page.locator("#paper")).to_have_value("reader")
             expect(page.locator("#custom-paper")).to_be_hidden()
             expect(page.locator("#paper-width")).to_be_disabled()
@@ -174,7 +174,7 @@ with (OUTPUT / "server.log").open("w") as log:
             assert bundle.ok and bundle.body().startswith(b"PK")
             (OUTPUT / "downloaded-bundle.zip").write_bytes(bundle.body())
             # Layout and consonant choices must reach the immutable worker build config.
-            page.locator("#project-form summary").click()
+            page.get_by_text("Page & reading settings", exact=True).click()
             page.locator("#paper").select_option("reader")
             expect(page.locator("#custom-paper")).to_be_hidden()
             expect(page.locator("#paper-height")).to_be_disabled()

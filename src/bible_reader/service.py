@@ -29,7 +29,14 @@ def doctor(state: Path):
         if not Path(kpse).exists():
             kpse = shutil.which("kpsewhich")
         if kpse:
-            for name in ("fontspec.sty", "polyglossia.sty", "bidi.sty", "hyperref.sty", "geometry.sty"):
+            for name in (
+                "fontspec.sty",
+                "xcolor.sty",
+                "polyglossia.sty",
+                "bidi.sty",
+                "hyperref.sty",
+                "geometry.sty",
+            ):
                 probe = subprocess.run([kpse, name], capture_output=True, text=True, timeout=10)
                 result["packages"][name] = probe.returncode == 0
     except ReaderError as error:
@@ -136,7 +143,7 @@ def build(
     else:
         font_instructions = "SBL Hebrew is not redistributed. Obtain it under its own terms and copy the matching font to reader-hebrew.ttf before recompiling."
     (output / "BUILD.txt").write_text(
-        "Rebuild this edition offline with XeLaTeX, fontspec, polyglossia, bidi, hyperref, geometry, and Latin Modern.\n"
+        "Rebuild this edition offline with XeLaTeX, fontspec, xcolor, polyglossia, bidi, hyperref, geometry, and Latin Modern.\n"
         "Run twice from this directory: xelatex -no-shell-escape -halt-on-error reader.tex\n"
         + font_instructions
         + "\nSee manifest.json for engine, font, source and application fingerprints.\n",

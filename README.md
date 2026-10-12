@@ -62,6 +62,27 @@ text** (the default) and **One verse per line**. In a project file set
 `layout.verse_layout` to `"continuous"` or `"verse-per-line"`; long verses can wrap
 in either mode. Projects without this setting use continuous text.
 
+**Word colors** defaults to **Auto (no color)**. Choose **Word class + names**
+for a preset palette, then open **Palette & class colors** to pick a custom color
+or **Auto (no color)** for each class. **Set all to no color** resets every class,
+including names, to Auto; you can then color individual classes. Use **Save settings**
+to keep the reset palette. Switching back to Auto keeps your overrides
+for later use. Scripture words use their source morphology; names also use the
+existing STEP name metadata. Attached prefixes and suffixes share the main word's
+color. Unknown or compound classes stay uncolored. Notes, markers, punctuation,
+and source text keep their existing appearance and content.
+In JSON projects, for example:
+
+```json
+{"layout": {"word_colors": "word-class", "word_color_overrides": {"noun": "#245A81", "name": "auto"}}}
+```
+
+TOML uses `word_colors = "word-class"` under `[layout]` and per-class values under
+`[layout.word_color_overrides]`. Supported keys are `noun`, `verb`, `adjective`,
+`adverb`, `pronoun`, `preposition`, `conjunction`, `particle`, `suffix`, `number`,
+and `name`. Omit an override to use its preset; custom colors are six-digit hex values.
+Omitted `word_colors` uses `"auto"`, including older projects.
+
 The **Cantillation** selector also offers **Consonants only**, **Consonants +
 maqqef**, and **Consonants + maqqef + sof pasuq**. All three hide Hebrew combining
 marks, including vowels, dagesh, and shin/sin dots. Consonants only hides all Hebrew

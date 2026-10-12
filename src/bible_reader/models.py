@@ -11,6 +11,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .word_classes import WordClass
+
 
 class ReaderError(Exception):
     """An actionable input, source, or build failure."""
@@ -55,11 +57,21 @@ class Layout(StrictModel):
     paper_width_mm: float | None = Field(default=None, ge=21, le=1000)
     paper_height_mm: float | None = Field(default=None, ge=21, le=1000)
     verse_layout: Literal["continuous", "verse-per-line"] = "continuous"
+    word_colors: Literal["auto", "word-class"] = "auto"
+    word_color_overrides: dict[WordClass, str] = Field(default_factory=dict)
     body_pt: float = Field(default=18.0, ge=12, le=26)
     leading_pt: float = Field(default=23.5, ge=16, le=38)
     notes_pt: float = Field(default=9.0, ge=7.5, le=14)
     first_folio: int = Field(default=1, ge=1, le=99999)
     hebrew_font: Literal["Ezra SIL", "SBL Hebrew"] = "Ezra SIL"
+
+    @field_validator("word_color_overrides")
+    @classmethod
+    def validate_word_colors(cls, value):
+        for color in value.values():
+            if color != "auto" and not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
+                raise ValueError("Word colors must be auto or a six-digit hex color such as #245A81")
+        return {category: color.upper() if color != "auto" else color for category, color in value.items()}
 
     @model_validator(mode="after")
     def validate_layout(self):

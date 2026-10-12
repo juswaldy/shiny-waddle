@@ -18,6 +18,7 @@ from pypdf import PdfReader
 from .models import Cancelled, ReaderDocument, ReaderError, digest
 from .render import escape_latex
 from .sources import catalog
+from .word_classes import word_color
 
 PAPERS = {
     "reader": (140, 216, 10),
@@ -208,6 +209,7 @@ def preamble(layout: dict) -> str:
     return rf"""\documentclass{{article}}
 \usepackage[paperwidth={width}mm,paperheight={height}mm,margin={margin}mm]{{geometry}}
 \usepackage{{fontspec}}
+\usepackage{{xcolor}}
 \usepackage[unicode,hidelinks]{{hyperref}}
 \usepackage{{polyglossia}}
 \setdefaultlanguage{{english}}
@@ -243,6 +245,9 @@ def preamble(layout: dict) -> str:
 
 def word_tex(token: dict, document: ReaderDocument, prefix: str) -> str:
     result = escape_latex(token["surface"])
+    color = word_color(token.get("word_class"), document.config["layout"])
+    if token["kind"] == "word" and color:
+        result = rf"\textcolor[HTML]{{{color[1:]}}}{{{result}}}"
     if token["reading"] in {"ketiv", "qere"} and document.config["readings"] == "both":
         result += rf"\ReadingMark{{{token['reading'][0].upper()}}}"
     for identity in token["helps"]:

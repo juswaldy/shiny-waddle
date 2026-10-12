@@ -24,6 +24,7 @@ flowchart LR
 | `models.py` | Strict Pydantic settings, frozen source records, reader document |
 | `sources.py` | Pinned acquisition, hash checks, OSIS/TSV adapters, canonical exports |
 | `editorial.py` | Crosswalk candidates, decisions, frequency, stable chapter help labels |
+| `word_classes.py` | Source-morphology display categories and preset word-color palette |
 | `tex.py` | Explicit language runs, TeX measurement, pagination, bounded compiler, PDF checks |
 | `service.py` | Shared inspect/build/doctor use cases and reproducibility bundles |
 | `store.py` | SQLite project revisions, durable job snapshots, atomic claims |
@@ -59,6 +60,18 @@ to scripture and review surfaces; lexical headwords retain their source pointing
 The chosen transformation is recorded in the source lock and credits. Raw surfaces
 remain unchanged. Source IDs are interpreted within the pinned book/revision in the lock.
 No source Unicode normalization or visual string reversal occurs.
+
+Reader tokens also retain raw `morph`, a derived `word_class` (or null), and
+`word_class_source` evidence. Classes follow the [OSHB morphology codes](https://hb.openscriptures.org/parsing/HebrewMorphologyCodes.html):
+one language prefix applies to the full slash-separated analysis. Attached
+conjunction/preposition/article prefixes and suffixes share the main component's
+class; multiple main components or unknown codes remain unclassified. Cardinal
+and ordinal adjective codes use the `number` display category. Confirmed OSHB
+proper names or existing STEP name evidence use `name`, including omitted helps;
+mixed candidates do not establish a name until a name entry is chosen.
+`layout.word_colors` defaults to `auto` (no color) or enables `word-class`.
+`layout.word_color_overrides` maps supported classes to `auto` or validated hex
+colors. These settings affect presentation independently of help selection.
 
 Each numeric lemma component maps to an anchor `<source-token-id>:<component-index>`.
 Exact extended IDs can resolve only when a single lexicon candidate exists. Base-ID

@@ -9,8 +9,56 @@ from bible_reader.editorial import build_document
 from bible_reader.models import Cancelled, Decision, ProjectConfig, ReaderError
 from bible_reader.service import build
 from bible_reader.tex import Compiler, final_tex, paginate, verify_pdf
+from bible_reader.word_classes import word_color
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
+def test_pdf_word_palette_and_overrides_only_paint_scripture(
+    source_state, tmp_path, tex_available, verse_layout
+):
+    config = ProjectConfig(
+        layout={
+            "word_colors": "word-class",
+            "word_color_overrides": {"noun": "#123ABC", "particle": "auto"},
+            "verse_layout": verse_layout,
+        }
+    )
+    output = tmp_path / "colors"
+    result = build(source_state, config, output)
+    assert result["reader_pages"] == 2
+    assert result["fonts_embedded"]
+    assert result["pdf_marker_destinations"] == "verified"
+    document = build_document(source_state, config)
+    expected = {
+        tuple(round(int(color[index : index + 2], 16) / 255, 3) for index in (1, 3, 5))
+        for verse in document.verses
+        for token in verse["tokens"]
+        if (color := word_color(token["word_class"], config.layout.model_dump()))
+    }
+    assert word_color("name", config.layout.model_dump()) is not None
+    painted = set()
+    pdf = PdfReader(output / "reader.pdf")
+    for page in pdf.pages:
+        fill, font, size = (0, 0, 0), None, None
+        stack = []
+        for operands, operator in page.get_contents().operations:
+            if operator == b"q":
+                stack.append((fill, font, size))
+            elif operator == b"Q":
+                fill, font, size = stack.pop()
+            elif operator == b"rg":
+                fill = tuple(float(value) for value in operands)
+            elif operator == b"g":
+                fill = (float(operands[0]),) * 3
+            elif operator == b"Tf":
+                font, size = operands
+            elif operator in {b"Tj", b"TJ"} and fill != (0, 0, 0):
+                painted.add(fill)
+                assert float(size) == pytest.approx(config.layout.body_pt * 72 / 72.27, abs=0.01)
+                assert "Ezra" in page["/Resources"]["/Font"][font]["/BaseFont"]
+    assert painted == expected
 
 
 @pytest.mark.parametrize(

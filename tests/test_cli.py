@@ -12,6 +12,7 @@ def test_init_refuses_overwrite_and_inspect_is_offline(source_state, tmp_path, c
     original = config.read_bytes()
     assert json.loads(original)["layout"]["verse_layout"] == "continuous"
     assert json.loads(original)["layout"]["paper"] == "reader"
+    assert json.loads(original)["layout"]["word_colors"] == "auto"
     with pytest.raises(SystemExit) as error:
         main(["init", "--project", str(config)])
     assert error.value.code == 1
@@ -41,8 +42,31 @@ def test_legacy_project_defaults_and_invalid_verse_layout(tmp_path):
     config = tmp_path / "legacy.json"
     config.write_text('{"layout": {"paper": "a5"}}')
     assert load_config(config).layout.verse_layout == "continuous"
+    assert load_config(config).layout.word_colors == "auto"
     with pytest.raises(ValueError):
         Layout(verse_layout="unknown")
+
+
+def test_word_color_settings_in_json_and_toml(tmp_path):
+    json_config = tmp_path / "colors.json"
+    json_config.write_text(
+        json.dumps(
+            {
+                "layout": {
+                    "word_colors": "word-class",
+                    "word_color_overrides": {"noun": "#112233", "name": "auto"},
+                }
+            }
+        )
+    )
+    toml_config = tmp_path / "colors.toml"
+    toml_config.write_text(
+        '[layout]\nword_colors = "word-class"\n[layout.word_color_overrides]\nnoun = "#112233"\nname = "auto"\n'
+    )
+    assert load_config(json_config) == load_config(toml_config)
+    assert load_config(json_config).layout.word_color_overrides == {"noun": "#112233", "name": "auto"}
+    with pytest.raises(ValueError):
+        Layout(word_colors="unknown")
 
 
 def test_custom_paper_in_json_and_toml(tmp_path):
