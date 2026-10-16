@@ -2,6 +2,7 @@ import hashlib
 import json
 import zipfile
 
+import pypdfium2 as pdfium
 import pytest
 from pypdf import PdfReader
 
@@ -149,6 +150,8 @@ def test_pdf_running_title_language_and_smaller_uppercase_stems(
     document = json.loads((output / "reader.v2.json").read_text())
     plans = json.loads((output / "page-plan.json").read_text())
     pdf = PdfReader(output / "reader.pdf")
+    rendered_pdf = pdfium.PdfDocument(output / "reader.pdf")
+    title_bounds = []
     # PDF sizes use 72 points/inch; TeX sizes use 72.27 points/inch.
     pdf_pt_per_tex_pt = 72 / 72.27
     for page, plan in zip(pdf.pages[: len(plans)], plans, strict=True):
@@ -169,11 +172,12 @@ def test_pdf_running_title_language_and_smaller_uppercase_stems(
             stems=stems,
             expected_stems=expected_stems,
             header_min_y=float(page.mediabox.top) - 60,
-            heading_size=(18.0 if plan["folio"] % 2 else 9.0) * pdf_pt_per_tex_pt,
+            heading_size=18.0 * pdf_pt_per_tex_pt,
         ):
             if not text.strip():
                 return
-            if size == pytest.approx(heading_size, abs=0.01) and cm[5] + tm[5] > header_min_y:
+            baseline = cm[1] * tm[4] + cm[3] * tm[5] + cm[5]
+            if size == pytest.approx(heading_size, abs=0.01) and baseline > header_min_y:
                 headings.append((text.strip(), font["/BaseFont"]))
             if text.strip() in expected_stems:
                 stems.append(text.strip())
@@ -186,9 +190,32 @@ def test_pdf_running_title_language_and_smaller_uppercase_stems(
             assert "Ezra" in font_name
             assert all("\u0590" <= char <= "\u05ff" for char in title)
         else:
-            assert title == "PROVERBS"
-            assert "LMRoman" in font_name
+            assert title == "Proverbs"
+            assert "LMRomanCaps" in font_name
         assert sorted(stems) == sorted(expected_stems)
+        rendered_page = rendered_pdf[plan["page"] - 1]
+        text_page = rendered_page.get_textpage()
+        width, height = rendered_page.get_size()
+        title_chars = [
+            text_page.get_charbox(index)
+            for index in range(text_page.count_chars())
+            if text_page.get_text_range(index, 1).strip()
+            and text_page.get_charbox(index)[1] > height - 60
+            and width * 0.3 < text_page.get_charbox(index)[0] < width * 0.7
+        ]
+        bottom = min(box[1] for box in title_chars)
+        top = max(box[3] for box in title_chars)
+        title_bounds.append((bottom, top))
+        if not plan["folio"] % 2:
+            initial_height = title_chars[0][3] - title_chars[0][1]
+            assert all(initial_height > box[3] - box[1] + 1 for box in title_chars[1:])
+        text_page.close()
+        rendered_page.close()
+    rendered_pdf.close()
+    # Compare actual glyph bounds across odd/even pages, including the baseline.
+    for bottom, top in title_bounds[1:]:
+        assert bottom == pytest.approx(title_bounds[0][0], abs=0.2)
+        assert top == pytest.approx(title_bounds[0][1], abs=0.2)
 
 
 def test_editorial_tex_is_escaped_and_long_gloss_paginated(source_state, tmp_path, tex_available):

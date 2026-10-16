@@ -209,6 +209,7 @@ def preamble(layout: dict) -> str:
     return rf"""\documentclass{{article}}
 \usepackage[paperwidth={width}mm,paperheight={height}mm,margin={margin}mm]{{geometry}}
 \usepackage{{fontspec}}
+\usepackage{{graphicx}}
 \usepackage{{xcolor}}
 \usepackage[unicode,hidelinks]{{hyperref}}
 \usepackage{{polyglossia}}
@@ -216,6 +217,7 @@ def preamble(layout: dict) -> str:
 \setotherlanguage{{hebrew}}
 \setmainfont{{lmroman10-regular.otf}}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf]
 \newfontfamily\hebrewfont[Script=Hebrew]{{reader-hebrew.ttf}}
+\newfontfamily\booktitlefont{{lmromancaps10-regular.otf}}
 \pagestyle{{empty}}
 \setlength{{\parindent}}{{0pt}}
 \setlength{{\parskip}}{{0pt}}
@@ -228,8 +230,16 @@ def preamble(layout: dict) -> str:
 \newcommand{{\Note}}[5]{{\hypertarget{{#1}}{{}}\mbox{{\textsuperscript{{#2}}\texthebrew{{#3}}}}\nobreak\hspace{{0.2em}}#4#5.\hspace{{0.9em}}}}
 \newcommand{{\Notes}}[1]{{\begingroup\setLTR\fontsize{{{layout["notes_pt"]}}}{{{layout["notes_pt"] * 1.35}}}\selectfont
   \raggedright\emergencystretch=3em #1\par\endgroup}}
+\newsavebox{{\BookTitleBox}}
+\newcommand{{\HebrewBookTitle}}[1]{{\texthebrew{{\fontsize{{18}}{{20}}\selectfont #1}}}}
+% Match the English caps to the selected Hebrew font's full title height.
+\newcommand{{\EnglishBookTitle}}[2]{{\begingroup
+  \sbox{{\BookTitleBox}}{{\HebrewBookTitle{{#1}}}}%
+  \raisebox{{-\dp\BookTitleBox}}{{\resizebox*{{!}}{{\dimexpr\ht\BookTitleBox+\dp\BookTitleBox\relax}}{{%
+    \textenglish{{\booktitlefont\fontsize{{18}}{{20}}\selectfont #2}}}}}}%
+\endgroup}}
 \newcommand{{\Header}}[3]{{\hbox to\linewidth{{\rlap{{\fontsize{{10}}{{12}}\selectfont #1}}\hfil
-  {{\ifodd#3\relax\fontsize{{18}}{{20}}\else\fontsize{{9}}{{10}}\fi\selectfont #2}}\hfil\llap{{\fontsize{{10}}{{12}}\selectfont #3}}}}\vskip3pt\hrule height0.35pt\vskip9pt}}
+  #2\hfil\llap{{\fontsize{{10}}{{12}}\selectfont #3}}}}\vskip3pt\hrule height0.35pt\vskip9pt}}
 \newbox\BodyBox
 \newbox\NotesBox
 \newbox\PageBox
@@ -354,9 +364,9 @@ def page_tex(groups: list, document: ReaderDocument, prefix: str, folio: int):
         passage += f"–{last[-2]}:{last[-1]}"
     book = catalog()["books"][document.config["book"]]
     title = (
-        rf"\texthebrew{{{escape_latex(book['hebrew'])}}}"
+        rf"\HebrewBookTitle{{{escape_latex(book['hebrew'])}}}"
         if folio % 2
-        else rf"\textenglish{{{escape_latex(book['title'].upper())}}}"
+        else rf"\EnglishBookTitle{{{escape_latex(book['hebrew'])}}}{{{escape_latex(book['title'])}}}"
     )
     boxes = (
         "\\setbox\\BodyBox=\\vbox{\\hsize=\\linewidth\n" + scripture + "}\n"

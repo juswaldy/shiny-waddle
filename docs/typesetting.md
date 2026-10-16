@@ -39,8 +39,10 @@ folio, accent policy, reading policy, and font choice are validated project sett
 Verb-stem labels in lexical notes use uppercase Latin letters at 50% of the note
 size (4.5 pt with the default 9 pt notes). Running book titles alternate by printed
 folio: Hebrew on odd folios, English on even folios, including exports whose
-`layout.first_folio` starts on an even number. Hebrew book titles use 18 pt type;
-English book titles use uppercase letters at 9 pt.
+`layout.first_folio` starts on an even number. Hebrew book titles use 18 pt type.
+English titles use Latin Modern Roman Caps, with taller title initials and smaller
+capitals for lowercase letters. Their full height and baseline placement match
+the same book's Hebrew title, measured in the selected Hebrew font.
 
 Word coloring defaults to `layout.word_colors = "auto"` (no color).
 `"word-class"` enables the preset palette with per-class hex/Auto overrides in

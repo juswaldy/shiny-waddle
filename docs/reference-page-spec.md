@@ -217,7 +217,8 @@ and line/anchor-aware note assignment.
 **R18 — Header and whitespace.** Derive the running reference from the first and
 last visible verse on that page, not the full requested passage. Keep book title
 centered geometrically, in Hebrew on odd printed folios and English on even printed
-folios. English titles use uppercase letters at 9 pt; Hebrew titles use 18 pt.
+folios. Hebrew titles use 18 pt. English titles use true small capitals with taller
+title initials, scaled to match the full height of the same book's Hebrew title.
 The alternation follows `layout.first_folio`, rather than the export's page
 index. Use a page-local, full-width apparatus separator. Place
 extra vertical space between text and apparatus when bottom-aligning the notes;
