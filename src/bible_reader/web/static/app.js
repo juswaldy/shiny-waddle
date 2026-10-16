@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const csrf = document.querySelector('meta[name="reader-token"]').content;
 let current, sourceInfo, reviewData, allJobs = [], page = 0, requestVersion = 0, noticeTimer, viewedJob;
-let pageSize = 40, reviewSaving = false;
+let pageSize = 40, reviewSaving = false, helpsResetting = false;
 const reviewDrafts = new Map(), visibleEditors = new Map();
 let visibleRows = [], filteredRows = [];
 let contextRow, contextReference, contextPinned = false, contextHideTimer, suppressContextFocus = false;
@@ -118,7 +118,7 @@ async function refreshProjects(selected) {
 }
 function fillForm() {
   const c = current.config;
-  const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max,
+  const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max, "gloss-selection": c.gloss_selection ?? "reviewed",
     paper: c.layout.paper, "paper-width": c.layout.paper_width_mm ?? 140, "paper-height": c.layout.paper_height_mm ?? 216,
     "verse-layout": c.layout.verse_layout ?? "continuous", "word-colors": c.layout.word_colors ?? "auto", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
     "notes-pt": c.layout.notes_pt, folio: c.layout.first_folio, readings: c.readings, cantillation: c.cantillation};
@@ -156,6 +156,7 @@ async function loadProject(identity) {
   closeVerseContext();
   viewedJob = undefined;
   $("review-edit-result").hidden = true;
+  $("reset-helps-status").hidden = true;
   current = await api(`/projects/${identity}`); page = 0; fillForm();
   localStorage.setItem("reader-project", identity);
   await refreshReview(); renderJobs();
@@ -163,7 +164,7 @@ async function loadProject(identity) {
 function formConfig() {
   const c = structuredClone(current.config);
   Object.assign(c, {name: $("project-name").value, book: $("book").value, passage: $("passage").value.trim(), selection: $("selection").value,
-    frequency_max: Number($("frequency").value), readings: $("readings").value, cantillation: $("cantillation").value});
+    frequency_max: Number($("frequency").value), gloss_selection: $("gloss-selection").value, readings: $("readings").value, cantillation: $("cantillation").value});
   Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, word_colors: $("word-colors").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
     leading_pt: Number($("leading-pt").value), notes_pt: Number($("notes-pt").value), first_folio: Number($("folio").value)});
   c.layout.word_color_overrides = {};
@@ -187,10 +188,11 @@ async function saveConfig(config) {
     requireSavedReview();
     current = await api(`/projects/${current.id}`, "PUT", {revision: current.revision, config});
     const option = $("project-picker").selectedOptions[0]; if (option) option.textContent = config.name;
+    $("reset-helps-status").hidden = true;
   }
   fillForm(); await refreshReview(); renderJobs();
 }
-async function refreshReview() {
+async function refreshReview({throwOnError = false} = {}) {
   if (!current) return;
   const version = ++requestVersion;
   $("review-intro").textContent = "Loading source text and lexical helps…";
@@ -212,6 +214,7 @@ async function refreshReview() {
     $("review-list").replaceChildren(el("p", "Open Sources to install this book, then refresh the review.", "empty"));
     $("review-intro").textContent = error.message; $("review-intro").className = "info-card error"; $("coverage").replaceChildren();
     updateReviewActions();
+    if (throwOnError) throw error;
   }
 }
 function initialEdit(row) {
@@ -225,7 +228,7 @@ function nameExcluded(row, edit = rowEdit(row)) {
 }
 function requireSavedReview() {
   if (reviewSaving) throw new Error("Wait for the lexical page to finish saving.");
-  if (reviewDrafts.size) throw new Error("Save or discard your lexical review edits before changing edition settings, switching projects, or building.");
+  if (reviewDrafts.size) throw new Error("Save or discard your lexical review edits before changing edition settings, switching projects, resetting helps, or building.");
 }
 function setDraft(row, value, explicit = false) {
   if (!explicit && JSON.stringify(value) === JSON.stringify(initialEdit(row))) reviewDrafts.delete(row.anchor);
@@ -236,11 +239,13 @@ function setDraft(row, value, explicit = false) {
 function updateReviewActions() {
   const count = visibleRows.filter(row => reviewDrafts.has(row.anchor)).length;
   const elsewhere = reviewDrafts.size - count;
-  $("draft-count").textContent = reviewSaving ? "Saving page…" : reviewDrafts.size ? `${count} unsaved edit${count === 1 ? "" : "s"} on this page${elsewhere ? ` · ${elsewhere} elsewhere` : ""}` : "No unsaved edits";
+  $("draft-count").textContent = helpsResetting ? "Resetting helps…" : reviewSaving ? "Saving page…" : reviewDrafts.size ? `${count} unsaved edit${count === 1 ? "" : "s"} on this page${elsewhere ? ` · ${elsewhere} elsewhere` : ""}` : "No unsaved edits";
   $("save-page").disabled = reviewSaving || !count;
   $("save-next").disabled = reviewSaving || !count || (page + 1) * pageSize >= filteredRows.length;
   $("discard-page").disabled = reviewSaving || !count;
   $("include-page").disabled = $("omit-page").disabled = reviewSaving || !visibleRows.length;
+  $("reset-helps").textContent = helpsResetting ? "Resetting helps…" : "Reset helps to defaults";
+  $("reset-helps").disabled = reviewSaving || !current || (!Object.keys(current.config.decisions || {}).length && current.config.gloss_selection === "first-entry");
   $("previous").disabled = reviewSaving || page === 0;
   $("next").disabled = reviewSaving || (page + 1) * pageSize >= filteredRows.length;
 }
@@ -429,10 +434,10 @@ function createReviewEditor(row, grid) {
     headword.textContent = entry?.headword || "—";
     card.classList.toggle("dirty", reviewDrafts.has(row.anchor));
     const excludedName = nameExcluded(row, value);
-    status.textContent = reviewDrafts.has(row.anchor) ? "unsaved" : excludedName ? "name omitted" : row.selected ? row.status : "omitted";
+    status.textContent = reviewDrafts.has(row.anchor) ? "unsaved" : excludedName ? "name omitted" : row.selected ? row.choice_method === "first-entry" ? "default" : row.status : "omitted";
     status.classList.toggle("unresolved", value.included && !value.entry_id);
     scopeHint.hidden = value.scope !== "book"; save.textContent = value.scope === "book" ? "Save all" : "Save help";
-    provenance.textContent = !entry ? "Choose a source entry" : value.gloss.trim() && value.gloss.trim() !== entry.gloss ? "Editorial wording · STEP source entry" : "STEP source gloss";
+    provenance.textContent = !entry ? "Choose a source entry" : value.gloss.trim() && value.gloss.trim() !== entry.gloss ? "Editorial wording · STEP source entry" : row.choice_method === "first-entry" && value.entry_id === row.entry_id ? "Default gloss · first STEP source entry" : "STEP source gloss";
     resetSource.disabled = reviewSaving || !entry || value.gloss === entry.gloss;
     undo.disabled = reviewSaving || !reviewDrafts.has(row.anchor);
     save.disabled = reviewSaving;
@@ -554,6 +559,45 @@ $("build").onclick = guard(async () => {requireSavedReview(); viewedJob = undefi
 $("import-source").onclick = guard(async () => {const job = await api("/sources/import", "POST", {book: $("import-book").value}); allJobs.unshift(job); renderJobs(); notice("Source import queued");});
 $("check-environment").onclick = guard(async () => { $("environment").textContent = JSON.stringify(await api("/doctor"), null, 2); });
 $("reload-review").onclick = guard(refreshReview);
+$("reset-helps").onclick = guard(async () => {
+  requireSavedReview();
+  const previousGlossSelection = $("gloss-selection").value;
+  const config = structuredClone(current.config);
+  $("gloss-selection").value = config.gloss_selection = "first-entry";
+  config.decisions = {};
+  const status = $("reset-helps-status"), progress = $("reset-helps-progress"), message = $("reset-helps-message");
+  const controls = [...document.querySelectorAll("#review-panel input, #review-panel select, #review-panel textarea, #review-panel button, #gloss-selection")];
+  const disabled = controls.map(control => control.disabled);
+  controls.forEach(control => {control.disabled = true;});
+  helpsResetting = reviewSaving = true; updateReviewActions();
+  visibleEditors.forEach(editor => editor.update());
+  $("review-list").setAttribute("aria-busy", "true");
+  status.className = "info-card reset-helps-status"; status.hidden = false;
+  progress.hidden = false; progress.removeAttribute("value");
+  message.textContent = "Saving default gloss and resetting helps…";
+  clearTimeout(noticeTimer); $("notice").hidden = true;
+  let saved = false;
+  try {
+    current = await api(`/projects/${current.id}`, "PUT", {revision: current.revision, config});
+    saved = true;
+    $("review-edit-result").hidden = true;
+    message.textContent = "Refreshing lexical helps…";
+    await refreshReview({throwOnError: true}); renderJobs();
+    progress.value = 1;
+    message.textContent = "Reset complete. Lexical helps now use Default gloss (first entry).";
+    notice("Lexical helps reset to defaults throughout this project’s book");
+  } catch (error) {
+    if (!saved) $("gloss-selection").value = previousGlossSelection;
+    status.classList.add("error"); progress.hidden = true;
+    message.textContent = saved ? `Helps reset, but the review could not refresh: ${error.message}` : `Reset failed: ${error.message}`;
+    throw error;
+  } finally {
+    helpsResetting = reviewSaving = false;
+    controls.forEach((control, index) => {if (control.isConnected) control.disabled = disabled[index];});
+    visibleEditors.forEach(editor => editor.update());
+    $("review-list").setAttribute("aria-busy", "false"); updateReviewActions();
+  }
+});
 for (const id of ["search", "show-all", "unresolved-only", "resolved-only", "edited-only"]) $(id).addEventListener("input", () => {
   if (id === "unresolved-only" && $(id).checked) $("resolved-only").checked = false;
   if (id === "resolved-only" && $(id).checked) $("unresolved-only").checked = false;

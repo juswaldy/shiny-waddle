@@ -64,6 +64,172 @@ def expect_review_choice(row, field, value):
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
 
 
+@pytest.mark.parametrize("view", ["cards", "grid"])
+@pytest.mark.parametrize("reset_policy", ["reviewed", "first-entry"])
+def test_default_gloss_policy_and_project_reset(
+    consonant_review, review_server, monkeypatch, view, reset_policy
+):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, csrf = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        project_url = url + f"/api/projects/{identity}"
+        project = page.request.get(project_url).json()
+        project["config"].update(
+            passage="1:1",
+            decisions={
+                "test-origin:0": {"entry_id": "step:test-alternate", "gloss": "Synthetic edited gloss"},
+                "test-prefix:0": {"action": "exclude"},
+                "test-repeat:0": {"entry_id": "step:test-alternate", "gloss": "Synthetic outside passage"},
+            },
+        )
+        assert page.request.put(
+            project_url,
+            headers={"X-Reader-Token": csrf},
+            data={"revision": project["revision"], "config": project["config"]},
+        ).ok
+        page.goto(url)
+        page.locator("#review-view").select_option(view)
+        page.locator("#show-all").check()
+        expect(page.locator(".help-row")).to_have_count(4)
+        origin = page.locator("[data-anchor='test-origin:0']")
+        expect(page.get_by_label("Gloss selection", exact=True)).to_have_value("reviewed")
+        expect_review_choice(origin, "Source entry", "step:test-alternate")
+        expect(origin.locator("textarea")).to_have_value("Synthetic edited gloss")
+        page.get_by_label("Gloss selection", exact=True).select_option("first-entry")
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        expect(origin.locator("textarea")).to_have_value("Synthetic edited gloss")
+        prefix = page.locator("[data-anchor='test-prefix:0']")
+        expect(prefix.locator("textarea")).to_have_value("Synthetic step:test-choice")
+        expect(prefix.locator("input[type=checkbox]")).not_to_be_checked()
+        if reset_policy == "reviewed":
+            page.get_by_label("Gloss selection", exact=True).select_option("reviewed")
+            with page.expect_response(lambda response: response.request.method == "PUT"):
+                page.get_by_role("button", name="Save settings", exact=True).click()
+            expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        origin.locator("textarea").fill("Synthetic pending draft")
+        page.get_by_role("button", name="Reset helps to defaults", exact=True).click()
+        expect(page.locator("#notice")).to_contain_text("Save or discard")
+        expect(origin.locator("textarea")).to_have_value("Synthetic pending draft")
+        expect(page.get_by_label("Gloss selection", exact=True)).to_have_value(reset_policy)
+        expect(page.locator("#reset-helps-status")).to_be_hidden()
+        page.get_by_role("button", name="Discard page edits", exact=True).click()
+        before = page.request.post(project_url + "/builds", headers={"X-Reader-Token": csrf}).json()
+        pending_saves, pending_reviews = [], []
+        page.route(
+            project_url,
+            lambda route: pending_saves.append(route) if route.request.method == "PUT" else route.continue_(),
+        )
+        page.route(project_url + "/review", lambda route: pending_reviews.append(route))
+        page.get_by_role("button", name="Reset helps to defaults", exact=True).click()
+        expect(page.get_by_label("Gloss selection", exact=True)).to_have_value("first-entry")
+        expect(page.get_by_label("Gloss selection", exact=True)).to_be_disabled()
+        expect(page.locator("#reset-helps-progress")).to_be_visible()
+        assert page.locator("#reset-helps-progress").get_attribute("value") is None
+        expect(page.locator("#reset-helps-message")).to_have_text("Saving default gloss and resetting helps…")
+        expect(page.locator("#notice")).to_be_hidden()
+        expect(page.get_by_role("button", name="Resetting helps…", exact=True)).to_be_disabled()
+        expect(page.locator("#draft-count")).to_have_text("Resetting helps…")
+        expect(page.locator("#review-list")).to_have_attribute("aria-busy", "true")
+        expect(page.locator("#reload-review")).to_be_disabled()
+        expect(origin.locator("textarea")).to_be_disabled()
+        assert len(pending_saves) == 1
+        submitted = pending_saves[0].request.post_data_json
+        assert submitted["config"]["gloss_selection"] == "first-entry"
+        assert submitted["config"]["decisions"] == {}
+        pending_saves.pop().continue_()
+        expect(page.locator("#reset-helps-message")).to_have_text("Refreshing lexical helps…")
+        expect(page.locator("#reset-helps-progress")).to_be_visible()
+        expect(page.locator("#review-list")).to_have_attribute("aria-busy", "true")
+        assert len(pending_reviews) == 1
+        artifacts = ROOT / "test-results"
+        artifacts.mkdir(exist_ok=True)
+        page.screenshot(path=str(artifacts / f"reset-helps-progress-{view}-{reset_policy}.png"))
+        pending_reviews.pop().continue_()
+        page.unroute(project_url)
+        page.unroute(project_url + "/review")
+        expect(page.locator("#notice")).to_have_text(
+            "Lexical helps reset to defaults throughout this project’s book"
+        )
+        expect(page.locator("#reset-helps-message")).to_have_text(
+            "Reset complete. Lexical helps now use Default gloss (first entry)."
+        )
+        expect(page.locator("#reset-helps-progress")).to_have_attribute("value", "1")
+        expect(page.locator("#review-list")).to_have_attribute("aria-busy", "false")
+        expect(page.get_by_label("Gloss selection", exact=True)).to_be_enabled()
+        expect_review_choice(origin, "Source entry", "step:test-choice")
+        expect(origin.locator("textarea")).to_have_value("Synthetic step:test-choice")
+        expect(origin.locator(".row-status")).to_have_text("default")
+        expect(origin.locator(".gloss-provenance")).to_have_text("Default gloss · first STEP source entry")
+        expect(prefix.locator("input[type=checkbox]")).to_be_checked()
+        expect(page.locator("#reset-helps")).to_be_disabled()
+        saved = page.request.get(project_url).json()
+        assert saved["config"]["decisions"] == {}
+        assert saved["config"]["gloss_selection"] == "first-entry"
+        assert (
+            "test-repeat:0"
+            in page.request.get(url + f"/api/jobs/{before['id']}").json()["config"]["decisions"]
+        )
+        page.screenshot(path=str(artifacts / f"default-gloss-{view}.png"))
+        page.reload()
+        expect(page.get_by_label("Gloss selection", exact=True)).to_have_value("first-entry")
+        expect(page.locator("#reset-helps")).to_be_disabled()
+        expect(origin.locator("textarea")).to_have_value("Synthetic step:test-choice")
+        assert not errors
+        browser.close()
+
+
+@pytest.mark.parametrize("failure_stage", ["save", "review"])
+def test_reset_progress_reports_failures_and_restores_controls(review_server, monkeypatch, failure_stage):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, _ = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page()
+        project_url = url + f"/api/projects/{identity}"
+        page.goto(url)
+        expect(page.locator(".help-row").first).to_be_visible()
+        expect(page.locator("#reset-helps")).to_be_enabled()
+        before = page.request.get(project_url).json()
+        assert before["config"]["decisions"] == {}
+        route_url = project_url if failure_stage == "save" else project_url + "/review"
+        page.route(
+            route_url,
+            lambda route: route.fulfill(status=409, json={"detail": "Synthetic reset failure"}),
+        )
+        page.get_by_role("button", name="Reset helps to defaults", exact=True).click()
+        expected = (
+            "Reset failed" if failure_stage == "save" else "Helps reset, but the review could not refresh"
+        )
+        expect(page.locator("#reset-helps-status")).to_have_class("info-card reset-helps-status error")
+        expect(page.locator("#reset-helps-message")).to_have_text(f"{expected}: Synthetic reset failure")
+        expect(page.locator("#reset-helps-progress")).to_be_hidden()
+        expect(page.locator("#review-list")).to_have_attribute("aria-busy", "false")
+        expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
+        expect(page.locator("#reload-review")).to_be_enabled()
+        expect(page.get_by_label("Gloss selection", exact=True)).to_be_enabled()
+        page.unroute(route_url)
+        saved = page.request.get(project_url).json()
+        if failure_stage == "save":
+            expect(page.get_by_label("Gloss selection", exact=True)).to_have_value("reviewed")
+            expect(page.locator("#reset-helps")).to_be_enabled()
+            assert saved == before
+            expect(page.locator(".help-row").first.locator("textarea")).to_be_enabled()
+        else:
+            expect(page.get_by_label("Gloss selection", exact=True)).to_have_value("first-entry")
+            expect(page.locator("#reset-helps")).to_be_disabled()
+            assert saved["config"]["gloss_selection"] == "first-entry"
+            assert saved["revision"] == before["revision"] + 1
+            page.locator("#reload-review").click()
+            expect(page.locator(".help-row").first).to_be_visible()
+        browser.close()
+
+
 def test_word_colors_default_palette_customization_and_project_persistence(review_server, monkeypatch):
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
     url, identity, _ = review_server

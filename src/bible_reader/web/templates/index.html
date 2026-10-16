@@ -23,6 +23,8 @@
         <p class="hint">Use the source’s chapter and verse numbering.</p>
         <label for="selection">Lexical helps</label><select id="selection"><option value="reference">Proverbs sample selection</option><option value="book-frequency">Uncommon in this book</option><option value="all">All lexical items</option></select>
         <label for="frequency">Maximum occurrences in this book</label><input id="frequency" type="number" min="1" max="100000">
+        <label for="gloss-selection">Gloss selection</label><select id="gloss-selection" aria-describedby="gloss-selection-hint"><option value="reviewed">Review ambiguous entries</option><option value="first-entry">Default gloss (first entry)</option></select>
+        <p id="gloss-selection-hint" class="hint">Default gloss uses the first entry in each word’s source list. Saved help edits take precedence.</p>
         <details><summary>Page &amp; reading settings</summary>
           <label for="paper">Paper size</label><select id="paper"><option value="reader">Reader · 140 × 216 mm (default)</option><option value="reference">Reference proof · 180 × 281 mm</option><option value="a4">A4</option><option value="a5">A5</option><option value="letter">US Letter</option><option value="custom">Custom</option></select>
           <div id="custom-paper" hidden>
@@ -64,6 +66,9 @@
         <div class="summary-row"><div id="coverage" class="metrics"></div><button id="reload-review" class="text-button">Refresh review ↻</button></div>
         <div id="review-intro" class="info-card">Import your sources to begin. Original text and editorial choices stay separate.</div>
         <div id="review-edit-result" class="info-card" role="status" hidden></div>
+        <button id="reset-helps" class="text-button" aria-describedby="reset-helps-hint" disabled>Reset helps to defaults</button>
+        <p id="reset-helps-hint" class="hint">Switches to Default gloss (first entry), then clears saved source-entry, gloss, and inclusion edits throughout this project’s book.</p>
+        <div id="reset-helps-status" class="info-card reset-helps-status" role="status" aria-live="polite" hidden><progress id="reset-helps-progress" max="1" aria-label="Reset helps progress"></progress><span id="reset-helps-message"></span></div>
         <div class="review-toolbar"><input id="search" type="search" placeholder="Find a word, gloss, or reference…" aria-label="Search lexical helps"><label class="check-label"><input id="show-all" type="checkbox"> Show omitted words</label><label class="check-label"><input id="unresolved-only" type="checkbox"> Needs review</label><label class="check-label"><input id="resolved-only" type="checkbox"> Rework resolved helps</label></div>
         <div class="review-options">
           <label>View <select id="review-view"><option value="cards">Cards</option><option value="grid">Grid</option></select></label>

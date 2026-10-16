@@ -43,8 +43,19 @@ def test_legacy_project_defaults_and_invalid_verse_layout(tmp_path):
     config.write_text('{"layout": {"paper": "a5"}}')
     assert load_config(config).layout.verse_layout == "continuous"
     assert load_config(config).layout.word_colors == "auto"
+    assert load_config(config).gloss_selection == "reviewed"
     with pytest.raises(ValueError):
         Layout(verse_layout="unknown")
+
+
+@pytest.mark.parametrize("policy", ["reviewed", "first-entry"])
+def test_gloss_selection_in_json_and_toml(tmp_path, policy):
+    json_config = tmp_path / "glosses.json"
+    json_config.write_text(json.dumps({"gloss_selection": policy}))
+    toml_config = tmp_path / "glosses.toml"
+    toml_config.write_text(f'gloss_selection = "{policy}"\n')
+    assert load_config(json_config) == load_config(toml_config)
+    assert load_config(json_config).gloss_selection == policy
 
 
 def test_word_color_settings_in_json_and_toml(tmp_path):
