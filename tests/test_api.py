@@ -191,6 +191,20 @@ def test_gloss_policy_defaults_and_validation(client):
     assert client.post("/api/projects", json={"gloss_selection": "unknown"}).status_code == 422
 
 
+def test_lexicon_appendix_setting_is_saved_and_snapshotted(client):
+    project = client.post("/api/projects", json={}).json()
+    assert project["config"]["lexicon_appendix"] is False
+    url = f"/api/projects/{project['id']}"
+    before = client.post(url + "/builds").json()
+    project["config"]["lexicon_appendix"] = True
+    saved = client.put(url, json={"revision": 1, "config": project["config"]}).json()
+    assert saved["config"]["lexicon_appendix"] is True
+    assert client.get(url + "/review").json()["appendix_entries"] == 33
+    assert client.post(url + "/builds").json()["config"]["lexicon_appendix"] is True
+    assert client.get(f"/api/jobs/{before['id']}").json()["config"]["lexicon_appendix"] is False
+    assert client.post("/api/projects", json={"lexicon_appendix": "yes"}).status_code == 422
+
+
 def test_validation_and_artifact_allowlist(client, source_state):
     assert client.post("/api/projects", json={"passage": "bad"}).status_code == 422
     assert client.post("/api/sources/import", json={"book": "../etc"}).status_code == 400

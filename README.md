@@ -62,6 +62,33 @@ text** (the default) and **One verse per line**. In a project file set
 `layout.verse_layout` to `"continuous"` or `"verse-per-line"`; long verses can wrap
 in either mode. Projects without this setting use continuous text.
 
+Check **Add lexicon appendix** above **Save settings** to add a Hebrew-sorted,
+four-column lexicon after the reader pages and before **Sources and edition**.
+It uses the selected passage's footnote helps, including the same **Maximum
+occurrences in this book** cutoff in **Uncommon in this book** mode, known-word
+omissions, name exclusions, and saved inclusion/gloss edits. Counts still come
+from the whole book. It does not add words from outside the built passage.
+Identical entry/stem/gloss combinations appear once across chapters; different
+source entries, verb stems, or edited glosses remain separate.
+
+The appendix reads down each column from right to left. Hebrew sorting ignores
+points and punctuation and groups final letters with their ordinary forms;
+displayed headwords retain their source spelling and vowels. Glosses use the
+saved note size and can wrap or continue into another column/page. An empty
+selection produces an explicit empty appendix. The setting defaults to off.
+In JSON or TOML projects, set the top-level `lexicon_appendix` to `true`.
+The CLI can override the saved setting for one build:
+
+```sh
+.venv/bin/bible-reader build --project reader.json --lexicon-appendix --output build/with-lexicon
+# Override a saved enabled appendix:
+.venv/bin/bible-reader build --project reader.json --no-lexicon-appendix --output build/without-lexicon
+```
+
+Enabled builds include `lexicon-appendix.json` with source-entry IDs, editorial
+status, and the originating chapter help IDs, both beside the PDF and in the
+source bundle. Unresolved selected helps still require review before building.
+
 **Word colors** defaults to **Auto (no color)**. Choose **Word class + names**
 for a preset palette, then open **Palette & class colors** to pick a custom color
 or **Auto (no color)** for each class. **Set all to no color** resets every class,

@@ -24,6 +24,7 @@ flowchart LR
 | `models.py` | Strict Pydantic settings, frozen source records, reader document |
 | `sources.py` | Pinned acquisition, hash checks, OSIS/TSV adapters, canonical exports |
 | `editorial.py` | Crosswalk candidates, decisions, frequency, stable chapter help labels |
+| `appendix.py` | Hebrew sort keys and the source-traceable union of selected passage helps |
 | `book_helps.py` | Versioned whole-book editorial help files and source compatibility checks |
 | `word_classes.py` | Source-morphology display categories and preset word-color palette |
 | `tex.py` | Explicit language runs, TeX measurement, pagination, bounded compiler, PDF checks |
@@ -154,6 +155,27 @@ stem, and gloss. The reference fixture supplies separate observed slots where th
 same lexeme has more than one note. Altered reference helps receive new labels.
 Each page projects the registry and repeats just its referenced helps, once per
 chapter-qualified help identity. Printed numbers are not lexical identities.
+
+The optional top-level `lexicon_appendix` setting defaults to false. When enabled,
+the reader document's `lexicon_appendix` list unions the passage's selected helps,
+deduplicating by source entry (or unresolved source lemma), exact headword, stem,
+and gloss. Each entry retains its source ID, source description, editorial/status
+metadata, and originating chapter-qualified `help_ids`. It reuses footnote
+selection after book-frequency, known-word, editorial, and name rules; it neither
+selects additional book words nor bypasses unresolved-help checks. A separate
+Hebrew sort key ignores marks/punctuation and folds final letters into their
+ordinary forms without modifying source/display text. Equal keys use source ID,
+stem, and gloss as deterministic tie-breakers.
+
+The final TeX inserts the lexicon before the credits in four right-to-left columns,
+using `multicol` with bidi's explicit column direction. TeX balances columns and
+continues long glosses across columns/pages. The scripture's measured page plans
+and page-local notes are unchanged. Named PDF destinations identify the appendix,
+every entry, and the credits, so PDF checks verify entry coverage, placement,
+page counts, and embedded fonts across all pages. Enabled exports also contain
+`lexicon-appendix.json`; PDF diagnostics distinguish reader, appendix, and credits
+pages. The browser and CLI share the saved setting, and the CLI offers explicit
+`--lexicon-appendix` / `--no-lexicon-appendix` build overrides.
 
 `ReaderDocument` version 2 contains resolved config, ordered verses/tokens, referenced
 helps, review rows, chapter registry, source lock, and warnings. The source lock

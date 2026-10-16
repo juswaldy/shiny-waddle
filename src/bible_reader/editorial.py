@@ -8,6 +8,7 @@ from dataclasses import asdict
 from importlib.resources import files
 from pathlib import Path
 
+from .appendix import collect_lexicon
 from .models import Decision, Entry, ProjectConfig, ReaderDocument, ReaderError, Token, digest, parse_passage
 from .sources import catalog, lemma_keys, load_book, load_lexicon
 from .word_classes import word_class
@@ -408,6 +409,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
             "Editorial decisions refer to missing source anchors; re-review after the source change."
         )
     used_helps = {h for v in rendered for t in v["tokens"] for h in t["helps"]}
+    passage_helps = {h: helps[h] for h in sorted(used_helps)}
     info = catalog()
     warnings = []
     if config.selection == "reference":
@@ -422,7 +424,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
     return ReaderDocument(
         config.model_dump(),
         rendered,
-        {h: helps[h] for h in sorted(used_helps)},
+        passage_helps,
         reviews,
         {str(k): v for k, v in registries.items()},
         {
@@ -434,6 +436,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
             "transformations": info["transformations"] + [DISPLAY_TRANSFORMATIONS[config.cantillation]],
         },
         warnings=warnings,
+        lexicon_appendix=collect_lexicon(passage_helps) if config.lexicon_appendix else [],
     )
 
 

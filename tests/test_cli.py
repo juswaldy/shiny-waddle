@@ -91,8 +91,29 @@ def test_legacy_project_defaults_and_invalid_verse_layout(tmp_path):
     assert load_config(config).layout.verse_layout == "continuous"
     assert load_config(config).layout.word_colors == "auto"
     assert load_config(config).gloss_selection == "reviewed"
+    assert load_config(config).lexicon_appendix is False
     with pytest.raises(ValueError):
         Layout(verse_layout="unknown")
+
+
+def test_lexicon_appendix_project_settings_and_cli_overrides(tmp_path, monkeypatch):
+    json_config = tmp_path / "appendix.json"
+    json_config.write_text('{"lexicon_appendix": true}')
+    toml_config = tmp_path / "appendix.toml"
+    toml_config.write_text("lexicon_appendix = true\n")
+    assert load_config(json_config) == load_config(toml_config)
+    captured = []
+
+    def fake_build(state, config, output, progress, *, emit):
+        captured.append(config.lexicon_appendix)
+        return {}
+
+    monkeypatch.setattr("bible_reader.cli.build", fake_build)
+    assert main(["build", "--project", str(toml_config)]) == 0
+    assert main(["build", "--project", str(toml_config), "--no-lexicon-appendix"]) == 0
+    assert main(["build", "--lexicon-appendix"]) == 0
+    assert main(["build"]) == 0
+    assert captured == [True, False, True, False]
 
 
 @pytest.mark.parametrize("policy", ["reviewed", "first-entry"])

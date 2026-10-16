@@ -57,6 +57,12 @@ def main(argv=None):
         if name == "build":
             cmd.add_argument("--output", type=Path)
             cmd.add_argument("--emit", choices=["pdf", "tex"], default="pdf")
+            cmd.add_argument(
+                "--lexicon-appendix",
+                action=argparse.BooleanOptionalAction,
+                default=None,
+                help="Append a Hebrew-sorted four-column lexicon using the reader's selected helps",
+            )
         else:
             cmd.add_argument("--report", type=Path)
     serve = commands.add_parser("serve", help="Open the local browser application")
@@ -106,6 +112,8 @@ def main(argv=None):
         elif args.command in {"inspect", "align", "build"}:
             config = load_config(args.project, args.passage)
             if args.command == "build":
+                if args.lexicon_appendix is not None:
+                    config.lexicon_appendix = args.lexicon_appendix
                 output = args.output or Path("build") / datetime.now().strftime("reader-%Y%m%d-%H%M%S-%f")
                 result = build(state, config, output, print, emit=args.emit)
             else:

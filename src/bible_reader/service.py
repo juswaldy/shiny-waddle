@@ -36,6 +36,7 @@ def doctor(state: Path):
                 "bidi.sty",
                 "hyperref.sty",
                 "geometry.sty",
+                "multicol.sty",
             ):
                 probe = subprocess.run([kpse, name], capture_output=True, text=True, timeout=10)
                 result["packages"][name] = probe.returncode == 0
@@ -78,6 +79,7 @@ def inspect_project(state: Path, config: ProjectConfig):
         "coverage": dict(counts),
         "verse_count": len(document.verses),
         "help_count": len(document.helps),
+        "appendix_entries": len(document.lexicon_appendix),
         "warnings": document.warnings,
         "config_hash": digest(config.model_dump()),
     }
@@ -113,6 +115,7 @@ def build(
         "reader_pages": len(plans),
         "verse_count": len(document.verses),
         "help_count": len(document.helps),
+        "appendix_entries": len(document.lexicon_appendix),
     }
     if emit == "pdf":
         progress("Compiling and checking the PDF")
@@ -134,6 +137,9 @@ def build(
         "credits.txt",
         "layout-diagnostics.json",
     ]
+    if config.lexicon_appendix:
+        write_json(output / "lexicon-appendix.json", document.lexicon_appendix)
+        artifacts.append("lexicon-appendix.json")
     if config.layout.hebrew_font == "Ezra SIL":
         (output / "Ezra-LICENSE.txt").write_bytes(
             files("bible_reader").joinpath("resources/Ezra-LICENSE.txt").read_bytes()
@@ -143,7 +149,7 @@ def build(
     else:
         font_instructions = "SBL Hebrew is not redistributed. Obtain it under its own terms and copy the matching font to reader-hebrew.ttf before recompiling."
     (output / "BUILD.txt").write_text(
-        "Rebuild this edition offline with XeLaTeX, fontspec, xcolor, polyglossia, bidi, hyperref, geometry, and Latin Modern.\n"
+        "Rebuild this edition offline with XeLaTeX, fontspec, xcolor, polyglossia, bidi, hyperref, geometry, multicol, and Latin Modern.\n"
         "Run twice from this directory: xelatex -no-shell-escape -halt-on-error reader.tex\n"
         + font_instructions
         + "\nSee manifest.json for engine, font, source and application fingerprints.\n",

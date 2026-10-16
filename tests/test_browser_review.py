@@ -65,6 +65,32 @@ def expect_review_choice(row, field, value):
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
 
 
+def test_lexicon_appendix_build_option_persists_and_is_in_the_build_snapshot(review_server, monkeypatch):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, _ = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page()
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(url)
+        expect(page.locator(".help-row").first).to_be_visible()
+        option = page.get_by_role("checkbox", name="Add lexicon appendix", exact=True)
+        expect(option).not_to_be_checked()
+        option.check()
+        page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        page.reload()
+        expect(option).to_be_checked()
+        page.get_by_role("button", name="Build reader PDF", exact=False).click()
+        expect(page.locator("#preview-panel")).to_be_visible()
+        job = page.request.get(url + "/api/jobs").json()[0]
+        assert job["project_id"] == identity and job["config"]["lexicon_appendix"] is True
+        assert job["config"]["frequency_max"] == 10
+        assert errors == []
+        browser.close()
+
+
 @pytest.mark.parametrize("view", ["cards", "grid"])
 def test_save_and_load_book_help_file(consonant_review, review_server, monkeypatch, tmp_path, view):
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))

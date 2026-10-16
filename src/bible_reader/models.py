@@ -89,6 +89,7 @@ class ProjectConfig(StrictModel):
     passage: str = Field(default="1:29-2:12", max_length=50)
     selection: Literal["all", "book-frequency", "reference"] = "reference"
     gloss_selection: Literal["reviewed", "first-entry"] = "reviewed"
+    lexicon_appendix: bool = False
     frequency_max: int = Field(default=10, ge=1, le=100000)
     known_entries: list[str] = Field(default_factory=list, max_length=10000)
     cantillation: Literal[
@@ -179,6 +180,7 @@ class ReaderDocument:
     sources: dict
     schema_version: int = 2
     warnings: list[str] = field(default_factory=list)
+    lexicon_appendix: list[dict] = field(default_factory=list)
 
     def json(self):
         return asdict(self)

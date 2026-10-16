@@ -203,8 +203,9 @@ def scripture_macros(layout: dict) -> str:
 """
 
 
-def preamble(layout: dict) -> str:
+def preamble(layout: dict, *, lexicon_appendix=False) -> str:
     width, height, margin = paper_dimensions(layout)
+    appendix_package = r"\usepackage{multicol}" if lexicon_appendix else ""
     # Parameters are validated numeric values; external content is always escaped separately.
     return rf"""\documentclass{{article}}
 \usepackage[paperwidth={width}mm,paperheight={height}mm,margin={margin}mm]{{geometry}}
@@ -212,6 +213,7 @@ def preamble(layout: dict) -> str:
 \usepackage{{graphicx}}
 \usepackage{{xcolor}}
 \usepackage[unicode,hidelinks]{{hyperref}}
+{appendix_package}
 \usepackage{{polyglossia}}
 \setdefaultlanguage{{english}}
 \setotherlanguage{{hebrew}}
@@ -376,7 +378,10 @@ def page_tex(groups: list, document: ReaderDocument, prefix: str, folio: int):
 
 
 def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDocument, folio: int):
-    body = [preamble(document.config["layout"]), r"\immediate\openout\Metrics=measure.metrics"]
+    body = [
+        preamble(document.config["layout"], lexicon_appendix=document.config.get("lexicon_appendix", False)),
+        r"\immediate\openout\Metrics=measure.metrics",
+    ]
     for index, candidate in enumerate(candidates):
         boxes, page = page_tex(candidate, document, f"measure{index}", folio)
         body.extend(
@@ -452,15 +457,71 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
     return plans
 
 
+def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
+    layout = document.config["layout"]
+    body = [
+        r"\begingroup\setLTR\pagestyle{plain}",
+        rf"\setcounter{{page}}{{{layout['first_folio'] + reader_pages}}}",
+        r"\section*{Lexicon}\hypertarget{reader-lexicon}{}",
+        r"{\small Selected reader helps, in Hebrew alphabetical order down columns from right to left.\par}",
+        r"{\small Help selection and edited wording match the reader notes.\par}",
+    ]
+    if document.config["selection"] == "book-frequency":
+        body.append(
+            r"{\small Maximum occurrences in the whole book: "
+            + str(document.config["frequency_max"])
+            + r"; saved inclusion choices also apply.\par}"
+        )
+    body.extend(
+        [
+            rf"\fontsize{{{layout['notes_pt']}}}{{{layout['notes_pt'] * 1.35}}}\selectfont",
+            r"\setlength{\columnsep}{4mm}\setlength{\multicolsep}{8pt}",
+            r"\raggedright\emergencystretch=1em\raggedcolumns\RTLmulticolcolumns",
+            # Keep the headword with the beginning of its English gloss. Long
+            # glosses may continue across columns/pages rather than being clipped.
+            r"\newcommand{\LexiconEntry}[4]{\par\addvspace{0.6\baselineskip}%",
+            r"{\raggedleft\noindent\hypertarget{lexicon-entry-#1}{}\texthebrew{#2}\par}\nobreak",
+            r"\noindent #3#4\par}",
+        ]
+    )
+    if document.lexicon_appendix:
+        body.append(r"\begin{multicols}{4}")
+        for entry in document.lexicon_appendix:
+            stem = rf"\NoteStem{{{escape_latex(entry['stem'].upper())}}}" if entry["stem"] else ""
+            headword = "".join(c for c in entry["headword"] if not ("\u0591" <= c <= "\u05af"))
+            body.append(
+                rf"\LexiconEntry{{{entry['id']}}}"
+                + "{"
+                + escape_latex(headword)
+                + "}"
+                + "{"
+                + stem
+                + "}"
+                + "{"
+                + escape_latex(entry["gloss"].rstrip(". "))
+                + ".}"
+            )
+        body.append(r"\end{multicols}")
+    else:
+        body.append(r"\bigskip No lexical helps selected for this passage.\par")
+    body.append(r"\clearpage\endgroup")
+    return "\n".join(body)
+
+
 def final_tex(document: ReaderDocument, plans: list):
-    body = [preamble(document.config["layout"])]
+    appendix_enabled = document.config.get("lexicon_appendix", False)
+    body = [preamble(document.config["layout"], lexicon_appendix=appendix_enabled)]
     for plan in plans:
         boxes, page = page_tex(plan["groups"], document, f"p{plan['page']}", plan["folio"])
         body.append(boxes)
         body.append(r"\noindent\vbox to\textheight{\hsize=\linewidth")
         body.append(page)
         body.append(r"}\par\newpage")
-    body.append(r"\raggedright\emergencystretch=3em\section*{Sources and edition}")
+    if appendix_enabled:
+        body.append(lexicon_tex(document, len(plans)))
+    body.append(
+        r"\raggedright\emergencystretch=3em\section*{Sources and edition}\hypertarget{reader-credits}{}"
+    )
     body.append(escape_latex(document.config["name"]) + r"\par\bigskip")
     for notice in document.sources["attributions"] + document.sources["transformations"] + document.warnings:
         body.append(escape_latex(notice) + r"\par\medskip")
@@ -472,10 +533,32 @@ def final_tex(document: ReaderDocument, plans: list):
 
 def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
     pdf = PdfReader(path)
-    if len(pdf.pages) != len(plans) + 1:
+    credits = pdf.named_destinations.get("reader-credits")
+    credits_page = pdf.get_destination_page_number(credits) if credits else -1
+    appendix_enabled = document.config.get("lexicon_appendix", False)
+    appendix_pages = credits_page - len(plans) if appendix_enabled else 0
+    if (
+        credits_page != len(pdf.pages) - 1
+        or (appendix_enabled and appendix_pages < 1)
+        or (not appendix_enabled and len(pdf.pages) != len(plans) + 1)
+    ):
         raise ReaderError(
-            f"Unexpected PDF pagination: {len(pdf.pages)} pages, expected {len(plans)} reader pages and one credits page"
+            f"Unexpected PDF pagination: {len(pdf.pages)} pages, expected {len(plans)} reader pages, "
+            "the selected lexicon appendix, and one final credits page"
         )
+    expected_entries = {f"lexicon-entry-{entry['id']}" for entry in document.lexicon_appendix}
+    actual_entries = {name for name in pdf.named_destinations if name.startswith("lexicon-entry-")}
+    if actual_entries != expected_entries:
+        raise ReaderError("Compiled PDF lexicon entries do not match the selected lexical helps")
+    if appendix_enabled:
+        start = pdf.named_destinations.get("reader-lexicon")
+        if start is None or pdf.get_destination_page_number(start) != len(plans):
+            raise ReaderError("The lexicon appendix must follow the reader pages")
+        if any(
+            not len(plans) <= pdf.get_destination_page_number(pdf.named_destinations[name]) < credits_page
+            for name in expected_entries
+        ):
+            raise ReaderError("A compiled lexicon entry falls outside the appendix")
     if re.search(r"Overfull \\[hv]box", log):
         raise ReaderError("The PDF has overflowing content; inspect reader.log and adjust the layout.")
     expected = [v["reference"] for v in document.verses]
@@ -500,7 +583,8 @@ def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
             destination = pdf.named_destinations.get(target)
             if destination is None or pdf.get_destination_page_number(destination) != page_index:
                 raise ReaderError("A compiled PDF lexical marker points to another page or a missing help")
-        for font in pdf.pages[page_index]["/Resources"]["/Font"].values():
+    for page in pdf.pages:
+        for font in page["/Resources"].get("/Font", {}).values():
             font = font.get_object()
             descendants = font.get("/DescendantFonts", [font])
             for descendant in descendants:
@@ -512,6 +596,8 @@ def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
     return {
         "reader_pages": len(plans),
         "credits_pages": 1,
+        "appendix_pages": appendix_pages,
+        "appendix_entries": len(document.lexicon_appendix),
         "total_pages": len(pdf.pages),
         "verse_count": len(expected),
         "help_count": len(document.helps),

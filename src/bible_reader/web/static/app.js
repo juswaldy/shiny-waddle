@@ -118,6 +118,8 @@ async function refreshProjects(selected) {
 }
 function fillForm() {
   const c = current.config;
+  c.lexicon_appendix ??= false;
+  $("lexicon-appendix").checked = c.lexicon_appendix;
   const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max, "gloss-selection": c.gloss_selection ?? "reviewed",
     paper: c.layout.paper, "paper-width": c.layout.paper_width_mm ?? 140, "paper-height": c.layout.paper_height_mm ?? 216,
     "verse-layout": c.layout.verse_layout ?? "continuous", "word-colors": c.layout.word_colors ?? "auto", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
@@ -165,6 +167,7 @@ async function loadProject(identity) {
 function formConfig() {
   const c = structuredClone(current.config);
   Object.assign(c, {name: $("project-name").value, book: $("book").value, passage: $("passage").value.trim(), selection: $("selection").value,
+    lexicon_appendix: $("lexicon-appendix").checked,
     frequency_max: Number($("frequency").value), gloss_selection: $("gloss-selection").value, readings: $("readings").value, cantillation: $("cantillation").value});
   Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, word_colors: $("word-colors").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
     leading_pt: Number($("leading-pt").value), notes_pt: Number($("notes-pt").value), first_folio: Number($("folio").value)});
@@ -515,7 +518,8 @@ function showBuild(job) {
   const result = job.result;
   const stale = current && job.project_revision !== current.revision;
   $("build-status").className = "info-card";
-  $("build-status").textContent = `${result.reader_pages} reader page${result.reader_pages === 1 ? "" : "s"} + source credits · ${result.verse_count} verses · ${result.help_count} helps${stale ? " · Earlier project revision — rebuild to include your latest edits." : " · Current saved edition"}`;
+  const appendix = result.appendix_pages ? ` + ${result.appendix_pages} lexicon page${result.appendix_pages === 1 ? "" : "s"}` : "";
+  $("build-status").textContent = `${result.reader_pages} reader page${result.reader_pages === 1 ? "" : "s"}${appendix} + source credits · ${result.verse_count} verses · ${result.help_count} helps${stale ? " · Earlier project revision — rebuild to include your latest edits." : " · Current saved edition"}`;
   for (const [id, file] of [["download-pdf", "reader.pdf"], ["download-bundle", "reader-bundle.zip"]]) {
     $(id).href = `/api/jobs/${job.id}/artifacts/${file}?download=true`; $(id).hidden = false;
   }
