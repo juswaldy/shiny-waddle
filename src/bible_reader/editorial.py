@@ -56,6 +56,13 @@ def lexical_candidates(lemma: str, crosswalk: dict[str, list[str]]) -> list[str]
     return crosswalk.get(lemma, crosswalk.get(lemma[:5], []))
 
 
+def default_entry_id(lemma: str, crosswalk: dict[str, list[str]], gloss_selection: str) -> str | None:
+    candidates = lexical_candidates(lemma, crosswalk)
+    if candidates and (gloss_selection == "first-entry" or (lemma in crosswalk and len(candidates) == 1)):
+        return candidates[0]
+    return None
+
+
 def is_name_morphology(morphology: str) -> bool:
     """STEP's N: language field identifies names; mixed name/common analyses stay explicit."""
     analyses = [part.strip() for part in morphology.split("/") if part.strip()]
@@ -126,7 +133,7 @@ def edit_decisions(state: Path, config: ProjectConfig, edits: list[tuple[str, De
         if (
             decision.gloss
             and not decision.entry_id
-            and not (origin_lemma in crosswalk and len(origin_candidates) == 1)
+            and not default_entry_id(origin_lemma, crosswalk, config.gloss_selection)
         ):
             raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
         if scope == "book" and (decision.action == "include" or decision.gloss) and not decision.entry_id:
@@ -267,7 +274,22 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                     "book-frequency": f"Book frequency {counts[lemma]}",
                     "reference": "Reference-page selection",
                 }[config.selection]
-                choice = candidate_ids[0] if len(candidate_ids) == 1 and exact else None
+                alignment_status = (
+                    "resolved"
+                    if len(candidate_ids) == 1 and exact
+                    else "ambiguous"
+                    if candidate_ids
+                    else "unmatched"
+                )
+                default_choice = default_entry_id(lemma, crosswalk, config.gloss_selection)
+                choice = default_choice
+                choice_method = (
+                    config.gloss_selection
+                    if choice and config.gloss_selection == "first-entry"
+                    else "exact"
+                    if choice
+                    else "unresolved"
+                )
                 if choice in config.known_entries:
                     selected, reason = False, "Known-word list"
                 if decision:
@@ -276,6 +298,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                         if decision.entry_id not in candidate_ids:
                             raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
                         choice = decision.entry_id
+                        choice_method = "decision"
                 component_morphology = lexical_morphology(token, index)
                 fixed_name_reason = name_omission_reason(component_morphology, candidate_entries)
                 name_reason = fixed_name_reason or name_omission_reason(
@@ -298,11 +321,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                 semantic = digest([choice or lemma, stem, gloss])[:20]
                 explicit_label = reference.get(anchor, {}).get("label")
                 if decision and (
-                    decision.gloss
-                    or (
-                        decision.entry_id
-                        and decision.entry_id != (candidate_ids[0] if len(candidate_ids) == 1 else None)
-                    )
+                    decision.gloss or (decision.entry_id and decision.entry_id != default_choice)
                 ):
                     explicit_label = None
                 if explicit_label is not None:
@@ -360,6 +379,8 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "entry_id": choice,
                             "gloss": gloss,
                             "status": status,
+                            "alignment_status": alignment_status,
+                            "choice_method": choice_method,
                             "selected": selected,
                             "name_excluded": bool(name_reason),
                             "fixed_name_reason": fixed_name_reason,
@@ -367,7 +388,13 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "label": label,
                             "help_id": help_id if selected else None,
                             "book_frequency": counts[lemma],
-                            "method": "exact extended ID" if exact else "base ID candidates; review required",
+                            "method": ("exact extended ID" if exact else "base ID candidates")
+                            + {
+                                "exact": "",
+                                "first-entry": "; first listed source entry (project default)",
+                                "decision": "; saved source-entry decision",
+                                "unresolved": "; review required",
+                            }[choice_method],
                         }
                     )
             verse_record["tokens"].append(record)
@@ -386,6 +413,11 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
     if config.selection == "reference":
         warnings.append(
             "Reference labels/anchors are editorial mappings to the scan; glosses are STEP short Gloss fields and differ from the scan."
+        )
+    if config.gloss_selection == "first-entry":
+        warnings.append(
+            "Default glosses use the first listed STEP source entry unless overridden. "
+            "Candidate order is not a context-specific sense selection; all candidates remain in the review report."
         )
     return ReaderDocument(
         config.model_dump(),

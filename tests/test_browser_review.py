@@ -64,6 +64,81 @@ def expect_review_choice(row, field, value):
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
 
 
+@pytest.mark.parametrize("view", ["cards", "grid"])
+def test_default_gloss_policy_and_project_reset(consonant_review, review_server, monkeypatch, view):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, csrf = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        project_url = url + f"/api/projects/{identity}"
+        project = page.request.get(project_url).json()
+        project["config"].update(
+            passage="1:1",
+            decisions={
+                "test-origin:0": {"entry_id": "step:test-alternate", "gloss": "Synthetic edited gloss"},
+                "test-prefix:0": {"action": "exclude"},
+                "test-repeat:0": {"entry_id": "step:test-alternate", "gloss": "Synthetic outside passage"},
+            },
+        )
+        assert page.request.put(
+            project_url,
+            headers={"X-Reader-Token": csrf},
+            data={"revision": project["revision"], "config": project["config"]},
+        ).ok
+        page.goto(url)
+        page.locator("#review-view").select_option(view)
+        page.locator("#show-all").check()
+        expect(page.locator(".help-row")).to_have_count(4)
+        origin = page.locator("[data-anchor='test-origin:0']")
+        expect(page.get_by_label("Gloss selection", exact=True)).to_have_value("reviewed")
+        expect_review_choice(origin, "Source entry", "step:test-alternate")
+        expect(origin.locator("textarea")).to_have_value("Synthetic edited gloss")
+        page.get_by_label("Gloss selection", exact=True).select_option("first-entry")
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        expect(origin.locator("textarea")).to_have_value("Synthetic edited gloss")
+        prefix = page.locator("[data-anchor='test-prefix:0']")
+        expect(prefix.locator("textarea")).to_have_value("Synthetic step:test-choice")
+        expect(prefix.locator("input[type=checkbox]")).not_to_be_checked()
+        origin.locator("textarea").fill("Synthetic pending draft")
+        page.get_by_role("button", name="Reset helps to defaults", exact=True).click()
+        expect(page.locator("#notice")).to_contain_text("Save or discard")
+        expect(origin.locator("textarea")).to_have_value("Synthetic pending draft")
+        page.get_by_role("button", name="Discard page edits", exact=True).click()
+        before = page.request.post(project_url + "/builds", headers={"X-Reader-Token": csrf}).json()
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Reset helps to defaults", exact=True).click()
+        expect(page.locator("#notice")).to_have_text(
+            "Lexical helps reset to defaults throughout this project’s book"
+        )
+        expect_review_choice(origin, "Source entry", "step:test-choice")
+        expect(origin.locator("textarea")).to_have_value("Synthetic step:test-choice")
+        expect(origin.locator(".row-status")).to_have_text("default")
+        expect(origin.locator(".gloss-provenance")).to_have_text("Default gloss · first STEP source entry")
+        expect(prefix.locator("input[type=checkbox]")).to_be_checked()
+        expect(page.locator("#reset-helps")).to_be_disabled()
+        saved = page.request.get(project_url).json()
+        assert saved["config"]["decisions"] == {}
+        assert saved["config"]["gloss_selection"] == "first-entry"
+        assert (
+            "test-repeat:0"
+            in page.request.get(url + f"/api/jobs/{before['id']}").json()["config"]["decisions"]
+        )
+        artifacts = ROOT / "test-results"
+        artifacts.mkdir(exist_ok=True)
+        page.screenshot(path=str(artifacts / f"default-gloss-{view}.png"))
+        page.reload()
+        expect(page.get_by_label("Gloss selection", exact=True)).to_have_value("first-entry")
+        expect(page.locator("#reset-helps")).to_be_disabled()
+        expect(origin.locator("textarea")).to_have_value("Synthetic step:test-choice")
+        assert not errors
+        browser.close()
+
+
 def test_word_colors_default_palette_customization_and_project_persistence(review_server, monkeypatch):
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
     url, identity, _ = review_server

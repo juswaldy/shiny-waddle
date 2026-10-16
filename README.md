@@ -99,6 +99,21 @@ source book. `known_entries` and per-anchor `decisions` support exclusions and
 reviewed glosses. Ambiguous or unmatched selected helps must be resolved or
 explicitly omitted before a build succeeds.
 
+**Gloss selection → Default gloss (first entry)** uses the first entry in
+each word’s source-entry list, including ambiguous and base-ID matches. The order
+comes from the pinned STEP lexicon. Saved source-entry choices, editorial glosses,
+and inclusion edits take precedence. All source candidates and the original
+alignment status remain inspectable; this option does not select a contextual
+sense. Missing entries still require review or omission, and names stay omitted.
+The default **Review ambiguous entries** keeps the existing explicit-review behavior.
+In JSON/TOML projects, set `gloss_selection` to `"first-entry"` or `"reviewed"`.
+
+**Reset helps to defaults** clears all saved source-entry, gloss, and inclusion
+decisions throughout the project’s book, including occurrences outside the current
+passage. It immediately saves the reset using the saved selection and gloss settings;
+known-word and frequency settings still apply. Save or discard pending row edits
+before resetting. Existing build snapshots retain their original decisions.
+
 Names are automatically omitted from lexical helps in every selection mode,
 including existing saved inclusion decisions. The rule uses OSHB proper-name
 morphology and STEP name metadata, including personal, place, and divine names.

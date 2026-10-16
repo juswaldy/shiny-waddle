@@ -88,6 +88,7 @@ class ProjectConfig(StrictModel):
     book: str = Field(default="Prov", pattern=r"^[A-Za-z0-9]{2,12}$")
     passage: str = Field(default="1:29-2:12", max_length=50)
     selection: Literal["all", "book-frequency", "reference"] = "reference"
+    gloss_selection: Literal["reviewed", "first-entry"] = "reviewed"
     frequency_max: int = Field(default=10, ge=1, le=100000)
     known_entries: list[str] = Field(default_factory=list, max_length=10000)
     cantillation: Literal[

@@ -74,10 +74,21 @@ mixed candidates do not establish a name until a name entry is chosen.
 colors. These settings affect presentation independently of help selection.
 
 Each numeric lemma component maps to an anchor `<source-token-id>:<component-index>`.
-Exact extended IDs can resolve only when a single lexicon candidate exists. Base-ID
-fallbacks and multiple candidates require explicit review. `Entry` IDs are qualified
-by `step:` and interpreted with the pinned lexicon revision. Only metadata and
+Under the default review policy, exact extended IDs resolve only when a single
+lexicon candidate exists; base-ID fallbacks and multiple candidates require review.
+`Entry` IDs are qualified by `step:` and interpreted with the pinned lexicon revision. Only metadata and
 STEP's short Gloss column are imported; `definition` remains empty.
+
+`gloss_selection` defaults to `reviewed`, preserving explicit review of ambiguous
+and base-ID matches. Opting into `first-entry` selects the first source candidate
+in pinned STEP row order as the default, before applying saved decisions. Review
+rows retain every candidate and record `alignment_status` separately from the
+effective selection `status`, plus `choice_method` (`exact`, `first-entry`,
+`decision`, or `unresolved`). The method and project configuration distinguish
+this reader-selected policy from a contextual sense choice. Missing mappings
+remain unmatched and name exclusion still applies. Resetting helps clears the
+project's `decisions` in one revision-checked settings update; all other settings,
+known-word exclusions, source records, and existing build snapshots remain intact.
 
 A review row records candidates, chosen entry, status, reason, source/display
 surface, morphology, reading, book frequency, selection, and help ID/label. Decisions

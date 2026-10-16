@@ -44,6 +44,59 @@ def test_project_review_edit_build_snapshot_and_conflict(client):
     assert client.post(f"/api/jobs/{queued['id']}/cancel").json()["status"] == "cancelled"
 
 
+@pytest.mark.parametrize("policy", ["reviewed", "first-entry"])
+def test_reset_helps_uses_saved_policy_and_preserves_settings_and_builds(client, consonant_review, policy):
+    project = client.post(
+        "/api/projects",
+        json={
+            "passage": "1:1",
+            "selection": "all",
+            "gloss_selection": policy,
+            "known_entries": ["step:test-other"],
+            "layout": {"verse_layout": "verse-per-line"},
+            "decisions": {
+                "test-origin:0": {"entry_id": "step:test-alternate", "gloss": "Synthetic edited gloss"},
+                "test-prefix:0": {"action": "exclude"},
+                "test-repeat:0": {"action": "exclude"},
+            },
+        },
+    ).json()
+    url = f"/api/projects/{project['id']}"
+    before = client.post(url + "/builds").json()
+    source_verses = client.get(url + "/review").json()["verses"]
+    config = {**project["config"], "decisions": {}}
+    payload = {"revision": project["revision"], "config": config}
+    response = client.put(url, json=payload)
+    assert response.status_code == 200
+    saved = response.json()
+    assert saved["revision"] == project["revision"] + 1
+    assert saved["config"] == config
+    review = client.get(url + "/review").json()
+    rows = {row["anchor"]: row for row in review["rows"]}
+    assert rows["test-prefix:0"]["selected"]
+    assert rows["test-origin:0"]["alignment_status"] == "ambiguous"
+    if policy == "first-entry":
+        assert rows["test-origin:0"]["entry_id"] == "step:test-choice"
+        assert rows["test-origin:0"]["gloss"] == "Synthetic step:test-choice"
+        assert rows["test-origin:0"]["choice_method"] == "first-entry"
+        assert review["coverage"] == {"resolved": 4}
+    else:
+        assert rows["test-origin:0"]["entry_id"] is None
+        assert rows["test-origin:0"]["status"] == "ambiguous"
+    assert [t["source_surface"] for t in review["verses"][0]["tokens"]] == [
+        t["source_surface"] for t in source_verses[0]["tokens"]
+    ]
+    assert client.get(f"/api/jobs/{before['id']}").json()["config"] == project["config"]
+    assert client.post(url + "/builds").json()["config"] == config
+    assert client.put(url, json=payload).status_code == 409
+    assert client.get(url).json() == saved
+
+
+def test_gloss_policy_defaults_and_validation(client):
+    assert client.post("/api/projects", json={}).json()["config"]["gloss_selection"] == "reviewed"
+    assert client.post("/api/projects", json={"gloss_selection": "unknown"}).status_code == 422
+
+
 def test_validation_and_artifact_allowlist(client, source_state):
     assert client.post("/api/projects", json={"passage": "bad"}).status_code == 422
     assert client.post("/api/sources/import", json={"book": "../etc"}).status_code == 400

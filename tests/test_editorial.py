@@ -155,6 +155,75 @@ def test_missing_mapping_stays_unmatched(source_state, monkeypatch):
         require_resolved(document)
 
 
+def test_first_entry_policy_preserves_candidates_source_records_and_missing_matches(
+    source_state, consonant_review
+):
+    config = ProjectConfig(passage="1:1-3:1", selection="all")
+    original_sources = [verse.json() for verse in consonant_review]
+    reviewed = build_document(source_state, config)
+    assert next(r for r in reviewed.review if r["anchor"] == "test-origin:0")["status"] == "ambiguous"
+    config.gloss_selection = "first-entry"
+    document = build_document(source_state, config)
+    assert len(document.review) == len(reviewed.review) == 11
+    for original, row in zip(reviewed.review, document.review, strict=True):
+        assert row["candidates"] == original["candidates"]
+        assert row["alignment_status"] == original["status"]
+        assert row["source_surface"] == original["source_surface"]
+        if row["candidates"]:
+            assert row["entry_id"] == row["candidates"][0]["id"]
+            assert row["gloss"] == row["candidates"][0]["gloss"]
+            assert row["status"] == "resolved"
+            assert row["choice_method"] == "first-entry"
+            assert "project default" in row["method"]
+            assert not document.helps[row["help_id"]]["editorial"]
+        else:
+            assert row["status"] == "unmatched"
+            assert row["choice_method"] == "unresolved"
+            assert row["entry_id"] is None and row["gloss"] == ""
+    assert [verse.json() for verse in consonant_review] == original_sources
+    with pytest.raises(ReaderError, match="1 unresolved"):
+        require_resolved(document)
+    config.decisions = {"test-unmatched:0": Decision(action="exclude")}
+    require_resolved(build_document(source_state, config))
+
+
+def test_first_entry_policy_keeps_saved_choices_glosses_and_inclusion_rules(source_state, consonant_review):
+    config = ProjectConfig(
+        passage="1:1-3:1",
+        selection="all",
+        gloss_selection="first-entry",
+        known_entries=["step:test-choice"],
+        decisions={
+            "test-origin:0": Decision(entry_id="step:test-alternate", gloss="Synthetic edited gloss"),
+            "test-prefix:0": Decision(action="exclude"),
+        },
+    )
+    rows = {r["anchor"]: r for r in build_document(source_state, config).review}
+    assert rows["test-origin:0"]["entry_id"] == "step:test-alternate"
+    assert rows["test-origin:0"]["gloss"] == "Synthetic edited gloss"
+    assert rows["test-origin:0"]["choice_method"] == "decision"
+    assert rows["test-origin:0"]["selected"]
+    assert not rows["test-prefix:0"]["selected"]
+    assert rows["test-different:0"]["reason"] == "Known-word list"
+    changed, _ = edit_decision(
+        source_state, config, "test-aramaic:0", Decision(gloss="Synthetic default edit"), "occurrence"
+    )
+    edited = next(r for r in build_document(source_state, changed).review if r["anchor"] == "test-aramaic:0")
+    assert edited["entry_id"] == "step:test-choice" and edited["gloss"] == "Synthetic default edit"
+
+
+def test_first_entry_policy_preserves_name_and_segment_omissions(source_state, name_review):
+    document = build_document(
+        source_state, ProjectConfig(passage="1:1", selection="all", gloss_selection="first-entry")
+    )
+    rows = {r["anchor"]: r for r in document.review}
+    assert all(not row["selected"] for row in rows.values() if row["name_excluded"])
+    assert rows["segmented-name:0"]["selected"]
+    assert not rows["segmented-name:1"]["selected"]
+    assert rows["lexicon-name:0"]["alignment_status"] == "ambiguous"
+    assert rows["unmatched-common:0"]["status"] == "unmatched"
+
+
 def test_single_base_id_candidate_still_requires_review(source_state, monkeypatch):
     book = editorial.load_book(source_state, "Prov")
     entries, crosswalk = editorial.load_lexicon(source_state)
@@ -181,6 +250,13 @@ def test_single_base_id_candidate_still_requires_review(source_state, monkeypatc
     assert candidate["status"] == "ambiguous"
     with pytest.raises(ReaderError, match="unresolved"):
         require_resolved(document)
+    default_document = build_document(source_state, ProjectConfig(gloss_selection="first-entry"))
+    default_row = next(r for r in default_document.review if r["anchor"] == row["anchor"])
+    assert default_row["entry_id"] == candidate["candidates"][0]["id"]
+    assert default_row["alignment_status"] == "ambiguous"
+    assert default_row["choice_method"] == "first-entry"
+    assert default_row["method"] == "base ID candidates; first listed source entry (project default)"
+    require_resolved(default_document)
 
 
 def test_frequency_known_words_and_decisions(source_state):
