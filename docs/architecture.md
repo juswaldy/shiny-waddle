@@ -156,7 +156,7 @@ same lexeme has more than one note. Altered reference helps receive new labels.
 Each page projects the registry and repeats just its referenced helps, once per
 chapter-qualified help identity. Printed numbers are not lexical identities.
 
-The optional top-level `lexicon_appendix` setting defaults to false. When enabled,
+The top-level `lexicon_appendix` and `lexicon_only` settings default to false. When either is enabled,
 the reader document's `lexicon_appendix` list unions the passage's selected helps,
 deduplicating by source entry (or unresolved source lemma), exact headword, stem,
 and gloss. Each entry retains its source ID, source description, editorial/status
@@ -167,15 +167,27 @@ Hebrew sort key ignores marks/punctuation and folds final letters into their
 ordinary forms without modifying source/display text. Equal keys use source ID,
 stem, and gloss as deterministic tie-breakers.
 
-The final TeX inserts the lexicon before the credits in four right-to-left columns,
-using `multicol` with bidi's explicit column direction. TeX balances columns and
+The final TeX inserts the lexicon before the credits in four left-to-right columns,
+using `multicol` with bidi's explicit column direction. Each entry places its RTL
+Hebrew headword on the left and LTR English stem/gloss on the right, on the same
+baseline. Glosses share the stem-label size (half `notes_pt`); hanging indents,
+zero paragraph spacing, and a 3 mm column gap keep the layout compact. The heading
+includes both book names and the selected passage. TeX balances columns and
 continues long glosses across columns/pages. The scripture's measured page plans
-and page-local notes are unchanged. Named PDF destinations identify the appendix,
+and page-local notes are unchanged in reader builds. Named PDF destinations identify the lexicon,
 every entry, and the credits, so PDF checks verify entry coverage, placement,
 page counts, and embedded fonts across all pages. Enabled exports also contain
 `lexicon-appendix.json`; PDF diagnostics distinguish reader, appendix, and credits
 pages. The browser and CLI share the saved setting, and the CLI offers explicit
 `--lexicon-appendix` / `--no-lexicon-appendix` build overrides.
+
+`lexicon_only` builds derive exactly the same selected helps but skip scripture
+measurements and emit an empty scripture page plan. They print the lexicon and
+source credits, with folios starting at `layout.first_folio`. PDF validation still
+checks all lexicon destinations, section boundaries, overflow, and embedded fonts;
+the source verse count remains available as coverage metadata. TeX-only exports
+load the required TeX packages once to retain dependency hashes without measuring
+scripture. CLI `--lexicon-only` / `--no-lexicon-only` override the saved mode.
 
 `ReaderDocument` version 2 contains resolved config, ordered verses/tokens, referenced
 helps, review rows, chapter registry, source lock, and warnings. The source lock

@@ -90,6 +90,7 @@ class ProjectConfig(StrictModel):
     selection: Literal["all", "book-frequency", "reference"] = "reference"
     gloss_selection: Literal["reviewed", "first-entry"] = "reviewed"
     lexicon_appendix: bool = False
+    lexicon_only: bool = False
     frequency_max: int = Field(default=10, ge=1, le=100000)
     known_entries: list[str] = Field(default_factory=list, max_length=10000)
     cantillation: Literal[

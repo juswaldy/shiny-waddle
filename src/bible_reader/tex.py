@@ -379,7 +379,11 @@ def page_tex(groups: list, document: ReaderDocument, prefix: str, folio: int):
 
 def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDocument, folio: int):
     body = [
-        preamble(document.config["layout"], lexicon_appendix=document.config.get("lexicon_appendix", False)),
+        preamble(
+            document.config["layout"],
+            lexicon_appendix=document.config.get("lexicon_appendix", False)
+            or document.config.get("lexicon_only", False),
+        ),
         r"\immediate\openout\Metrics=measure.metrics",
     ]
     for index, candidate in enumerate(candidates):
@@ -459,35 +463,45 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
 
 def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
     layout = document.config["layout"]
+    book = catalog()["books"][document.config["book"]]
+    english_pt = layout["notes_pt"] * 0.5
+    headword_pt = layout["notes_pt"]
     body = [
         r"\begingroup\setLTR\pagestyle{plain}",
         rf"\setcounter{{page}}{{{layout['first_folio'] + reader_pages}}}",
-        r"\section*{Lexicon}\hypertarget{reader-lexicon}{}",
-        r"{\small Selected reader helps, in Hebrew alphabetical order down columns from right to left.\par}",
-        r"{\small Help selection and edited wording match the reader notes.\par}",
+        r"\hypertarget{reader-lexicon}{}\noindent{\large\bfseries "
+        + escape_latex(book["title"])
+        + r" — Lexicon}\hfill\texthebrew{"
+        + escape_latex(book["hebrew"])
+        + r"}\par\smallskip",
     ]
+    subtitle = escape_latex(document.config["passage"])
     if document.config["selection"] == "book-frequency":
-        body.append(
-            r"{\small Maximum occurrences in the whole book: "
-            + str(document.config["frequency_max"])
-            + r"; saved inclusion choices also apply.\par}"
-        )
+        subtitle += r"\quad Maximum occurrences in the whole book: " + str(document.config["frequency_max"])
+    body.append(r"{\fontsize{7}{9}\selectfont " + subtitle + r"\par}")
     body.extend(
         [
-            rf"\fontsize{{{layout['notes_pt']}}}{{{layout['notes_pt'] * 1.35}}}\selectfont",
-            r"\setlength{\columnsep}{4mm}\setlength{\multicolsep}{8pt}",
-            r"\raggedright\emergencystretch=1em\raggedcolumns\RTLmulticolcolumns",
-            # Keep the headword with the beginning of its English gloss. Long
-            # glosses may continue across columns/pages rather than being clipped.
-            r"\newcommand{\LexiconEntry}[4]{\par\addvspace{0.6\baselineskip}%",
-            r"{\raggedleft\noindent\hypertarget{lexicon-entry-#1}{}\texthebrew{#2}\par}\nobreak",
-            r"\noindent #3#4\par}",
+            # The English gloss and stem label share the existing stem-label
+            # size. TeX's line boxes reserve the larger Hebrew glyphs' full height.
+            rf"\fontsize{{{english_pt}}}{{{english_pt * 1.3}}}\selectfont",
+            r"\setlength{\columnsep}{3mm}\setlength{\multicolsep}{5pt}",
+            r"\setlength{\parskip}{0pt}\setlength{\lineskip}{0.5pt}",
+            r"\raggedright\emergencystretch=1em\raggedcolumns\LTRmulticolcolumns",
+            r"\newlength{\LexiconWordWidth}\newsavebox{\LexiconWordBox}",
+            r"\newcommand{\LexiconEntry}[4]{\par\begingroup",
+            r"\hangindent=\dimexpr\LexiconWordWidth+1mm\relax\hangafter=1",
+            r"\noindent\hypertarget{lexicon-entry-#1}{}%",
+            rf"\sbox{{\LexiconWordBox}}{{\texthebrew{{\fontsize{{{headword_pt}}}{{{headword_pt * 1.2}}}\selectfont #2}}}}%",
+            r"\makebox[\LexiconWordWidth][l]{\ifdim\wd\LexiconWordBox>\LexiconWordWidth",
+            r"\resizebox{\LexiconWordWidth}{!}{\usebox{\LexiconWordBox}}\else\usebox{\LexiconWordBox}\fi}%",
+            r"\nobreak\hspace{1mm}#3#4\par\endgroup}",
         ]
     )
     if document.lexicon_appendix:
         body.append(r"\begin{multicols}{4}")
+        body.append(r"\setlength{\LexiconWordWidth}{0.4\linewidth}")
         for entry in document.lexicon_appendix:
-            stem = rf"\NoteStem{{{escape_latex(entry['stem'].upper())}}}" if entry["stem"] else ""
+            stem = escape_latex(entry["stem"].upper()) + r"\enspace " if entry["stem"] else ""
             headword = "".join(c for c in entry["headword"] if not ("\u0591" <= c <= "\u05af"))
             body.append(
                 rf"\LexiconEntry{{{entry['id']}}}"
@@ -509,16 +523,18 @@ def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
 
 
 def final_tex(document: ReaderDocument, plans: list):
-    appendix_enabled = document.config.get("lexicon_appendix", False)
+    only = document.config.get("lexicon_only", False)
+    appendix_enabled = document.config.get("lexicon_appendix", False) or only
     body = [preamble(document.config["layout"], lexicon_appendix=appendix_enabled)]
-    for plan in plans:
+    reader_plans = [] if only else plans
+    for plan in reader_plans:
         boxes, page = page_tex(plan["groups"], document, f"p{plan['page']}", plan["folio"])
         body.append(boxes)
         body.append(r"\noindent\vbox to\textheight{\hsize=\linewidth")
         body.append(page)
         body.append(r"}\par\newpage")
     if appendix_enabled:
-        body.append(lexicon_tex(document, len(plans)))
+        body.append(lexicon_tex(document, len(reader_plans)))
     body.append(
         r"\raggedright\emergencystretch=3em\section*{Sources and edition}\hypertarget{reader-credits}{}"
     )
@@ -535,7 +551,10 @@ def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
     pdf = PdfReader(path)
     credits = pdf.named_destinations.get("reader-credits")
     credits_page = pdf.get_destination_page_number(credits) if credits else -1
-    appendix_enabled = document.config.get("lexicon_appendix", False)
+    only = document.config.get("lexicon_only", False)
+    appendix_enabled = document.config.get("lexicon_appendix", False) or only
+    if only and plans:
+        raise ReaderError("A lexicon-only build cannot contain scripture page plans")
     appendix_pages = credits_page - len(plans) if appendix_enabled else 0
     if (
         credits_page != len(pdf.pages) - 1
@@ -563,7 +582,7 @@ def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
         raise ReaderError("The PDF has overflowing content; inspect reader.log and adjust the layout.")
     expected = [v["reference"] for v in document.verses]
     actual = [ref for p in plans for ref in p["references"]]
-    if actual != expected:
+    if not only and actual != expected:
         raise ReaderError("Page plan lost or duplicated verses")
     for plan in plans:
         used = {h for g in plan["groups"] for v in g for t in v["tokens"] for h in t["helps"]}
@@ -598,6 +617,7 @@ def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
         "credits_pages": 1,
         "appendix_pages": appendix_pages,
         "appendix_entries": len(document.lexicon_appendix),
+        "lexicon_only": only,
         "total_pages": len(pdf.pages),
         "verse_count": len(expected),
         "help_count": len(document.helps),

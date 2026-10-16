@@ -71,11 +71,14 @@ from the whole book. It does not add words from outside the built passage.
 Identical entry/stem/gloss combinations appear once across chapters; different
 source entries, verb stems, or edited glosses remain separate.
 
-The appendix reads down each column from right to left. Hebrew sorting ignores
-points and punctuation and groups final letters with their ordinary forms;
-displayed headwords retain their source spelling and vowels. Glosses use the
-saved note size and can wrap or continue into another column/page. An empty
-selection produces an explicit empty appendix. The setting defaults to off.
+The lexicon includes the book name and reads down each column from left to right.
+Each entry puts the Hebrew headword on the left and its English stem/gloss on the
+right, starting on the same line. English uses half the saved note size, matching
+the QAL/PIEL labels (4.5 pt with default settings), with compact spacing. Long
+glosses wrap beneath the English text or continue into another column/page.
+Hebrew sorting ignores points and punctuation and groups final letters with their
+ordinary forms; displayed headwords retain their source spelling and vowels.
+An empty selection produces an explicit empty lexicon. The appendix defaults to off.
 In JSON or TOML projects, set the top-level `lexicon_appendix` to `true`.
 The CLI can override the saved setting for one build:
 
@@ -85,7 +88,21 @@ The CLI can override the saved setting for one build:
 .venv/bin/bible-reader build --project reader.json --no-lexicon-appendix --output build/without-lexicon
 ```
 
-Enabled builds include `lexicon-appendix.json` with source-entry IDs, editorial
+Choose **Build content → Lexicon only** to build the same selected lexicon and
+source credits without scripture pages. This does not require enabling the
+appendix checkbox. The saved project setting is top-level `lexicon_only = true`
+in TOML or `"lexicon_only": true` in JSON. CLI overrides are:
+
+```sh
+.venv/bin/bible-reader build --project reader.json --lexicon-only --output build/lexicon-only
+.venv/bin/bible-reader build --project reader.json --no-lexicon-only --output build/reader-again
+```
+
+Both lexicon modes use the same passage, whole-book occurrence limit, and saved
+help decisions. Lexicon-only builds skip scripture pagination and start at the
+saved first folio. They also support `--emit tex`.
+
+Lexicon builds include `lexicon-appendix.json` with source-entry IDs, editorial
 status, and the originating chapter help IDs, both beside the PDF and in the
 source bundle. Unresolved selected helps still require review before building.
 

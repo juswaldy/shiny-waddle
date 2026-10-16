@@ -89,9 +89,15 @@ Enable **Add lexicon appendix**, top-level `lexicon_appendix = true` in a projec
 or the CLI build option `--lexicon-appendix`. It defaults to off. The appendix
 follows the final reader page and starts before **Sources and edition**, with
 folios continuing from `layout.first_folio`. It uses four balanced columns,
-ordered top-to-bottom and right-to-left, with Hebrew headwords and explicitly
-LTR English glosses at the saved note size. Headwords stay with the beginning
-of their gloss; long glosses may continue into later columns/pages. Hebrew
+ordered top-to-bottom and left-to-right, with the book's English and Hebrew names
+in the heading. Each entry starts with an explicitly RTL Hebrew headword on the
+left and LTR English stem/gloss to its right, on the same baseline. Hebrew uses
+the saved note size; English matches the existing stem-label size at half that
+size (4.5 pt by default). A 3 mm column gap, zero paragraph spacing, and tight line
+spacing pack entries densely while line boxes retain pointed Hebrew glyphs' full
+height. Headwords occupy 40% of each column, with unusually wide headwords scaled
+to fit that space. Continuation lines indent beneath the gloss. Headwords stay
+with the beginning of their gloss; long glosses may continue into later columns/pages. Hebrew
 sorting uses a separate mark/punctuation-free key, with final letters folded to
 ordinary forms. Headwords retain their vowels and source Unicode.
 
@@ -106,6 +112,13 @@ Appendix columns use TeX's automatic splitting and balancing. The reader's
 measured verse/note boxes and page plans retain their existing construction.
 PDF checks inspect actual destinations for every appendix entry and both section
 boundaries; no fixed appendix page count is assumed.
+
+Choose **Build content → Lexicon only**, set top-level `lexicon_only = true`, or
+use CLI `--lexicon-only` to omit scripture pages and print the same selected
+lexicon plus source credits. This mode implicitly includes the lexicon even if
+`lexicon_appendix` is false. It does not measure scripture; `page-plan.json` is
+empty, and PDF checks require the lexicon to begin on the first physical page.
+Folios start at the saved first folio. `--emit tex` supports both lexicon modes.
 
 ## Compiler and artifact checks
 

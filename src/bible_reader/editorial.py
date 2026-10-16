@@ -436,7 +436,9 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
             "transformations": info["transformations"] + [DISPLAY_TRANSFORMATIONS[config.cantillation]],
         },
         warnings=warnings,
-        lexicon_appendix=collect_lexicon(passage_helps) if config.lexicon_appendix else [],
+        lexicon_appendix=collect_lexicon(passage_helps)
+        if config.lexicon_appendix or config.lexicon_only
+        else [],
     )
 
 

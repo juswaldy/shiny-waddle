@@ -65,7 +65,10 @@ def expect_review_choice(row, field, value):
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
 
 
-def test_lexicon_appendix_build_option_persists_and_is_in_the_build_snapshot(review_server, monkeypatch):
+@pytest.mark.parametrize("lexicon_only", [False, True])
+def test_lexicon_appendix_build_option_persists_and_is_in_the_build_snapshot(
+    review_server, monkeypatch, lexicon_only
+):
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
     url, identity, _ = review_server
     with sync_playwright() as playwright:
@@ -78,15 +81,24 @@ def test_lexicon_appendix_build_option_persists_and_is_in_the_build_snapshot(rev
         option = page.get_by_role("checkbox", name="Add lexicon appendix", exact=True)
         expect(option).not_to_be_checked()
         option.check()
+        if lexicon_only:
+            page.get_by_label("Build content", exact=True).select_option("lexicon")
+            expect(option).to_be_disabled()
         page.get_by_role("button", name="Save settings", exact=True).click()
         expect(page.locator("#notice")).to_have_text("Edition settings saved")
         page.reload()
         expect(option).to_be_checked()
-        page.get_by_role("button", name="Build reader PDF", exact=False).click()
+        expect(page.get_by_label("Build content", exact=True)).to_have_value(
+            "lexicon" if lexicon_only else "reader"
+        )
+        page.get_by_role(
+            "button", name="Build lexicon PDF" if lexicon_only else "Build reader PDF", exact=False
+        ).click()
         expect(page.locator("#preview-panel")).to_be_visible()
         job = page.request.get(url + "/api/jobs").json()[0]
         assert job["project_id"] == identity and job["config"]["lexicon_appendix"] is True
         assert job["config"]["frequency_max"] == 10
+        assert job["config"]["lexicon_only"] is lexicon_only
         assert errors == []
         browser.close()
 

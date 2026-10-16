@@ -45,13 +45,17 @@ def test_appendix_deduplicates_chapters_but_keeps_entries_stems_and_editorial_wo
     assert helps == original
 
 
-def test_appendix_uses_the_same_frequency_and_override_selection_as_notes(source_state, consonant_review):
+@pytest.mark.parametrize("lexicon_only", [False, True])
+def test_appendix_uses_the_same_frequency_and_override_selection_as_notes(
+    source_state, consonant_review, lexicon_only
+):
     config = ProjectConfig(
         passage="1:1-3:1",
         selection="book-frequency",
         frequency_max=1,
         gloss_selection="first-entry",
-        lexicon_appendix=True,
+        lexicon_appendix=not lexicon_only,
+        lexicon_only=lexicon_only,
         known_entries=["step:test-other"],
         decisions={
             "test-origin:0": Decision(entry_id="step:test-alternate", gloss="Synthetic edited help"),
@@ -69,6 +73,7 @@ def test_appendix_uses_the_same_frequency_and_override_selection_as_notes(source
     assert {help for entry in document.lexicon_appendix for help in entry["help_ids"]} == set(document.helps)
     # Switching the appendix off changes neither notes nor source scripture.
     config.lexicon_appendix = False
+    config.lexicon_only = False
     ordinary = build_document(source_state, config)
     assert ordinary.lexicon_appendix == []
     assert ordinary.helps == document.helps and ordinary.verses == document.verses

@@ -119,7 +119,10 @@ async function refreshProjects(selected) {
 function fillForm() {
   const c = current.config;
   c.lexicon_appendix ??= false;
+  c.lexicon_only ??= false;
   $("lexicon-appendix").checked = c.lexicon_appendix;
+  $("build-content").value = c.lexicon_only ? "lexicon" : "reader";
+  updateBuildOptions();
   const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max, "gloss-selection": c.gloss_selection ?? "reviewed",
     paper: c.layout.paper, "paper-width": c.layout.paper_width_mm ?? 140, "paper-height": c.layout.paper_height_mm ?? 216,
     "verse-layout": c.layout.verse_layout ?? "continuous", "word-colors": c.layout.word_colors ?? "auto", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
@@ -141,6 +144,11 @@ function updatePaperFields() {
   const custom = $("paper").value === "custom";
   $("custom-paper").hidden = !custom;
   $("paper-width").disabled = $("paper-height").disabled = !custom;
+}
+function updateBuildOptions() {
+  const only = $("build-content").value === "lexicon";
+  $("lexicon-appendix").disabled = only;
+  $("build").replaceChildren(document.createTextNode(only ? "Build lexicon PDF " : "Build reader PDF "), el("span", "↗"));
 }
 function updateWordColorFields() {
   const enabled = $("word-colors").value === "word-class";
@@ -168,6 +176,7 @@ function formConfig() {
   const c = structuredClone(current.config);
   Object.assign(c, {name: $("project-name").value, book: $("book").value, passage: $("passage").value.trim(), selection: $("selection").value,
     lexicon_appendix: $("lexicon-appendix").checked,
+    lexicon_only: $("build-content").value === "lexicon",
     frequency_max: Number($("frequency").value), gloss_selection: $("gloss-selection").value, readings: $("readings").value, cantillation: $("cantillation").value});
   Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, word_colors: $("word-colors").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
     leading_pt: Number($("leading-pt").value), notes_pt: Number($("notes-pt").value), first_folio: Number($("folio").value)});
@@ -519,7 +528,10 @@ function showBuild(job) {
   const stale = current && job.project_revision !== current.revision;
   $("build-status").className = "info-card";
   const appendix = result.appendix_pages ? ` + ${result.appendix_pages} lexicon page${result.appendix_pages === 1 ? "" : "s"}` : "";
-  $("build-status").textContent = `${result.reader_pages} reader page${result.reader_pages === 1 ? "" : "s"}${appendix} + source credits · ${result.verse_count} verses · ${result.help_count} helps${stale ? " · Earlier project revision — rebuild to include your latest edits." : " · Current saved edition"}`;
+  const only = job.config.lexicon_only;
+  const pages = only ? `${result.appendix_pages} lexicon page${result.appendix_pages === 1 ? "" : "s"}` : `${result.reader_pages} reader page${result.reader_pages === 1 ? "" : "s"}${appendix}`;
+  const coverage = only ? `${result.appendix_entries} entries from ${result.verse_count} verses` : `${result.verse_count} verses · ${result.help_count} helps`;
+  $("build-status").textContent = `${pages} + source credits · ${coverage}${stale ? " · Earlier project revision — rebuild to include your latest edits." : " · Current saved edition"}`;
   for (const [id, file] of [["download-pdf", "reader.pdf"], ["download-bundle", "reader-bundle.zip"]]) {
     $(id).href = `/api/jobs/${job.id}/artifacts/${file}?download=true`; $(id).hidden = false;
   }
@@ -576,6 +588,7 @@ $("project-picker").onchange = guard(() => loadProject($("project-picker").value
 $("project-form").onsubmit = guard(async event => {event.preventDefault(); await saveConfig(formConfig()); notice("Edition settings saved");});
 $("selection").onchange = () => { $("frequency").disabled = $("selection").value !== "book-frequency"; };
 $("paper").onchange = updatePaperFields;
+$("build-content").onchange = updateBuildOptions;
 $("word-colors").onchange = updateWordColorFields;
 $("word-colors-clear").onclick = () => {
   document.querySelectorAll("[data-word-class]").forEach(row => {$("word-color-" + row.dataset.wordClass).value = "auto";});

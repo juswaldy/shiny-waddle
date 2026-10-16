@@ -63,6 +63,12 @@ def main(argv=None):
                 default=None,
                 help="Append a Hebrew-sorted four-column lexicon using the reader's selected helps",
             )
+            cmd.add_argument(
+                "--lexicon-only",
+                action=argparse.BooleanOptionalAction,
+                default=None,
+                help="Build the selected lexicon and source credits without scripture pages",
+            )
         else:
             cmd.add_argument("--report", type=Path)
     serve = commands.add_parser("serve", help="Open the local browser application")
@@ -114,6 +120,8 @@ def main(argv=None):
             if args.command == "build":
                 if args.lexicon_appendix is not None:
                     config.lexicon_appendix = args.lexicon_appendix
+                if args.lexicon_only is not None:
+                    config.lexicon_only = args.lexicon_only
                 output = args.output or Path("build") / datetime.now().strftime("reader-%Y%m%d-%H%M%S-%f")
                 result = build(state, config, output, print, emit=args.emit)
             else:

@@ -92,6 +92,7 @@ def test_legacy_project_defaults_and_invalid_verse_layout(tmp_path):
     assert load_config(config).layout.word_colors == "auto"
     assert load_config(config).gloss_selection == "reviewed"
     assert load_config(config).lexicon_appendix is False
+    assert load_config(config).lexicon_only is False
     with pytest.raises(ValueError):
         Layout(verse_layout="unknown")
 
@@ -114,6 +115,26 @@ def test_lexicon_appendix_project_settings_and_cli_overrides(tmp_path, monkeypat
     assert main(["build", "--lexicon-appendix"]) == 0
     assert main(["build"]) == 0
     assert captured == [True, False, True, False]
+
+
+def test_lexicon_only_project_settings_and_cli_overrides(tmp_path, monkeypatch):
+    project = tmp_path / "lexicon.toml"
+    project.write_text("lexicon_only = true\n")
+    json_project = tmp_path / "lexicon.json"
+    json_project.write_text('{"lexicon_only": true}')
+    assert load_config(project) == load_config(json_project)
+    captured = []
+
+    def fake_build(state, config, output, progress, *, emit):
+        captured.append(config.lexicon_only)
+        return {}
+
+    monkeypatch.setattr("bible_reader.cli.build", fake_build)
+    assert main(["build", "--lexicon-only"]) == 0
+    assert main(["build", "--project", str(project)]) == 0
+    assert main(["build", "--project", str(project), "--no-lexicon-only"]) == 0
+    assert main(["build"]) == 0
+    assert captured == [True, True, False, False]
 
 
 @pytest.mark.parametrize("policy", ["reviewed", "first-entry"])
