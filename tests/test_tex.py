@@ -10,10 +10,12 @@ from bible_reader.tex import blocks, contents, page_tex, word_tex
 @pytest.mark.parametrize(
     "book,folio,title",
     [
-        ("Gen", 1, r"\texthebrew{בראשית}"),
-        ("Gen", 2, r"\textenglish{GENESIS}"),
-        ("Prov", 1329, r"\texthebrew{משלי}"),
-        ("Prov", 1330, r"\textenglish{PROVERBS}"),
+        ("Gen", 1, r"\HebrewBookTitle{בראשית}"),
+        ("Gen", 2, r"\EnglishBookTitle{בראשית}{Genesis}"),
+        ("Prov", 1329, r"\HebrewBookTitle{משלי}"),
+        ("Prov", 1330, r"\EnglishBookTitle{משלי}{Proverbs}"),
+        ("1Sam", 2, r"\EnglishBookTitle{שמואל א}{1 Samuel}"),
+        ("Song", 2, r"\EnglishBookTitle{שיר השירים}{Song of Songs}"),
     ],
 )
 def test_running_title_uses_printed_folio_language(book, folio, title):
