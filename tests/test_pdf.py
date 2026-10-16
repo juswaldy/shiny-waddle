@@ -9,10 +9,149 @@ from pypdf import PdfReader
 from bible_reader.editorial import build_document
 from bible_reader.models import Cancelled, Decision, ProjectConfig, ReaderError
 from bible_reader.service import build
-from bible_reader.tex import Compiler, final_tex, paginate, verify_pdf
+from bible_reader.tex import Compiler, final_tex, paginate, paper_dimensions, verify_pdf
 from bible_reader.word_classes import word_color
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.parametrize("paper,verse_layout", [("reader", "continuous"), ("reference", "verse-per-line")])
+def test_lexicon_appendix_is_four_columns_in_hebrew_order_before_credits(
+    source_state, tmp_path, tex_available, paper, verse_layout
+):
+    config = ProjectConfig(
+        lexicon_appendix=True, layout={"paper": paper, "verse_layout": verse_layout, "first_folio": 1329}
+    )
+    output = tmp_path / "appendix"
+    result = build(source_state, config, output)
+    document = build_document(source_state, config)
+    pdf = PdfReader(output / "reader.pdf")
+    entries = json.loads((output / "lexicon-appendix.json").read_text())
+    assert entries == document.lexicon_appendix
+    assert result["appendix_entries"] == len(entries) == 33
+    assert result["appendix_pages"] == 1
+    assert result["total_pages"] == result["reader_pages"] + 2
+    appendix_page = pdf.pages[result["reader_pages"]]
+    assert "Proverbs — Lexicon" in appendix_page.extract_text()
+    assert "Sources and edition" in pdf.pages[-1].extract_text()
+    assert result["pdf_marker_destinations"] == "verified" and result["fonts_embedded"]
+    # Inspect actual PDF destinations, not TeX strings: the sorted sequence flows
+    # down four separate columns, starting with the leftmost column.
+    width, _, margin = paper_dimensions(config.layout.model_dump())
+    step = ((width - 2 * margin - 9) / 4 + 3) * 72 / 25.4
+    margin_pt = margin * 72 / 25.4
+    positions = []
+    for entry in entries:
+        destination = pdf.named_destinations[f"lexicon-entry-{entry['id']}"]
+        assert pdf.get_destination_page_number(destination) == result["reader_pages"]
+        column = round((float(destination.left) - margin_pt) / step)
+        positions.append((column, float(destination.top)))
+    assert {column for column, _ in positions} == {0, 1, 2, 3}
+    assert positions == sorted(positions, key=lambda item: (item[0], -item[1]))
+    assert max(y for _, y in positions) - min(y for _, y in positions) < 140
+    # Check actual typography: each Hebrew headword starts to the left of an
+    # English gloss on the same baseline, at the stem labels' half-note size.
+    hebrew, english = [], []
+    pt = 72 / 72.27
+
+    def collect_entry_runs(text, cm, tm, font, size):
+        if not text.strip():
+            return
+        baseline = cm[1] * tm[4] + cm[3] * tm[5] + cm[5]
+        x = cm[0] * tm[4] + cm[2] * tm[5] + cm[4]
+        if "Ezra" in font["/BaseFont"] and size == pytest.approx(config.layout.notes_pt * pt, abs=0.01):
+            hebrew.append((x, baseline))
+        if "LMRoman" in font["/BaseFont"] and size == pytest.approx(
+            config.layout.notes_pt * 0.5 * pt, abs=0.01
+        ):
+            english.append((x, baseline))
+
+    appendix_page.extract_text(visitor_text=collect_entry_runs)
+    assert len(hebrew) >= len(entries) and len(english) >= len(entries)
+    for x, baseline in hebrew:
+        assert any(right > x and abs(other_baseline - baseline) < 0.1 for right, other_baseline in english)
+    with zipfile.ZipFile(output / "reader-bundle.zip") as bundle:
+        assert json.loads(bundle.read("lexicon-appendix.json")) == entries
+    manifest = json.loads((output / "manifest.json").read_text())
+    assert "multicol.sty" in manifest["tex_inputs"]
+    # Preserve proof images for visual inspection, including the chapter boundary.
+    rendered = pdfium.PdfDocument(output / "reader.pdf")
+    for page_index in [0, result["reader_pages"]]:
+        rendered[page_index].render(scale=2).to_pil().save(output / f"proof-{page_index + 1}.png")
+
+
+def test_lexicon_appendix_continues_across_pages_and_escapes_edited_text(
+    source_state, tmp_path, tex_available
+):
+    document = build_document(source_state, ProjectConfig(lexicon_appendix=True))
+    # Synthetic repetition is a layout stress case, not new source lexicon data.
+    base = document.lexicon_appendix[0]
+    document.lexicon_appendix = [
+        {
+            **base,
+            "id": f"test-layout-{i}",
+            "gloss": f"Synthetic entry {i}: 50% & {{review}}. " + "Longer editorial wording. " * 12,
+        }
+        for i in range(60)
+    ]
+    compiler = Compiler(tmp_path / "long-appendix", "Ezra SIL")
+    plans = paginate(document, compiler)
+    text = final_tex(document, plans)
+    log = compiler.compile("reader", text, passes=2)
+    result = verify_pdf(compiler.directory / "reader.pdf", plans, document, log)
+    assert result["appendix_pages"] > 1
+    assert result["appendix_entries"] == 60
+    pdf = PdfReader(compiler.directory / "reader.pdf")
+    assert "Sources and edition" in pdf.pages[-1].extract_text()
+    assert "50% & {review}" in " ".join(
+        " ".join(page.extract_text() for page in pdf.pages[len(plans) : -1]).split()
+    )
+    assert r"50\% \& \{review\}" in text
+
+
+def test_empty_lexicon_appendix_is_explicit_and_still_precedes_sources(source_state, tmp_path, tex_available):
+    config = ProjectConfig(
+        lexicon_appendix=True, known_entries=["step:H1847", "step:H3374", "step:H8130"], passage="1:29"
+    )
+    document = build_document(source_state, config)
+    config.decisions = {row["anchor"]: Decision(action="exclude") for row in document.review}
+    result = build(source_state, config, tmp_path / "empty-appendix")
+    pdf = PdfReader(tmp_path / "empty-appendix/reader.pdf")
+    assert result["appendix_pages"] == 1 and result["appendix_entries"] == 0
+    assert "No lexical helps selected" in pdf.pages[result["reader_pages"]].extract_text()
+    assert "Sources and edition" in pdf.pages[-1].extract_text()
+
+
+@pytest.mark.parametrize("emit", ["pdf", "tex"])
+def test_lexicon_only_skips_scripture_and_keeps_sources_and_exports(
+    source_state, tmp_path, tex_available, monkeypatch, emit
+):
+    config = ProjectConfig(lexicon_only=True)
+    assert not config.lexicon_appendix
+
+    def no_scripture_measurements(*_):
+        pytest.fail("Lexicon-only builds must not paginate scripture")
+
+    monkeypatch.setattr("bible_reader.service.paginate", no_scripture_measurements)
+    output = tmp_path / "lexicon-only"
+    result = build(source_state, config, output, emit=emit)
+    assert result["reader_pages"] == 0 and result["lexicon_only"]
+    assert result["appendix_entries"] == 33
+    assert json.loads((output / "page-plan.json").read_text()) == []
+    entries = json.loads((output / "lexicon-appendix.json").read_text())
+    assert entries == build_document(source_state, config).lexicon_appendix
+    manifest = json.loads((output / "manifest.json").read_text())
+    assert "multicol.sty" in manifest["tex_inputs"]
+    with zipfile.ZipFile(output / "reader-bundle.zip") as bundle:
+        assert json.loads(bundle.read("lexicon-appendix.json")) == entries
+    if emit == "pdf":
+        assert result["total_pages"] == 2 and result["appendix_pages"] == 1
+        pdf = PdfReader(output / "reader.pdf")
+        assert "Proverbs — Lexicon" in pdf.pages[0].extract_text()
+        assert "Sources and edition" in pdf.pages[1].extract_text()
+        assert not any(name.startswith("p1-") for name in pdf.named_destinations)
+    else:
+        assert not (output / "reader.pdf").exists()
 
 
 @pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])

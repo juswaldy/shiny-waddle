@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from ..book_helps import MAX_HELP_FILE_BYTES, BookHelps, load_book_helps, save_book_helps
 from ..editorial import edit_decision, edit_decisions
 from ..models import Decision, ProjectConfig, ReaderError, StrictModel
 from ..service import doctor, inspect_project
@@ -47,6 +48,11 @@ class EditDecision(DecisionEdit):
 class EditDecisionPage(StrictModel):
     revision: int = Field(ge=1)
     edits: list[DecisionEdit] = Field(min_length=1, max_length=200)
+
+
+class LoadBookHelps(StrictModel):
+    revision: int = Field(ge=1)
+    helps: BookHelps
 
 
 def create_app(state: Path | None = None, *, start_worker=True):
@@ -90,7 +96,7 @@ def create_app(state: Path | None = None, *, start_worker=True):
                     {"detail": "Reload the local reader page before making changes."}, status_code=403
                 )
             length = request.headers.get("content-length")
-            if length and (not length.isdigit() or int(length) > 2_000_000):
+            if length and (not length.isdigit() or int(length) > MAX_HELP_FILE_BYTES):
                 return JSONResponse({"detail": "Request too large"}, status_code=413)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -162,6 +168,27 @@ def create_app(state: Path | None = None, *, start_worker=True):
     def review(identity: str):
         config = ProjectConfig.model_validate(store.project(identity)["config"])
         return inspect_project(state, config)
+
+    @app.get("/api/projects/{identity}/helps")
+    def download_helps(identity: str, revision: int):
+        project = store.project(identity)
+        if revision != project["revision"]:
+            raise ReaderError("Project changed in another tab. Reload before saving.")
+        config = ProjectConfig.model_validate(project["config"])
+        helps = save_book_helps(state, config)
+        return JSONResponse(
+            helps.model_dump(),
+            headers={"Content-Disposition": f'attachment; filename="{config.book}-lexical-helps.json"'},
+        )
+
+    @app.post("/api/projects/{identity}/helps")
+    def upload_helps(identity: str, value: LoadBookHelps):
+        project = store.project(identity)
+        if value.revision != project["revision"]:
+            raise ReaderError("Project changed in another tab. Reload before saving.")
+        config = load_book_helps(state, ProjectConfig.model_validate(project["config"]), value.helps)
+        saved = store.save_project(identity, value.revision, config)
+        return {"project": saved, "loaded": len(config.decisions)}
 
     @app.post("/api/projects/{identity}/decisions")
     def save_decision(identity: str, value: EditDecision):

@@ -62,6 +62,50 @@ text** (the default) and **One verse per line**. In a project file set
 `layout.verse_layout` to `"continuous"` or `"verse-per-line"`; long verses can wrap
 in either mode. Projects without this setting use continuous text.
 
+Check **Add lexicon appendix** above **Save settings** to add a Hebrew-sorted,
+four-column lexicon after the reader pages and before **Sources and edition**.
+It uses the selected passage's footnote helps, including the same **Maximum
+occurrences in this book** cutoff in **Uncommon in this book** mode, known-word
+omissions, name exclusions, and saved inclusion/gloss edits. Counts still come
+from the whole book. It does not add words from outside the built passage.
+Identical entry/stem/gloss combinations appear once across chapters; different
+source entries, verb stems, or edited glosses remain separate.
+
+The lexicon includes the book name and reads down each column from left to right.
+Each entry puts the Hebrew headword on the left and its English stem/gloss on the
+right, starting on the same line. English uses half the saved note size, matching
+the QAL/PIEL labels (4.5 pt with default settings), with compact spacing. Long
+glosses wrap beneath the English text or continue into another column/page.
+Hebrew sorting ignores points and punctuation and groups final letters with their
+ordinary forms; displayed headwords retain their source spelling and vowels.
+An empty selection produces an explicit empty lexicon. The appendix defaults to off.
+In JSON or TOML projects, set the top-level `lexicon_appendix` to `true`.
+The CLI can override the saved setting for one build:
+
+```sh
+.venv/bin/bible-reader build --project reader.json --lexicon-appendix --output build/with-lexicon
+# Override a saved enabled appendix:
+.venv/bin/bible-reader build --project reader.json --no-lexicon-appendix --output build/without-lexicon
+```
+
+Choose **Build content → Lexicon only** to build the same selected lexicon and
+source credits without scripture pages. This does not require enabling the
+appendix checkbox. The saved project setting is top-level `lexicon_only = true`
+in TOML or `"lexicon_only": true` in JSON. CLI overrides are:
+
+```sh
+.venv/bin/bible-reader build --project reader.json --lexicon-only --output build/lexicon-only
+.venv/bin/bible-reader build --project reader.json --no-lexicon-only --output build/reader-again
+```
+
+Both lexicon modes use the same passage, whole-book occurrence limit, and saved
+help decisions. Lexicon-only builds skip scripture pagination and start at the
+saved first folio. They also support `--emit tex`.
+
+Lexicon builds include `lexicon-appendix.json` with source-entry IDs, editorial
+status, and the originating chapter help IDs, both beside the PDF and in the
+source bundle. Unresolved selected helps still require review before building.
+
 **Word colors** defaults to **Auto (no color)**. Choose **Word class + names**
 for a preset palette, then open **Palette & class colors** to pick a custom color
 or **Auto (no color)** for each class. **Set all to no color** resets every class,
@@ -115,6 +159,33 @@ then saves that setting with the cleared decisions. A progress indicator shows
 saving and refreshing until the updated helps are ready. The saved help-selection,
 known-word, and frequency settings still apply. Save or discard pending row edits
 before resetting. Existing build snapshots retain their original decisions.
+
+**Save book helps** downloads a reusable `Prov-lexical-helps.json` file (or the
+selected book's code). It includes every saved source-entry choice, editorial
+gloss, inclusion/omission, and reason throughout the book, including chapters
+outside the current passage and both written/read forms, plus the saved default
+gloss policy. **Load book helps** restores that file into any edition of the same
+book, replacing its saved decisions and default gloss policy. An empty set clears
+the decisions. Save or discard row drafts and save edition settings first.
+The edition's passage, layout, help-selection policy, frequency threshold, and
+known-word list stay as saved; previous build snapshots retain their decisions.
+
+Help files contain editorial decisions, not a copy of the biblical text or
+dictionary. They pin the text and lexicon source revisions and checksums. Loading
+checks every decision against the installed sources, including hidden chapters
+and readings. A different book, incompatible sources or entries, malformed file,
+or stale project revision rejects the entire load. Projects support up to 100,000
+decisions; help files and API requests are limited to 64 MB.
+
+The CLI uses the same save/load checks and writes a new JSON file:
+
+```sh
+.venv/bin/bible-reader helps save --project reader.json --output build/Prov-lexical-helps.json
+.venv/bin/bible-reader helps load --project another-edition.toml --input build/Prov-lexical-helps.json --output build/restored-reader.json
+```
+
+Existing output files are never overwritten. The source project may be JSON or
+TOML; load preserves its other settings in the new JSON project.
 
 Names are automatically omitted from lexical helps in every selection mode,
 including existing saved inclusion decisions. The rule uses OSHB proper-name

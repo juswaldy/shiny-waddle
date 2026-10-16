@@ -26,6 +26,10 @@
 .gloss-provenance{font-size:10px;color:var(--muted)}
 .reset-helps-status{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .reset-helps-status progress{width:140px;max-width:100%;accent-color:var(--accent)}
+.book-helps-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#book-helps-status{font-size:12px;color:var(--muted)}
+.sidebar .build-option{display:flex;align-items:center;gap:8px;margin-top:20px}
+.build-option input{flex-shrink:0}
 .review-grid-scroll{max-width:100%;overflow:auto;border:1px solid var(--line);border-top:0}
 .review-grid{width:100%;min-width:870px;border-collapse:collapse;table-layout:fixed;font-size:12px}
 .review-grid caption{text-align:left;padding:10px;color:var(--muted);font-size:11px}

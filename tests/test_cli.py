@@ -38,14 +38,103 @@ def test_toml_configuration_and_passage_override(tmp_path):
     assert result.layout.verse_layout == "verse-per-line"
 
 
+def test_save_and_load_book_helps_without_overwriting_projects(source_state, consonant_review, tmp_path):
+    original = tmp_path / "project.json"
+    original.write_text(
+        json.dumps(
+            {
+                "selection": "all",
+                "passage": "1:1",
+                "gloss_selection": "first-entry",
+                "decisions": {
+                    "test-repeat:0": {"entry_id": "step:test-alternate", "gloss": "Editorial help"},
+                    "test-ketiv:0": {"action": "exclude"},
+                },
+            }
+        )
+    )
+    destination = tmp_path / "destination.toml"
+    destination.write_text('passage = "3:1"\nselection = "all"\n[layout]\npaper = "a5"\n')
+    saved = tmp_path / "book-helps.json"
+    restored = tmp_path / "loaded.json"
+    base = ["--state", str(source_state), "helps"]
+    save = [*base, "save", "--project", str(original), "--output", str(saved)]
+    assert main(save) == 0
+    original_bytes = original.read_bytes()
+    toml_bytes = destination.read_bytes()
+    load = [*base, "load", "--project", str(destination), "--input", str(saved), "--output", str(restored)]
+    assert main(load) == 0
+    config = load_config(restored)
+    assert config.decisions == load_config(original).decisions
+    assert config.gloss_selection == "first-entry"
+    assert config.passage == "3:1" and config.layout.paper == "a5"
+    assert original.read_bytes() == original_bytes and destination.read_bytes() == toml_bytes
+    for command, output in [(save, saved), (load, restored)]:
+        before = output.read_bytes()
+        with pytest.raises(SystemExit) as error:
+            main(command)
+        assert error.value.code == 1
+        assert output.read_bytes() == before
+    data = json.loads(saved.read_text())
+    data["sources"]["lexicon_revision"] = "different"
+    saved.write_text(json.dumps(data))
+    restored.unlink()
+    with pytest.raises(SystemExit) as error:
+        main(load)
+    assert error.value.code == 1
+    assert not restored.exists()
+
+
 def test_legacy_project_defaults_and_invalid_verse_layout(tmp_path):
     config = tmp_path / "legacy.json"
     config.write_text('{"layout": {"paper": "a5"}}')
     assert load_config(config).layout.verse_layout == "continuous"
     assert load_config(config).layout.word_colors == "auto"
     assert load_config(config).gloss_selection == "reviewed"
+    assert load_config(config).lexicon_appendix is False
+    assert load_config(config).lexicon_only is False
     with pytest.raises(ValueError):
         Layout(verse_layout="unknown")
+
+
+def test_lexicon_appendix_project_settings_and_cli_overrides(tmp_path, monkeypatch):
+    json_config = tmp_path / "appendix.json"
+    json_config.write_text('{"lexicon_appendix": true}')
+    toml_config = tmp_path / "appendix.toml"
+    toml_config.write_text("lexicon_appendix = true\n")
+    assert load_config(json_config) == load_config(toml_config)
+    captured = []
+
+    def fake_build(state, config, output, progress, *, emit):
+        captured.append(config.lexicon_appendix)
+        return {}
+
+    monkeypatch.setattr("bible_reader.cli.build", fake_build)
+    assert main(["build", "--project", str(toml_config)]) == 0
+    assert main(["build", "--project", str(toml_config), "--no-lexicon-appendix"]) == 0
+    assert main(["build", "--lexicon-appendix"]) == 0
+    assert main(["build"]) == 0
+    assert captured == [True, False, True, False]
+
+
+def test_lexicon_only_project_settings_and_cli_overrides(tmp_path, monkeypatch):
+    project = tmp_path / "lexicon.toml"
+    project.write_text("lexicon_only = true\n")
+    json_project = tmp_path / "lexicon.json"
+    json_project.write_text('{"lexicon_only": true}')
+    assert load_config(project) == load_config(json_project)
+    captured = []
+
+    def fake_build(state, config, output, progress, *, emit):
+        captured.append(config.lexicon_only)
+        return {}
+
+    monkeypatch.setattr("bible_reader.cli.build", fake_build)
+    assert main(["build", "--lexicon-only"]) == 0
+    assert main(["build", "--project", str(project)]) == 0
+    assert main(["build", "--project", str(project), "--no-lexicon-only"]) == 0
+    assert main(["build"]) == 0
+    assert captured == [True, True, False, False]
 
 
 @pytest.mark.parametrize("policy", ["reviewed", "first-entry"])

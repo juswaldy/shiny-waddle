@@ -14,7 +14,7 @@ from pathlib import Path
 from .editorial import build_document, require_resolved
 from .models import ProjectConfig, ReaderError, digest
 from .sources import catalog
-from .tex import Compiler, engine_path, final_tex, font_path, paginate, verify_pdf
+from .tex import Compiler, engine_path, final_tex, font_path, paginate, preamble, verify_pdf
 
 
 def write_json(path: Path, value):
@@ -36,6 +36,7 @@ def doctor(state: Path):
                 "bidi.sty",
                 "hyperref.sty",
                 "geometry.sty",
+                "multicol.sty",
             ):
                 probe = subprocess.run([kpse, name], capture_output=True, text=True, timeout=10)
                 result["packages"][name] = probe.returncode == 0
@@ -78,6 +79,7 @@ def inspect_project(state: Path, config: ProjectConfig):
         "coverage": dict(counts),
         "verse_count": len(document.verses),
         "help_count": len(document.helps),
+        "appendix_entries": len(document.lexicon_appendix),
         "warnings": document.warnings,
         "config_hash": digest(config.model_dump()),
     }
@@ -105,7 +107,7 @@ def build(
     write_json(output / "note-registry.json", document.registry)
     require_resolved(document)
     compiler = Compiler(output, config.layout.hebrew_font, cancelled)
-    plans = paginate(document, compiler, progress)
+    plans = [] if config.lexicon_only else paginate(document, compiler, progress)
     write_json(output / "page-plan.json", plans)
     text = final_tex(document, plans)
     (output / "reader.tex").write_text(text, encoding="utf-8")
@@ -113,11 +115,19 @@ def build(
         "reader_pages": len(plans),
         "verse_count": len(document.verses),
         "help_count": len(document.helps),
+        "appendix_entries": len(document.lexicon_appendix),
+        "lexicon_only": config.lexicon_only,
     }
     if emit == "pdf":
         progress("Compiling and checking the PDF")
         log = compiler.compile("reader", text, passes=2)
         checks = verify_pdf(output / "reader.pdf", plans, document, log)
+    elif config.lexicon_only:
+        # A lexicon-only TeX export has no scripture measurements. Load its TeX
+        # dependencies once so the source bundle still records their hashes.
+        compiler.compile(
+            "measure", preamble(config.layout.model_dump(), lexicon_appendix=True) + r"\end{document}"
+        )
     notices = "\n\n".join(
         document.sources["attributions"] + document.sources["transformations"] + document.warnings
     )
@@ -134,6 +144,9 @@ def build(
         "credits.txt",
         "layout-diagnostics.json",
     ]
+    if config.lexicon_appendix or config.lexicon_only:
+        write_json(output / "lexicon-appendix.json", document.lexicon_appendix)
+        artifacts.append("lexicon-appendix.json")
     if config.layout.hebrew_font == "Ezra SIL":
         (output / "Ezra-LICENSE.txt").write_bytes(
             files("bible_reader").joinpath("resources/Ezra-LICENSE.txt").read_bytes()
@@ -143,7 +156,7 @@ def build(
     else:
         font_instructions = "SBL Hebrew is not redistributed. Obtain it under its own terms and copy the matching font to reader-hebrew.ttf before recompiling."
     (output / "BUILD.txt").write_text(
-        "Rebuild this edition offline with XeLaTeX, fontspec, xcolor, polyglossia, bidi, hyperref, geometry, and Latin Modern.\n"
+        "Rebuild this edition offline with XeLaTeX, fontspec, xcolor, polyglossia, bidi, hyperref, geometry, multicol, and Latin Modern.\n"
         "Run twice from this directory: xelatex -no-shell-escape -halt-on-error reader.tex\n"
         + font_instructions
         + "\nSee manifest.json for engine, font, source and application fingerprints.\n",

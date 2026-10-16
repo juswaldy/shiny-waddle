@@ -2,6 +2,8 @@
 
 The print contract is the [reference-page specification](reference-page-spec.md).
 The implementation uses XeLaTeX, fontspec, xcolor, polyglossia/bidi, hyperref, and geometry.
+Optional lexicon appendices also use the standard `multicol` package, included in
+the pinned TeX setup and checked by `doctor`.
 Trusted macros live in `src/bible_reader/tex.py`; all external plain text is escaped
 once at the TeX boundary. Hebrew words are kept with their superscript markers.
 English note flow contains explicitly delimited Hebrew headwords.
@@ -81,6 +83,43 @@ repeated 4, 9, and 16 and distinct same-lexeme slots. Every page repeats only th
 helps used on that page, grouped by chapter. K/Q superscripts identify source
 readings independently of lexical-help numbers.
 
+## Lexicon appendix
+
+Enable **Add lexicon appendix**, top-level `lexicon_appendix = true` in a project,
+or the CLI build option `--lexicon-appendix`. It defaults to off. The appendix
+follows the final reader page and starts before **Sources and edition**, with
+folios continuing from `layout.first_folio`. It uses four balanced columns,
+ordered top-to-bottom and left-to-right, with the book's English and Hebrew names
+in the heading. Each entry starts with an explicitly RTL Hebrew headword on the
+left and LTR English stem/gloss to its right, on the same baseline. Hebrew uses
+the saved note size; English matches the existing stem-label size at half that
+size (4.5 pt by default). A 3 mm column gap, zero paragraph spacing, and tight line
+spacing pack entries densely while line boxes retain pointed Hebrew glyphs' full
+height. Headwords occupy 40% of each column, with unusually wide headwords scaled
+to fit that space. Continuation lines indent beneath the gloss. Headwords stay
+with the beginning of their gloss; long glosses may continue into later columns/pages. Hebrew
+sorting uses a separate mark/punctuation-free key, with final letters folded to
+ordinary forms. Headwords retain their vowels and source Unicode.
+
+Entries are the deduplicated union of the built passage's footnote helps, using
+the same whole-book frequency cutoff, editorial inclusion/omission, known-word,
+name-exclusion, and gloss policies. Different source entries, verb stems, or
+glosses remain distinct. An empty selection prints a clear empty-appendix notice.
+`lexicon-appendix.json` retains links to the source-qualified entries and their
+originating helps. This list also appears in `reader.v2.json` and the source bundle.
+
+Appendix columns use TeX's automatic splitting and balancing. The reader's
+measured verse/note boxes and page plans retain their existing construction.
+PDF checks inspect actual destinations for every appendix entry and both section
+boundaries; no fixed appendix page count is assumed.
+
+Choose **Build content → Lexicon only**, set top-level `lexicon_only = true`, or
+use CLI `--lexicon-only` to omit scripture pages and print the same selected
+lexicon plus source credits. This mode implicitly includes the lexicon even if
+`lexicon_appendix` is false. It does not measure scripture; `page-plan.json` is
+empty, and PDF checks require the lexicon to begin on the first physical page.
+Folios start at the saved first folio. `--emit tex` supports both lexicon modes.
+
 ## Compiler and artifact checks
 
 The compiler uses an argument list, no shell escape, restricted TeX file access,
@@ -90,11 +129,13 @@ with `--emit tex`. Oversized atomic verse/opening groups fail explicitly.
 
 A successful PDF build checks:
 
-- Expected reader pages plus a source-credit page, without lost or duplicate verses.
+- Expected reader pages, any enabled lexicon pages, and a final source-credit page,
+  without lost or duplicate verses.
 - Actual PDF link count against every lexical marker in the reader document.
 - Each marker's actual PDF destination resolves to a note on the same page.
-- All reader-page fonts are embedded; logs contain no missing glyphs or overfull boxes.
+- All PDF fonts are embedded; logs contain no missing glyphs or overfull boxes.
 - Every page's help set exactly matches its word anchors.
+- Every appendix entry has a PDF destination after the reader and before credits.
 
 The bundle contains TeX, reader/selection records, page metrics, source credits,
 manifest, PDF/logs, and, for Ezra, the unmodified font and license. `BUILD.txt`

@@ -24,6 +24,8 @@ flowchart LR
 | `models.py` | Strict Pydantic settings, frozen source records, reader document |
 | `sources.py` | Pinned acquisition, hash checks, OSIS/TSV adapters, canonical exports |
 | `editorial.py` | Crosswalk candidates, decisions, frequency, stable chapter help labels |
+| `appendix.py` | Hebrew sort keys and the source-traceable union of selected passage helps |
+| `book_helps.py` | Versioned whole-book editorial help files and source compatibility checks |
 | `word_classes.py` | Source-morphology display categories and preset word-color palette |
 | `tex.py` | Explicit language runs, TeX measurement, pagination, bounded compiler, PDF checks |
 | `service.py` | Shared inspect/build/doctor use cases and reproducibility bundles |
@@ -133,12 +135,59 @@ explicit, and existing immutable build snapshots retain their saved decisions.
 Browser drafts remain in memory across paging, filters, view switches, review
 refreshes, and other row saves; they are never committed implicitly by a build.
 
+Book help files use format `bible-reader-book-helps`, schema version 1. They store
+the book, OSHB and STEP identities/revisions/artifact hashes, default gloss policy,
+and all per-anchor decisions with their reasons. They contain no source text or
+dictionary entries. Save/load validates every anchor and candidate throughout
+the book, independent of the current passage and reading policy. Unresolved
+choices stay unresolved; historical name decisions remain inspectable and cannot
+enable name helps. Loading replaces the destination's decisions and default gloss
+policy, preserving all other settings. The web API exposes revision-checked
+`GET /api/projects/{id}/helps?revision=N` and `POST /api/projects/{id}/helps`
+(`revision`, `helps`), saving one atomic project revision. Invalid files never
+partially apply. The CLI `helps save/load` shares this service and writes a new
+file, refusing existing outputs. Projects and files allow 100,000 decisions;
+help files and web request bodies are limited to 64 MB.
+
 The chapter registry is computed before filtering the requested passage, from the
 same selected chapters and settings. General help identity includes lexical entry,
 stem, and gloss. The reference fixture supplies separate observed slots where the
 same lexeme has more than one note. Altered reference helps receive new labels.
 Each page projects the registry and repeats just its referenced helps, once per
 chapter-qualified help identity. Printed numbers are not lexical identities.
+
+The top-level `lexicon_appendix` and `lexicon_only` settings default to false. When either is enabled,
+the reader document's `lexicon_appendix` list unions the passage's selected helps,
+deduplicating by source entry (or unresolved source lemma), exact headword, stem,
+and gloss. Each entry retains its source ID, source description, editorial/status
+metadata, and originating chapter-qualified `help_ids`. It reuses footnote
+selection after book-frequency, known-word, editorial, and name rules; it neither
+selects additional book words nor bypasses unresolved-help checks. A separate
+Hebrew sort key ignores marks/punctuation and folds final letters into their
+ordinary forms without modifying source/display text. Equal keys use source ID,
+stem, and gloss as deterministic tie-breakers.
+
+The final TeX inserts the lexicon before the credits in four left-to-right columns,
+using `multicol` with bidi's explicit column direction. Each entry places its RTL
+Hebrew headword on the left and LTR English stem/gloss on the right, on the same
+baseline. Glosses share the stem-label size (half `notes_pt`); hanging indents,
+zero paragraph spacing, and a 3 mm column gap keep the layout compact. The heading
+includes both book names and the selected passage. TeX balances columns and
+continues long glosses across columns/pages. The scripture's measured page plans
+and page-local notes are unchanged in reader builds. Named PDF destinations identify the lexicon,
+every entry, and the credits, so PDF checks verify entry coverage, placement,
+page counts, and embedded fonts across all pages. Enabled exports also contain
+`lexicon-appendix.json`; PDF diagnostics distinguish reader, appendix, and credits
+pages. The browser and CLI share the saved setting, and the CLI offers explicit
+`--lexicon-appendix` / `--no-lexicon-appendix` build overrides.
+
+`lexicon_only` builds derive exactly the same selected helps but skip scripture
+measurements and emit an empty scripture page plan. They print the lexicon and
+source credits, with folios starting at `layout.first_folio`. PDF validation still
+checks all lexicon destinations, section boundaries, overflow, and embedded fonts;
+the source verse count remains available as coverage metadata. TeX-only exports
+load the required TeX packages once to retain dependency hashes without measuring
+scripture. CLI `--lexicon-only` / `--no-lexicon-only` override the saved mode.
 
 `ReaderDocument` version 2 contains resolved config, ordered verses/tokens, referenced
 helps, review rows, chapter registry, source lock, and warnings. The source lock
