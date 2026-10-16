@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from bible_reader.models import ProjectConfig
+from bible_reader.models import ProjectConfig, Token, Verse
 from bible_reader.web.app import create_app
 
 
@@ -42,6 +42,104 @@ def test_project_review_edit_build_snapshot_and_conflict(client):
     assert client.get(f"/api/jobs/{queued['id']}").json()["config"]["name"] == "Proverbs reader"
     assert client.get(f"/api/jobs/{queued['id']}").json()["config"]["layout"]["verse_layout"] == "continuous"
     assert client.post(f"/api/jobs/{queued['id']}/cancel").json()["status"] == "cancelled"
+
+
+def test_book_help_download_load_restore_and_snapshot(client, consonant_review):
+    project = client.post(
+        "/api/projects",
+        json={
+            "selection": "all",
+            "passage": "1:1",
+            "gloss_selection": "first-entry",
+            "decisions": {
+                "test-origin:0": {"entry_id": "step:test-choice", "gloss": "Editorial שָׁמַר"},
+                "test-repeat:0": {"action": "exclude", "reason": "Outside the passage"},
+                "test-ketiv:0": {"entry_id": "step:test-alternate", "gloss": "Editorial K/Q help"},
+            },
+        },
+    ).json()
+    url = f"/api/projects/{project['id']}"
+    download = client.get(url + "/helps?revision=1")
+    assert download.status_code == 200
+    assert download.headers["content-disposition"] == 'attachment; filename="Prov-lexical-helps.json"'
+    saved = download.json()
+    assert saved["decisions"] == project["config"]["decisions"]
+    assert client.get(url).json() == project  # Downloading never changes the project.
+    destination = client.post(
+        "/api/projects",
+        json={
+            "name": "Different edition",
+            "selection": "all",
+            "passage": "3:1",
+            "readings": "qere",
+            "layout": {"paper": "a4"},
+            "decisions": {"test-qere:0": {"action": "exclude"}},
+        },
+    ).json()
+    target = f"/api/projects/{destination['id']}"
+    before = client.post(target + "/builds").json()
+    response = client.post(target + "/helps", json={"revision": 1, "helps": saved})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["loaded"] == 3
+    assert result["project"]["revision"] == 2
+    config = result["project"]["config"]
+    assert config == {
+        **destination["config"],
+        "decisions": saved["decisions"],
+        "gloss_selection": "first-entry",
+    }
+    assert client.get(f"/api/jobs/{before['id']}").json()["config"] == destination["config"]
+    assert client.post(target + "/builds").json()["config"] == config
+    # Both load and download reject stale tabs.
+    assert client.post(target + "/helps", json={"revision": 1, "helps": saved}).status_code == 409
+    assert client.get(target + "/helps?revision=1").status_code == 409
+    assert client.get(target).json() == result["project"]
+
+
+@pytest.mark.parametrize(
+    "change,status",
+    [
+        ({"book": "Gen"}, 400),
+        ({"schema_version": 2}, 422),
+        ({"format": "other"}, 422),
+        ({"sources": {}}, 422),
+        ({"decisions": {"missing:0": {"action": "exclude"}}}, 400),
+        ({"decisions": {"test-ketiv:0": {"entry_id": "step:test-other"}}}, 400),
+        ({"decisions": {"test-repeat:0": {"gloss": "Unattributed edit"}}}, 400),
+        ({"decisions": {"test-origin:0": {"gloss": "Invalid\ntext"}}}, 422),
+    ],
+)
+def test_invalid_book_help_load_is_atomic(client, consonant_review, change, status):
+    project = client.post("/api/projects", json={"selection": "all", "passage": "1:1"}).json()
+    url = f"/api/projects/{project['id']}"
+    saved = client.get(url + "/helps?revision=1").json()
+    response = client.post(url + "/helps", json={"revision": 1, "helps": {**saved, **change}})
+    assert response.status_code == status
+    assert client.get(url).json() == project
+
+
+def test_book_help_load_supports_large_books(client, consonant_review):
+    # Synthetic identities exercise the former 10,000-decision / 2 MB limits.
+    tokens = tuple(Token(f"large-{i}", "שמר", "1001") for i in range(10001))
+    consonant_review[:] = [Verse("Prov", 1, 1, tokens)]
+    decisions = {
+        f"{token.id}:0": {"entry_id": "step:test-choice", "gloss": "Synthetic gloss " * 10}
+        for token in tokens
+    }
+    created = client.post(
+        "/api/projects", json={"selection": "all", "passage": "1:1", "decisions": decisions}
+    )
+    assert created.status_code == 201
+    project = created.json()
+    url = f"/api/projects/{project['id']}"
+    download = client.get(url + "/helps?revision=1")
+    assert download.status_code == 200
+    assert len(download.content) > 2_000_000
+    response = client.post(url + "/helps", json={"revision": 1, "helps": download.json()})
+    assert response.status_code == 200
+    assert response.json()["loaded"] == 10001
+    assert response.json()["project"]["config"]["decisions"] == project["config"]["decisions"]
 
 
 @pytest.mark.parametrize("policy", ["reviewed", "first-entry"])

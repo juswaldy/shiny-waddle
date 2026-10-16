@@ -24,6 +24,7 @@ flowchart LR
 | `models.py` | Strict Pydantic settings, frozen source records, reader document |
 | `sources.py` | Pinned acquisition, hash checks, OSIS/TSV adapters, canonical exports |
 | `editorial.py` | Crosswalk candidates, decisions, frequency, stable chapter help labels |
+| `book_helps.py` | Versioned whole-book editorial help files and source compatibility checks |
 | `word_classes.py` | Source-morphology display categories and preset word-color palette |
 | `tex.py` | Explicit language runs, TeX measurement, pagination, bounded compiler, PDF checks |
 | `service.py` | Shared inspect/build/doctor use cases and reproducibility bundles |
@@ -132,6 +133,20 @@ and unsupported anchors are reported once each. Unresolved choices remain
 explicit, and existing immutable build snapshots retain their saved decisions.
 Browser drafts remain in memory across paging, filters, view switches, review
 refreshes, and other row saves; they are never committed implicitly by a build.
+
+Book help files use format `bible-reader-book-helps`, schema version 1. They store
+the book, OSHB and STEP identities/revisions/artifact hashes, default gloss policy,
+and all per-anchor decisions with their reasons. They contain no source text or
+dictionary entries. Save/load validates every anchor and candidate throughout
+the book, independent of the current passage and reading policy. Unresolved
+choices stay unresolved; historical name decisions remain inspectable and cannot
+enable name helps. Loading replaces the destination's decisions and default gloss
+policy, preserving all other settings. The web API exposes revision-checked
+`GET /api/projects/{id}/helps?revision=N` and `POST /api/projects/{id}/helps`
+(`revision`, `helps`), saving one atomic project revision. Invalid files never
+partially apply. The CLI `helps save/load` shares this service and writes a new
+file, refusing existing outputs. Projects and files allow 100,000 decisions;
+help files and web request bodies are limited to 64 MB.
 
 The chapter registry is computed before filtering the requested passage, from the
 same selected chapters and settings. General help identity includes lexical entry,

@@ -38,6 +38,53 @@ def test_toml_configuration_and_passage_override(tmp_path):
     assert result.layout.verse_layout == "verse-per-line"
 
 
+def test_save_and_load_book_helps_without_overwriting_projects(source_state, consonant_review, tmp_path):
+    original = tmp_path / "project.json"
+    original.write_text(
+        json.dumps(
+            {
+                "selection": "all",
+                "passage": "1:1",
+                "gloss_selection": "first-entry",
+                "decisions": {
+                    "test-repeat:0": {"entry_id": "step:test-alternate", "gloss": "Editorial help"},
+                    "test-ketiv:0": {"action": "exclude"},
+                },
+            }
+        )
+    )
+    destination = tmp_path / "destination.toml"
+    destination.write_text('passage = "3:1"\nselection = "all"\n[layout]\npaper = "a5"\n')
+    saved = tmp_path / "book-helps.json"
+    restored = tmp_path / "loaded.json"
+    base = ["--state", str(source_state), "helps"]
+    save = [*base, "save", "--project", str(original), "--output", str(saved)]
+    assert main(save) == 0
+    original_bytes = original.read_bytes()
+    toml_bytes = destination.read_bytes()
+    load = [*base, "load", "--project", str(destination), "--input", str(saved), "--output", str(restored)]
+    assert main(load) == 0
+    config = load_config(restored)
+    assert config.decisions == load_config(original).decisions
+    assert config.gloss_selection == "first-entry"
+    assert config.passage == "3:1" and config.layout.paper == "a5"
+    assert original.read_bytes() == original_bytes and destination.read_bytes() == toml_bytes
+    for command, output in [(save, saved), (load, restored)]:
+        before = output.read_bytes()
+        with pytest.raises(SystemExit) as error:
+            main(command)
+        assert error.value.code == 1
+        assert output.read_bytes() == before
+    data = json.loads(saved.read_text())
+    data["sources"]["lexicon_revision"] = "different"
+    saved.write_text(json.dumps(data))
+    restored.unlink()
+    with pytest.raises(SystemExit) as error:
+        main(load)
+    assert error.value.code == 1
+    assert not restored.exists()
+
+
 def test_legacy_project_defaults_and_invalid_verse_layout(tmp_path):
     config = tmp_path / "legacy.json"
     config.write_text('{"layout": {"paper": "a5"}}')

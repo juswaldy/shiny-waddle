@@ -66,6 +66,13 @@
         <div class="summary-row"><div id="coverage" class="metrics"></div><button id="reload-review" class="text-button">Refresh review ↻</button></div>
         <div id="review-intro" class="info-card">Import your sources to begin. Original text and editorial choices stay separate.</div>
         <div id="review-edit-result" class="info-card" role="status" hidden></div>
+        <div class="book-helps-actions" role="group" aria-label="Book lexical help files" aria-describedby="book-helps-hint">
+          <button id="save-book-helps" class="secondary" disabled>Save book helps</button>
+          <button id="load-book-helps" class="secondary" disabled>Load book helps</button>
+          <input id="book-helps-file" type="file" accept=".json,application/json" aria-label="Book helps JSON file" hidden>
+          <span id="book-helps-status" role="status" aria-live="polite"></span>
+        </div>
+        <p id="book-helps-hint" class="hint">Save a JSON file with every saved source-entry, gloss, and inclusion edit in this book, including other passages and written/read forms. Load replaces this book’s saved edits and default-gloss policy. Passage, layout, and help-selection settings stay as saved. Save pending row edits and edition settings first.</p>
         <button id="reset-helps" class="text-button" aria-describedby="reset-helps-hint" disabled>Reset helps to defaults</button>
         <p id="reset-helps-hint" class="hint">Switches to Default gloss (first entry), then clears saved source-entry, gloss, and inclusion edits throughout this project’s book.</p>
         <div id="reset-helps-status" class="info-card reset-helps-status" role="status" aria-live="polite" hidden><progress id="reset-helps-progress" max="1" aria-label="Reset helps progress"></progress><span id="reset-helps-message"></span></div>

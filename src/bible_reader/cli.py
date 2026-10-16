@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from .book_helps import load_book_helps, read_book_helps, save_book_helps
 from .models import ProjectConfig, ReaderError
 from .service import build, doctor, inspect_project, write_json
 from .sources import catalog, import_sources
@@ -41,6 +42,14 @@ def main(argv=None):
     imp = source_commands.add_parser("import")
     imp.add_argument("--book", choices=list(catalog()["books"]), default="Prov")
     imp.add_argument("--all", action="store_true")
+    helps = commands.add_parser("helps", help="Save or load editorial helps for an entire book")
+    help_commands = helps.add_subparsers(dest="help_command", required=True)
+    for name in ("save", "load"):
+        cmd = help_commands.add_parser(name)
+        cmd.add_argument("--project", type=Path, required=True)
+        cmd.add_argument("--output", type=Path, required=True)
+        if name == "load":
+            cmd.add_argument("--input", type=Path, required=True)
     for name in ("inspect", "align", "build"):
         cmd = commands.add_parser(name)
         cmd.add_argument("--project", type=Path)
@@ -83,6 +92,17 @@ def main(argv=None):
             else:
                 for book in catalog()["books"] if args.all else [args.book]:
                     print(json.dumps(import_sources(state, book, print), ensure_ascii=False))
+        elif args.command == "helps":
+            if args.output.exists():
+                raise ReaderError("Output file already exists. Choose a new filename.")
+            config = load_config(args.project)
+            if args.help_command == "save":
+                result = save_book_helps(state, config)
+            else:
+                result = load_book_helps(state, config, read_book_helps(args.input))
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            write_json(args.output, result.model_dump())
+            print(f"Wrote {args.output} ({len(result.decisions)} lexical decisions for {config.book})")
         elif args.command in {"inspect", "align", "build"}:
             config = load_config(args.project, args.passage)
             if args.command == "build":

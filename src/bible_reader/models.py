@@ -95,7 +95,7 @@ class ProjectConfig(StrictModel):
         "preserve", "hide", "consonants-only", "consonants", "consonants-maqqef-sof-pasuq"
     ] = "hide"
     readings: Literal["both", "qere", "ketiv"] = "both"
-    decisions: dict[str, Decision] = Field(default_factory=dict, max_length=10000)
+    decisions: dict[str, Decision] = Field(default_factory=dict, max_length=100000)
     layout: Layout = Field(default_factory=Layout)
 
     @field_validator("name")

@@ -1,5 +1,6 @@
 """Opt-in browser checks against the attributable offline source fixtures."""
 
+import json
 import os
 import socket
 import threading
@@ -62,6 +63,88 @@ def expect_review_choice(row, field, value):
         expect(group.locator(f"input[value='{value}']")).to_be_checked()
     else:
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
+
+
+@pytest.mark.parametrize("view", ["cards", "grid"])
+def test_save_and_load_book_help_file(consonant_review, review_server, monkeypatch, tmp_path, view):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, csrf = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        project_url = url + f"/api/projects/{identity}"
+        project = page.request.get(project_url).json()
+        project["config"].update(
+            passage="1:1",
+            gloss_selection="reviewed",
+            readings="qere",
+            decisions={
+                "test-origin:0": {"entry_id": "step:test-alternate", "gloss": "Editorial שָׁמַר & help"},
+                "test-prefix:0": {"action": "exclude"},
+                "test-repeat:0": {"entry_id": "step:test-choice", "gloss": "Editorial other chapter"},
+                "test-ketiv:0": {"entry_id": "step:test-alternate", "gloss": "Editorial written form"},
+            },
+        )
+        assert page.request.put(
+            project_url,
+            headers={"X-Reader-Token": csrf},
+            data={"revision": project["revision"], "config": project["config"]},
+        ).ok
+        page.goto(url)
+        page.locator("#review-view").select_option(view)
+        page.locator("#show-all").check()
+        expect(page.locator(".help-row")).to_have_count(4)
+        origin = page.locator("[data-anchor='test-origin:0']")
+        origin.locator("textarea").fill("Unsaved draft")
+        page.get_by_role("button", name="Save book helps", exact=True).click()
+        expect(page.locator("#notice")).to_contain_text("Save or discard")
+        page.get_by_role("button", name="Load book helps", exact=True).click()
+        expect(page.locator("#notice")).to_contain_text("Save or discard")
+        expect(origin.locator("textarea")).to_have_value("Unsaved draft")
+        page.locator("#discard-page").click()
+        page.get_by_label("Gloss selection", exact=True).select_option("first-entry")
+        page.get_by_role("button", name="Save book helps", exact=True).click()
+        expect(page.locator("#notice")).to_contain_text("Save edition settings")
+        page.get_by_label("Gloss selection", exact=True).select_option("reviewed")
+        with page.expect_download() as download:
+            page.get_by_role("button", name="Save book helps", exact=True).click()
+        assert download.value.suggested_filename == "Prov-lexical-helps.json"
+        saved_file = tmp_path / download.value.suggested_filename
+        download.value.save_as(saved_file)
+        saved = json.loads(saved_file.read_text())
+        assert len(saved["decisions"]) == 4 and "test-ketiv:0" in saved["decisions"]
+        expect(page.locator("#book-helps-status")).to_have_text("Saved 4 lexical decisions for Proverbs.")
+        page.locator("#reset-helps").click()
+        expect(page.locator("#reset-helps-message")).to_contain_text("Reset complete")
+        expect(origin.locator("textarea")).to_have_value("Synthetic step:test-choice")
+        before = page.request.get(project_url).json()
+        page.locator("#book-helps-file").set_input_files(
+            {"name": "invalid.json", "mimeType": "application/json", "buffer": b"invalid JSON"}
+        )
+        expect(page.locator("#notice")).to_contain_text("valid book helps JSON")
+        assert page.request.get(project_url).json() == before
+        wrong_book = {**saved, "book": "Gen"}
+        page.locator("#book-helps-file").set_input_files(
+            {"name": "wrong.json", "mimeType": "application/json", "buffer": json.dumps(wrong_book).encode()}
+        )
+        expect(page.locator("#notice")).to_contain_text("current edition uses Prov")
+        assert page.request.get(project_url).json() == before
+        with page.expect_file_chooser() as chooser:
+            page.get_by_role("button", name="Load book helps", exact=True).click()
+        chooser.value.set_files(saved_file)
+        expect(page.locator("#book-helps-status")).to_have_text("Loaded 4 lexical decisions for Proverbs.")
+        expect(origin.locator("textarea")).to_have_value("Editorial שָׁמַר & help")
+        expect_review_choice(origin, "Source entry", "step:test-alternate")
+        expect(page.get_by_label("Gloss selection", exact=True)).to_have_value("reviewed")
+        restored = page.request.get(project_url).json()
+        assert restored["config"]["decisions"] == saved["decisions"]
+        assert restored["config"]["passage"] == "1:1" and restored["config"]["readings"] == "qere"
+        page.reload()
+        expect(origin.locator("textarea")).to_have_value("Editorial שָׁמַר & help")
+        assert errors == [], errors
+        browser.close()
 
 
 @pytest.mark.parametrize("view", ["cards", "grid"])

@@ -116,6 +116,33 @@ saving and refreshing until the updated helps are ready. The saved help-selectio
 known-word, and frequency settings still apply. Save or discard pending row edits
 before resetting. Existing build snapshots retain their original decisions.
 
+**Save book helps** downloads a reusable `Prov-lexical-helps.json` file (or the
+selected book's code). It includes every saved source-entry choice, editorial
+gloss, inclusion/omission, and reason throughout the book, including chapters
+outside the current passage and both written/read forms, plus the saved default
+gloss policy. **Load book helps** restores that file into any edition of the same
+book, replacing its saved decisions and default gloss policy. An empty set clears
+the decisions. Save or discard row drafts and save edition settings first.
+The edition's passage, layout, help-selection policy, frequency threshold, and
+known-word list stay as saved; previous build snapshots retain their decisions.
+
+Help files contain editorial decisions, not a copy of the biblical text or
+dictionary. They pin the text and lexicon source revisions and checksums. Loading
+checks every decision against the installed sources, including hidden chapters
+and readings. A different book, incompatible sources or entries, malformed file,
+or stale project revision rejects the entire load. Projects support up to 100,000
+decisions; help files and API requests are limited to 64 MB.
+
+The CLI uses the same save/load checks and writes a new JSON file:
+
+```sh
+.venv/bin/bible-reader helps save --project reader.json --output build/Prov-lexical-helps.json
+.venv/bin/bible-reader helps load --project another-edition.toml --input build/Prov-lexical-helps.json --output build/restored-reader.json
+```
+
+Existing output files are never overwritten. The source project may be JSON or
+TOML; load preserves its other settings in the new JSON project.
+
 Names are automatically omitted from lexical helps in every selection mode,
 including existing saved inclusion decisions. The rule uses OSHB proper-name
 morphology and STEP name metadata, including personal, place, and divine names.

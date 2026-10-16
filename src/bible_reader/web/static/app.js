@@ -157,6 +157,7 @@ async function loadProject(identity) {
   viewedJob = undefined;
   $("review-edit-result").hidden = true;
   $("reset-helps-status").hidden = true;
+  $("book-helps-status").textContent = "";
   current = await api(`/projects/${identity}`); page = 0; fillForm();
   localStorage.setItem("reader-project", identity);
   await refreshReview(); renderJobs();
@@ -228,7 +229,35 @@ function nameExcluded(row, edit = rowEdit(row)) {
 }
 function requireSavedReview() {
   if (reviewSaving) throw new Error("Wait for the lexical page to finish saving.");
-  if (reviewDrafts.size) throw new Error("Save or discard your lexical review edits before changing edition settings, switching projects, resetting helps, or building.");
+  if (reviewDrafts.size) throw new Error("Save or discard your lexical review edits before changing edition settings, switching projects, saving or loading book helps, resetting helps, or building.");
+}
+function requireSavedHelpSettings() {
+  requireSavedReview();
+  if (JSON.stringify(formConfig()) !== JSON.stringify(current.config)) {
+    throw new Error("Save edition settings before saving or loading book helps.");
+  }
+}
+async function transferBookHelps(loading, action) {
+  requireSavedHelpSettings();
+  reviewSaving = true;
+  const controls = [...document.querySelectorAll("#review-panel input, #review-panel select, #review-panel textarea, #review-panel button, #project-form input, #project-form select, #project-form button, #project-picker, #new-project, #build")];
+  const disabled = controls.map(control => control.disabled);
+  controls.forEach(control => {control.disabled = true;});
+  updateReviewActions();
+  $("review-list").setAttribute("aria-busy", "true");
+  $("book-helps-status").textContent = loading ? "Loading book helps…" : "Saving book helps…";
+  let applied = false;
+  try {
+    await action(() => {applied = true;});
+  } catch (error) {
+    $("book-helps-status").textContent = applied ? "Book helps loaded; refresh the review to see them." : loading ? "Book helps were not loaded." : "Book helps were not saved.";
+    throw error;
+  } finally {
+    reviewSaving = false;
+    controls.forEach((control, index) => {if (control.isConnected) control.disabled = disabled[index];});
+    visibleEditors.forEach(editor => editor.update());
+    $("review-list").setAttribute("aria-busy", "false"); updateReviewActions(); renderJobs();
+  }
 }
 function setDraft(row, value, explicit = false) {
   if (!explicit && JSON.stringify(value) === JSON.stringify(initialEdit(row))) reviewDrafts.delete(row.anchor);
@@ -246,6 +275,7 @@ function updateReviewActions() {
   $("include-page").disabled = $("omit-page").disabled = reviewSaving || !visibleRows.length;
   $("reset-helps").textContent = helpsResetting ? "Resetting helps…" : "Reset helps to defaults";
   $("reset-helps").disabled = reviewSaving || !current || (!Object.keys(current.config.decisions || {}).length && current.config.gloss_selection === "first-entry");
+  $("save-book-helps").disabled = $("load-book-helps").disabled = reviewSaving || !current;
   $("previous").disabled = reviewSaving || page === 0;
   $("next").disabled = reviewSaving || (page + 1) * pageSize >= filteredRows.length;
 }
@@ -559,6 +589,29 @@ $("build").onclick = guard(async () => {requireSavedReview(); viewedJob = undefi
 $("import-source").onclick = guard(async () => {const job = await api("/sources/import", "POST", {book: $("import-book").value}); allJobs.unshift(job); renderJobs(); notice("Source import queued");});
 $("check-environment").onclick = guard(async () => { $("environment").textContent = JSON.stringify(await api("/doctor"), null, 2); });
 $("reload-review").onclick = guard(refreshReview);
+$("save-book-helps").onclick = guard(() => transferBookHelps(false, async () => {
+  const helps = await api(`/projects/${current.id}/helps?revision=${current.revision}`);
+  const url = URL.createObjectURL(new Blob([JSON.stringify(helps, null, 2) + "\n"], {type: "application/json"}));
+  const link = el("a"); link.href = url; link.download = `${helps.book}-lexical-helps.json`;
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  $("book-helps-status").textContent = `Saved ${Object.keys(helps.decisions).length} lexical decisions for ${sourceInfo.books[helps.book]?.title || helps.book}.`;
+}));
+$("load-book-helps").onclick = guard(() => {requireSavedHelpSettings(); $("book-helps-file").click();});
+$("book-helps-file").onchange = guard(async () => {
+  const file = $("book-helps-file").files[0]; $("book-helps-file").value = "";
+  if (!file) return;
+  await transferBookHelps(true, async applied => {
+    if (file.size > 64_000_000) throw new Error("Book help files must be at most 64 MB.");
+    let helps;
+    try {helps = JSON.parse(await file.text());} catch {throw new Error("Choose a valid book helps JSON file.");}
+    const result = await api(`/projects/${current.id}/helps`, "POST", {revision: current.revision, helps});
+    current = result.project; applied();
+    $("review-edit-result").hidden = $("reset-helps-status").hidden = true;
+    fillForm(); await refreshReview({throwOnError: true});
+    $("book-helps-status").textContent = `Loaded ${result.loaded} lexical decisions for ${sourceInfo.books[current.config.book]?.title || current.config.book}.`;
+  });
+});
 $("reset-helps").onclick = guard(async () => {
   requireSavedReview();
   const previousGlossSelection = $("gloss-selection").value;
