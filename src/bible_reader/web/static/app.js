@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const csrf = document.querySelector('meta[name="reader-token"]').content;
 let current, sourceInfo, reviewData, allJobs = [], page = 0, requestVersion = 0, noticeTimer, viewedJob;
-let pageSize = 40, reviewSaving = false;
+let pageSize = 40, reviewSaving = false, helpsResetting = false;
 const reviewDrafts = new Map(), visibleEditors = new Map();
 let visibleRows = [], filteredRows = [];
 let contextRow, contextReference, contextPinned = false, contextHideTimer, suppressContextFocus = false;
@@ -156,6 +156,7 @@ async function loadProject(identity) {
   closeVerseContext();
   viewedJob = undefined;
   $("review-edit-result").hidden = true;
+  $("reset-helps-status").hidden = true;
   current = await api(`/projects/${identity}`); page = 0; fillForm();
   localStorage.setItem("reader-project", identity);
   await refreshReview(); renderJobs();
@@ -187,10 +188,11 @@ async function saveConfig(config) {
     requireSavedReview();
     current = await api(`/projects/${current.id}`, "PUT", {revision: current.revision, config});
     const option = $("project-picker").selectedOptions[0]; if (option) option.textContent = config.name;
+    $("reset-helps-status").hidden = true;
   }
   fillForm(); await refreshReview(); renderJobs();
 }
-async function refreshReview() {
+async function refreshReview({throwOnError = false} = {}) {
   if (!current) return;
   const version = ++requestVersion;
   $("review-intro").textContent = "Loading source text and lexical helps…";
@@ -212,6 +214,7 @@ async function refreshReview() {
     $("review-list").replaceChildren(el("p", "Open Sources to install this book, then refresh the review.", "empty"));
     $("review-intro").textContent = error.message; $("review-intro").className = "info-card error"; $("coverage").replaceChildren();
     updateReviewActions();
+    if (throwOnError) throw error;
   }
 }
 function initialEdit(row) {
@@ -236,12 +239,13 @@ function setDraft(row, value, explicit = false) {
 function updateReviewActions() {
   const count = visibleRows.filter(row => reviewDrafts.has(row.anchor)).length;
   const elsewhere = reviewDrafts.size - count;
-  $("draft-count").textContent = reviewSaving ? "Saving page…" : reviewDrafts.size ? `${count} unsaved edit${count === 1 ? "" : "s"} on this page${elsewhere ? ` · ${elsewhere} elsewhere` : ""}` : "No unsaved edits";
+  $("draft-count").textContent = helpsResetting ? "Resetting helps…" : reviewSaving ? "Saving page…" : reviewDrafts.size ? `${count} unsaved edit${count === 1 ? "" : "s"} on this page${elsewhere ? ` · ${elsewhere} elsewhere` : ""}` : "No unsaved edits";
   $("save-page").disabled = reviewSaving || !count;
   $("save-next").disabled = reviewSaving || !count || (page + 1) * pageSize >= filteredRows.length;
   $("discard-page").disabled = reviewSaving || !count;
   $("include-page").disabled = $("omit-page").disabled = reviewSaving || !visibleRows.length;
-  $("reset-helps").disabled = reviewSaving || !Object.keys(current?.config.decisions || {}).length;
+  $("reset-helps").textContent = helpsResetting ? "Resetting helps…" : "Reset helps to defaults";
+  $("reset-helps").disabled = reviewSaving || !current || (!Object.keys(current.config.decisions || {}).length && current.config.gloss_selection === "first-entry");
   $("previous").disabled = reviewSaving || page === 0;
   $("next").disabled = reviewSaving || (page + 1) * pageSize >= filteredRows.length;
 }
@@ -557,16 +561,41 @@ $("check-environment").onclick = guard(async () => { $("environment").textConten
 $("reload-review").onclick = guard(refreshReview);
 $("reset-helps").onclick = guard(async () => {
   requireSavedReview();
-  const config = structuredClone(current.config); config.decisions = {};
-  reviewSaving = true; updateReviewActions();
+  const previousGlossSelection = $("gloss-selection").value;
+  const config = structuredClone(current.config);
+  $("gloss-selection").value = config.gloss_selection = "first-entry";
+  config.decisions = {};
+  const status = $("reset-helps-status"), progress = $("reset-helps-progress"), message = $("reset-helps-message");
+  const controls = [...document.querySelectorAll("#review-panel input, #review-panel select, #review-panel textarea, #review-panel button, #gloss-selection")];
+  const disabled = controls.map(control => control.disabled);
+  controls.forEach(control => {control.disabled = true;});
+  helpsResetting = reviewSaving = true; updateReviewActions();
   visibleEditors.forEach(editor => editor.update());
+  $("review-list").setAttribute("aria-busy", "true");
+  status.className = "info-card reset-helps-status"; status.hidden = false;
+  progress.hidden = false; progress.removeAttribute("value");
+  message.textContent = "Saving default gloss and resetting helps…";
+  clearTimeout(noticeTimer); $("notice").hidden = true;
+  let saved = false;
   try {
     current = await api(`/projects/${current.id}`, "PUT", {revision: current.revision, config});
+    saved = true;
     $("review-edit-result").hidden = true;
-    await refreshReview(); renderJobs();
+    message.textContent = "Refreshing lexical helps…";
+    await refreshReview({throwOnError: true}); renderJobs();
+    progress.value = 1;
+    message.textContent = "Reset complete. Lexical helps now use Default gloss (first entry).";
     notice("Lexical helps reset to defaults throughout this project’s book");
+  } catch (error) {
+    if (!saved) $("gloss-selection").value = previousGlossSelection;
+    status.classList.add("error"); progress.hidden = true;
+    message.textContent = saved ? `Helps reset, but the review could not refresh: ${error.message}` : `Reset failed: ${error.message}`;
+    throw error;
   } finally {
-    reviewSaving = false; visibleEditors.forEach(editor => editor.update()); updateReviewActions();
+    helpsResetting = reviewSaving = false;
+    controls.forEach((control, index) => {if (control.isConnected) control.disabled = disabled[index];});
+    visibleEditors.forEach(editor => editor.update());
+    $("review-list").setAttribute("aria-busy", "false"); updateReviewActions();
   }
 });
 for (const id of ["search", "show-all", "unresolved-only", "resolved-only", "edited-only"]) $(id).addEventListener("input", () => {

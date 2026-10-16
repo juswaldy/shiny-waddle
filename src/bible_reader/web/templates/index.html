@@ -67,7 +67,8 @@
         <div id="review-intro" class="info-card">Import your sources to begin. Original text and editorial choices stay separate.</div>
         <div id="review-edit-result" class="info-card" role="status" hidden></div>
         <button id="reset-helps" class="text-button" aria-describedby="reset-helps-hint" disabled>Reset helps to defaults</button>
-        <p id="reset-helps-hint" class="hint">Clears saved source-entry, gloss, and inclusion edits throughout this project’s book. Uses the saved selection and gloss settings.</p>
+        <p id="reset-helps-hint" class="hint">Switches to Default gloss (first entry), then clears saved source-entry, gloss, and inclusion edits throughout this project’s book.</p>
+        <div id="reset-helps-status" class="info-card reset-helps-status" role="status" aria-live="polite" hidden><progress id="reset-helps-progress" max="1" aria-label="Reset helps progress"></progress><span id="reset-helps-message"></span></div>
         <div class="review-toolbar"><input id="search" type="search" placeholder="Find a word, gloss, or reference…" aria-label="Search lexical helps"><label class="check-label"><input id="show-all" type="checkbox"> Show omitted words</label><label class="check-label"><input id="unresolved-only" type="checkbox"> Needs review</label><label class="check-label"><input id="resolved-only" type="checkbox"> Rework resolved helps</label></div>
         <div class="review-options">
           <label>View <select id="review-view"><option value="cards">Cards</option><option value="grid">Grid</option></select></label>

@@ -110,8 +110,10 @@ In JSON/TOML projects, set `gloss_selection` to `"first-entry"` or `"reviewed"`.
 
 **Reset helps to defaults** clears all saved source-entry, gloss, and inclusion
 decisions throughout the project’s book, including occurrences outside the current
-passage. It immediately saves the reset using the saved selection and gloss settings;
-known-word and frequency settings still apply. Save or discard pending row edits
+passage. It first switches **Gloss selection** to **Default gloss (first entry)**,
+then saves that setting with the cleared decisions. A progress indicator shows
+saving and refreshing until the updated helps are ready. The saved help-selection,
+known-word, and frequency settings still apply. Save or discard pending row edits
 before resetting. Existing build snapshots retain their original decisions.
 
 Names are automatically omitted from lexical helps in every selection mode,

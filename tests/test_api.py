@@ -45,7 +45,7 @@ def test_project_review_edit_build_snapshot_and_conflict(client):
 
 
 @pytest.mark.parametrize("policy", ["reviewed", "first-entry"])
-def test_reset_helps_uses_saved_policy_and_preserves_settings_and_builds(client, consonant_review, policy):
+def test_reset_helps_sets_first_entry_and_preserves_settings_and_builds(client, consonant_review, policy):
     project = client.post(
         "/api/projects",
         json={
@@ -64,7 +64,7 @@ def test_reset_helps_uses_saved_policy_and_preserves_settings_and_builds(client,
     url = f"/api/projects/{project['id']}"
     before = client.post(url + "/builds").json()
     source_verses = client.get(url + "/review").json()["verses"]
-    config = {**project["config"], "decisions": {}}
+    config = {**project["config"], "gloss_selection": "first-entry", "decisions": {}}
     payload = {"revision": project["revision"], "config": config}
     response = client.put(url, json=payload)
     assert response.status_code == 200
@@ -75,14 +75,10 @@ def test_reset_helps_uses_saved_policy_and_preserves_settings_and_builds(client,
     rows = {row["anchor"]: row for row in review["rows"]}
     assert rows["test-prefix:0"]["selected"]
     assert rows["test-origin:0"]["alignment_status"] == "ambiguous"
-    if policy == "first-entry":
-        assert rows["test-origin:0"]["entry_id"] == "step:test-choice"
-        assert rows["test-origin:0"]["gloss"] == "Synthetic step:test-choice"
-        assert rows["test-origin:0"]["choice_method"] == "first-entry"
-        assert review["coverage"] == {"resolved": 4}
-    else:
-        assert rows["test-origin:0"]["entry_id"] is None
-        assert rows["test-origin:0"]["status"] == "ambiguous"
+    assert rows["test-origin:0"]["entry_id"] == "step:test-choice"
+    assert rows["test-origin:0"]["gloss"] == "Synthetic step:test-choice"
+    assert rows["test-origin:0"]["choice_method"] == "first-entry"
+    assert review["coverage"] == {"resolved": 4}
     assert [t["source_surface"] for t in review["verses"][0]["tokens"]] == [
         t["source_surface"] for t in source_verses[0]["tokens"]
     ]

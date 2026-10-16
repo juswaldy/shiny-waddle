@@ -87,8 +87,11 @@ effective selection `status`, plus `choice_method` (`exact`, `first-entry`,
 `decision`, or `unresolved`). The method and project configuration distinguish
 this reader-selected policy from a contextual sense choice. Missing mappings
 remain unmatched and name exclusion still applies. Resetting helps clears the
-project's `decisions` in one revision-checked settings update; all other settings,
-known-word exclusions, source records, and existing build snapshots remain intact.
+project's `decisions` and sets `gloss_selection` to `first-entry` in one
+revision-checked settings update. The browser switches the selector before saving
+and shows progress through the save and review refresh. Save failures restore the
+previous selector; refresh failures report that the reset was saved. All other
+settings, known-word exclusions, source records, and existing build snapshots remain intact.
 
 A review row records candidates, chosen entry, status, reason, source/display
 surface, morphology, reading, book frequency, selection, and help ID/label. Decisions
