@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from bible_reader import editorial, sources, tex
+from bible_reader import editorial, service, sources, tex
 from bible_reader.models import Entry, Token, Verse
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -24,7 +24,7 @@ def source_state(tmp_path, monkeypatch):
     info = sources.catalog()
     info["books"]["Prov"]["sha256"] = provenance["files"]["Prov.xml"]
     info["lexicon"]["sha256"] = provenance["files"]["TBESH.txt"]
-    for module in (sources, editorial, tex):
+    for module in (sources, editorial, service, tex):
         monkeypatch.setattr(module, "catalog", lambda: info)
     return state
 
@@ -152,6 +152,6 @@ def greek_state(tmp_path, monkeypatch):
             asset["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     for asset in [info["greek"]["lexicon"], *info["greek"]["crosswalk"]["assets"]]:
         asset["sha256"] = hashlib.sha256((raw / asset["filename"]).read_bytes()).hexdigest()
-    for module in [sources, editorial, tex]:
+    for module in [sources, editorial, service, tex]:
         monkeypatch.setattr(module, "catalog", lambda: info)
     return state

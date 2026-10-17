@@ -53,6 +53,25 @@ def test_lxx_missing_lexical_links_stay_explicit_and_verse_zero_is_addressable(g
         editorial.build_document(greek_state, config)
 
 
+def test_nt_environment_requires_verified_crosswalk_as_well_as_text_and_lexicon(greek_state, monkeypatch):
+    from types import SimpleNamespace
+
+    from bible_reader import service
+
+    # Isolate a Greek NT workspace; no LXX artifact can independently make it ready.
+    for name in ["LXX-main.csv", "LXX-alternate.csv"]:
+        (greek_state / "raw/greek" / name).unlink()
+    engine = greek_state / "xelatex"
+    (greek_state / "kpsewhich").touch()
+    monkeypatch.setattr(service, "engine_path", lambda: str(engine))
+    monkeypatch.setattr(service.subprocess, "run", lambda *a, **kw: SimpleNamespace(returncode=0, stdout=""))
+    monkeypatch.setattr(service, "font_path", lambda _: greek_state / "font.ttf")
+    assert service.doctor(greek_state)["ready"]
+    (greek_state / "raw/greek/gntLookups.js").write_text("corrupt crosswalk")
+    status = service.doctor(greek_state)
+    assert status["greek_lexicon"] and not status["greek_crosswalk"] and not status["ready"]
+
+
 def test_greek_fixtures_are_attributable_and_unchanged():
     provenance = json.loads((FIXTURES / "provenance.json").read_text())
     for name, expected in provenance["files"].items():

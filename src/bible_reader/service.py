@@ -48,27 +48,37 @@ def doctor(state: Path):
         except ReaderError:
             result["fonts"][font] = None
     info = catalog()
+    verified_artifacts = {}
+
+    def verified_asset(path, expected):
+        key = (path, expected)
+        if key not in verified_artifacts:
+            verified_artifacts[key] = (
+                path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == expected
+            )
+        return verified_artifacts[key]
+
     for code, book in info["books"].items():
         path, asset = book_artifact(state, code)
         installed = path.is_file()
-        verified = installed and hashlib.sha256(path.read_bytes()).hexdigest() == asset["sha256"]
+        verified = verified_asset(path, asset["sha256"])
         result["sources"].append(
             {
                 "book": code,
                 "title": book["title"],
                 "language": book.get("language", "hbo"),
+                "source": book.get("source", "oshb"),
                 "installed": installed,
                 "verified": verified,
             }
         )
     lex = state / "raw/TBESH.txt"
-    result["lexicon"] = (
-        lex.is_file() and hashlib.sha256(lex.read_bytes()).hexdigest() == info["lexicon"]["sha256"]
-    )
+    result["lexicon"] = verified_asset(lex, info["lexicon"]["sha256"])
     greek_lexicon = state / "raw/greek/TBESG.txt"
-    result["greek_lexicon"] = (
-        greek_lexicon.is_file()
-        and hashlib.sha256(greek_lexicon.read_bytes()).hexdigest() == info["greek"]["lexicon"]["sha256"]
+    result["greek_lexicon"] = verified_asset(greek_lexicon, info["greek"]["lexicon"]["sha256"])
+    result["greek_crosswalk"] = all(
+        verified_asset(state / "raw/greek" / asset["filename"], asset["sha256"])
+        for asset in info["greek"]["crosswalk"]["assets"]
     )
     result["ready"] = bool(
         result["engine"]
@@ -76,7 +86,14 @@ def doctor(state: Path):
         and all(result["packages"].values())
         and any(result["fonts"].values())
         and any(
-            s["verified"] and (result["greek_lexicon"] if s["language"] == "grc" else result["lexicon"])
+            s["verified"]
+            and (
+                result["greek_lexicon"]
+                and result["fonts"]["Gentium Plus"]
+                and (s["source"] != "sblgnt" or result["greek_crosswalk"])
+                if s["language"] == "grc"
+                else result["lexicon"]
+            )
             for s in result["sources"]
         )
     )

@@ -68,8 +68,8 @@ def engine_path() -> str:
 
 def font_path(name: str) -> Path:
     if name == "Gentium Plus":
-        return Path(str(files("bible_reader").joinpath("resources/GentiumPlus-Regular.ttf")))
-    if name == "Ezra SIL":
+        paths = [Path(str(files("bible_reader").joinpath("resources/GentiumPlus-Regular.ttf")))]
+    elif name == "Ezra SIL":
         paths = [
             Path(str(files("bible_reader").joinpath("resources/SILEOT.ttf"))),
             Path.cwd() / ".tools/ezra/usr/share/fonts/truetype/ezra/SILEOT.ttf",
