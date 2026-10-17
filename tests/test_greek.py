@@ -1,40 +1,15 @@
 import hashlib
 import json
-import shutil
 from pathlib import Path
 
 import pytest
 
-from bible_reader import editorial, sources, tex
+from bible_reader import editorial
 from bible_reader.book_helps import load_book_helps, save_book_helps
 from bible_reader.greek import morphgnt_crosswalk, parse_morphgnt, parse_rahlfs, parse_tbesg
 from bible_reader.models import Decision, ProjectConfig, ReaderError
 
 FIXTURES = Path(__file__).parent / "fixtures/greek"
-
-
-@pytest.fixture
-def greek_state(tmp_path, monkeypatch):
-    state = tmp_path / "state"
-    raw = state / "raw/greek"
-    raw.mkdir(parents=True)
-    info = sources.catalog()
-    for name in ["TBESG.txt", "gntLookups.js", "GreekWordList.js", "LXX-main.csv", "LXX-alternate.csv"]:
-        shutil.copyfile(FIXTURES / name, raw / name)
-    for code, name in [("John", "John.txt"), ("Mark", "Mark16.txt")]:
-        shutil.copyfile(FIXTURES / name, raw / info["books"][code]["artifact"]["filename"])
-    for selected in info["books"].values():
-        if selected.get("language") != "grc":
-            continue
-        asset = selected["artifact"]
-        path = raw / asset["filename"]
-        if path.exists():
-            asset["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
-    for asset in [info["greek"]["lexicon"], *info["greek"]["crosswalk"]["assets"]]:
-        asset["sha256"] = hashlib.sha256((raw / asset["filename"]).read_bytes()).hexdigest()
-    for module in [sources, editorial, tex]:
-        monkeypatch.setattr(module, "catalog", lambda: info)
-    return state
 
 
 def test_greek_projects_align_offline_preserve_surfaces_and_round_trip_helps(greek_state):
@@ -145,3 +120,63 @@ def test_greek_lexicon_and_published_crosswalk_keep_candidates_and_gaps():
     assert morphgnt_crosswalk(b'gntLookups={"a":"x"}', b'greekWordList={"x":{"strong":"32a"}}', mapping) == {}
     with pytest.raises(ReaderError):
         morphgnt_crosswalk(b"gntLookups=evil()", b"greekWordList={}", mapping)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
+def test_greek_pdf_has_embedded_fonts_same_page_notes_and_clear_chapter_inset(
+    greek_state, tmp_path, tex_available, verse_layout
+):
+    import zipfile
+
+    from pypdf import PdfReader
+
+    from bible_reader.service import build
+
+    config = ProjectConfig(
+        book="John",
+        passage="1:1-18",
+        selection="all",
+        lexicon_appendix=True,
+        layout={"verse_layout": verse_layout},
+    )
+    document = editorial.build_document(greek_state, config)
+    config.decisions = {
+        r["anchor"]: Decision(
+            action="exclude", reason="Typography fixture: unresolved help explicitly excluded"
+        )
+        for r in document.review
+        if r["selected"] and r["status"] != "resolved"
+    }
+    output = tmp_path / "greek-pdf"
+    result = build(greek_state, config, output)
+    assert result["fonts_embedded"] and result["pdf_marker_destinations"] == "verified"
+    assert result["reader_pages"] >= 2 and result["appendix_pages"] == 1
+    pdf = PdfReader(output / "reader.pdf")
+    assert "Ἐν" in pdf.pages[0].extract_text() and "λόγος" in pdf.pages[0].extract_text()
+    if verse_layout == "continuous":
+        runs = []
+
+        def collect(text, cm, tm, font, size):
+            if (
+                text.strip()
+                and "GentiumPlus" in font["/BaseFont"]
+                and size == pytest.approx(18 * 72 / 72.27, abs=0.01)
+            ):
+                runs.append(
+                    (cm[0] * tm[4] + cm[2] * tm[5] + cm[4], round(cm[1] * tm[4] + cm[3] * tm[5] + cm[5], 1))
+                )
+
+        pdf.pages[0].extract_text(visitor_text=collect)
+        baselines = sorted({y for _, y in runs}, reverse=True)
+        # The chapter box occupies the first two lines. Check real PDF glyph
+        # positions, including wrapped words, rather than just TeX strings.
+        assert len(baselines) >= 2
+        for baseline in baselines[:2]:
+            assert min(x for x, y in runs if y == baseline) >= (10 + 14) * 72 / 25.4 - 0.2
+    with zipfile.ZipFile(output / "reader-bundle.zip") as bundle:
+        assert b"SIL OPEN FONT LICENSE" in bundle.read("GentiumPlus-LICENSE.txt")
+        assert bundle.read("reader-greek.ttf")
+        assert bundle.read("SBLGNT-README.md")
+    manifest = json.loads((output / "manifest.json").read_text())
+    assert manifest["font"] == "Gentium Plus" and manifest["greek_font_sha256"]

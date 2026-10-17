@@ -120,3 +120,38 @@ def name_review(source_state, monkeypatch):
     monkeypatch.setattr(editorial, "load_book", lambda *_: book)
     monkeypatch.setattr(editorial, "load_lexicon", lambda _, book="Prov": (entries, crosswalk))
     return book
+
+
+@pytest.fixture
+def greek_state(tmp_path, monkeypatch):
+    greek_fixtures = FIXTURES / "greek"
+    state = tmp_path / "state"
+    raw = state / "raw/greek"
+    raw.mkdir(parents=True)
+    info = sources.catalog()
+    for name in [
+        "TBESG.txt",
+        "gntLookups.js",
+        "GreekWordList.js",
+        "LXX-main.csv",
+        "LXX-alternate.csv",
+        "SBLGNT-README.md",
+        "RAHLFS-README.md",
+        "README.md",
+        "SBLGNT-license.html",
+    ]:
+        shutil.copyfile(greek_fixtures / name, raw / name)
+    for code, name in [("John", "John.txt"), ("Mark", "Mark16.txt")]:
+        shutil.copyfile(greek_fixtures / name, raw / info["books"][code]["artifact"]["filename"])
+    for selected in info["books"].values():
+        if selected.get("language") != "grc":
+            continue
+        asset = selected["artifact"]
+        path = raw / asset["filename"]
+        if path.exists():
+            asset["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    for asset in [info["greek"]["lexicon"], *info["greek"]["crosswalk"]["assets"]]:
+        asset["sha256"] = hashlib.sha256((raw / asset["filename"]).read_bytes()).hexdigest()
+    for module in [sources, editorial, tex]:
+        monkeypatch.setattr(module, "catalog", lambda: info)
+    return state

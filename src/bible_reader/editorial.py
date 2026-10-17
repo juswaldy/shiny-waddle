@@ -439,6 +439,8 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
     info = catalog()
     warnings = []
     selected_source = info["books"][config.book]
+    if selected_source.get("coverage_note"):
+        warnings.append(selected_source["coverage_note"])
     if selected_source.get("nonmonotonic_references"):
         warnings.append(
             "The selected Rahlfs artifact has nonmonotonic verse references; original file and word order are preserved."

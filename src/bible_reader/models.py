@@ -64,6 +64,7 @@ class Layout(StrictModel):
     notes_pt: float = Field(default=9.0, ge=7.5, le=14)
     first_folio: int = Field(default=1, ge=1, le=99999)
     hebrew_font: Literal["Ezra SIL", "SBL Hebrew"] = "Ezra SIL"
+    greek_font: Literal["Gentium Plus"] = "Gentium Plus"
 
     @field_validator("word_color_overrides")
     @classmethod

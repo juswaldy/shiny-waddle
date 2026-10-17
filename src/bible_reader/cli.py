@@ -96,7 +96,7 @@ def main(argv=None):
                 else ProjectConfig(
                     book=args.book,
                     name=f"{catalog()['books'][args.book]['title']} reader",
-                    passage="1:1-10",
+                    passage=catalog()["books"][args.book].get("default_passage", "1:1-10"),
                     selection="book-frequency",
                 )
             )

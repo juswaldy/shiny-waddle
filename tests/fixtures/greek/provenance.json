@@ -40,6 +40,10 @@
     "README.md": {
       "artifact": "README.md",
       "transformation": "Unmodified upstream notice"
+    },
+    "SBLGNT-license.html": {
+      "artifact": "SBLGNT-license.html",
+      "transformation": "Unmodified official license snapshot, hashed in Greek source catalog"
     }
   },
   "files": {
@@ -52,7 +56,8 @@
     "LXX-alternate.csv": "4848323a63af49f8e1a6eb3a8689906715e48d5e0a4c7cd44b8e0c6becae3ecd",
     "LXX-main.csv": "8fe6af384df8c5c537951a186f4436f1ac6864e624c3047435b1ec1eb8c3b0bc",
     "SBLGNT-README.md": "043bb6c0d654e85fa8a8db19e177ee035623e23b7ff1556e5431ad95184d5830",
-    "GreekWordList.js": "3f5a2fe426f212b7877bcf9f5a0d4f4b9e934cce6b12489ce30f5b9f52fa6a04"
+    "GreekWordList.js": "3f5a2fe426f212b7877bcf9f5a0d4f4b9e934cce6b12489ce30f5b9f52fa6a04",
+    "SBLGNT-license.html": "837f5a5e3f0454134aae2e95141b4d8b887cdc6c8e536bf2fe204d5b7ad4ad75"
   },
   "terms": "Each source retains its separate upstream terms. Rahlfs fixture CC BY-NC-SA 4.0 with upstream CCAT conditions; selected source rows are not MIT."
 }

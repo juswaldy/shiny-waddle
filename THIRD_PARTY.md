@@ -13,6 +13,7 @@ The repository MIT license applies to application code, not all input materials.
 | STEP TBESG metadata and short Gloss | Pinned Greek lexicon; selected fixture rows | CC BY 4.0; STEP Bible / Tyndale House Cambridge; Meaning excluded |
 | Open Scriptures GreekResources crosswalk | Pinned lookup and word-list artifacts; selected metadata fixture | CC BY 4.0, Open Scriptures Septuagint Project; definitions excluded from canonical imports |
 | Ezra SIL 2.51 | Unmodified `src/bible_reader/resources/SILEOT.ttf` | SIL Open Font License 1.1; shaping-code MIT notice also retained in `Ezra-LICENSE.txt` |
+| Gentium Plus | Unmodified `src/bible_reader/resources/GentiumPlus-Regular.ttf` | SIL Open Font License 1.1; accompanying `GentiumPlus-LICENSE.txt`; exact upstream revision and hash in the Greek catalog |
 | SBL Hebrew | Optional user-installed font | Not redistributed by the application |
 | Latin Modern / TeX packages | User or project-local TeX installation | Respective upstream font and TeX package licenses; the TeX distribution is not part of the Python wheel |
 | `mishle002.jpg` | Local visual reference only | Provenance/redistribution terms not established; excluded from Git, packages, and exports |
