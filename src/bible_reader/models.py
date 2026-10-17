@@ -148,6 +148,8 @@ class Token:
     # Non-XML adapters retain the complete original row/unit separately.
     source_record: str = ""
     lexical_keys: tuple[str, ...] = ()
+    # Optional source-supplied spelling, separate from punctuation-bearing text.
+    spelling_key: str | None = None
 
     def json(self):
         return asdict(self)

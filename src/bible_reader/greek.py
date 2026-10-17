@@ -36,6 +36,7 @@ def parse_morphgnt(data: bytes, book: str, source_book: int) -> list[Verse]:
                 language="grc",
                 source_record=line,
                 lexical_keys=(f"morphgnt:{lemma}",),
+                spelling_key=word,
             )
         )
     if not grouped:

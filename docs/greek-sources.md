@@ -51,7 +51,10 @@ label, source metadata, default passage, and build warnings expose this limit.
 The MorphGNT adapter retains all seven original columns in `source_record`,
 including punctuation-bearing text, unpunctuated word, normalized word, lemma,
 part of speech, and parsing code. Display uses the original punctuation-bearing
-column. Derived token IDs use source BCV plus the one-based verse word position;
+column. A separate `spelling_key` retains the unpunctuated `word` column exactly,
+including its accents and case, for bulk edits, review keys, and spelling counts;
+the normalized-word column does not control these matches.
+Derived token IDs use source BCV plus the one-based verse word position;
 the upstream format does not supply independent word IDs.
 
 Rahlfs uses Wong's `LXX_final_main.csv` and `LXX_final_alternate.csv` MyBible

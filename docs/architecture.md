@@ -126,7 +126,11 @@ and book-wide inclusions report and skip name occurrences.
 Lexical review can expand a decision to every matching word in the selected book.
 A separate consonant key removes Hebrew marks/punctuation and slash segmentation
 from the raw surface; prefixes/suffixes, logical order, and source Unicode remain
-intact. Matching stays within a language and includes both K/Q records and words
+intact. MorphGNT instead supplies its unpunctuated `word` column as a separate
+`spelling_key`, preserving accents and case while display retains punctuation.
+The same effective spelling key controls bulk matches, review keys, and word
+counts; sources without a separate spelling retain the surface-derived key.
+Matching stays within a language and includes both K/Q records and words
 outside the current passage. Each compatible lexical component receives an
 ordinary per-anchor decision, replacing earlier edits. Components without the
 chosen entry in their pinned crosswalk candidates are reported and left unchanged.

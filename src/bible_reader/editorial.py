@@ -53,6 +53,11 @@ def consonant_key(raw: str) -> str:
     return display_surface(raw, "consonants-only")
 
 
+def token_spelling_key(token: Token) -> str:
+    """Prefer an explicit source spelling; otherwise use the existing surface key."""
+    return token.spelling_key if token.spelling_key is not None else consonant_key(token.surface)
+
+
 def lexical_candidates(lemma: str, crosswalk: dict[str, list[str]]) -> list[str]:
     base = re.fullmatch(r"([HG]\d{4,5})[A-Za-z]+", lemma)
     return crosswalk.get(lemma, crosswalk.get(base.group(1), []) if base else [])
@@ -142,13 +147,13 @@ def edit_decisions(state: Path, config: ProjectConfig, edits: list[tuple[str, De
             raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
         if scope == "book" and (decision.action == "include" or decision.gloss) and not decision.entry_id:
             raise ReaderError(f"Choose a source entry before applying a help to all occurrences: {anchor}")
-        key = consonant_key(origin.surface)
+        key = token_spelling_key(origin)
         if scope == "book" and not key:
-            raise ReaderError("This source word has no consonants to match.")
+            raise ReaderError("This source word has no spelling to match.")
         applied, skipped = [], []
         targets = anchors.items() if scope == "book" else [(anchor, anchors[anchor])]
         for target, (verse, token, lemma, morphology) in targets:
-            if scope == "book" and (token.language != origin.language or consonant_key(token.surface) != key):
+            if scope == "book" and (token.language != origin.language or token_spelling_key(token) != key):
                 continue
             if decision.entry_id and decision.entry_id not in lexical_candidates(lemma, crosswalk):
                 skipped.append(
@@ -222,7 +227,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
         for key in token_keys(token)
     )
     word_counts = Counter(
-        (token.language, consonant_key(token.surface))
+        (token.language, token_spelling_key(token))
         for verse in book
         for token in verse.tokens
         if token.kind == "word" and token_keys(token)
@@ -255,6 +260,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                 "id": token.id,
                 "surface": surface,
                 "source_surface": token.surface,
+                "spelling_key": token_spelling_key(token),
                 "reading": token.reading,
                 "kind": token.kind,
                 "language": token.language,
@@ -388,8 +394,8 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "language": token.language,
                             "surface": surface,
                             "source_surface": token.surface,
-                            "consonants": consonant_key(token.surface),
-                            "word_occurrences": word_counts[(token.language, consonant_key(token.surface))],
+                            "consonants": token_spelling_key(token),
+                            "word_occurrences": word_counts[(token.language, token_spelling_key(token))],
                             "lemma": lemma,
                             "morphology": token.morph,
                             "lexical_morphology": component_morphology,
