@@ -3,7 +3,7 @@
 A Python local browser app and CLI: pinned biblical text + lexical helps →
 reviewable reader document → measured LaTeX → printable PDF.
 
-The app imports the Open Scriptures Hebrew Bible and STEP short glosses, keeps
+The app imports the Open Scriptures Hebrew Bible, SBLGNT, Rahlfs LXX, and STEP short glosses, keeps
 source readings and editorial decisions separate, and puts each page's lexical
 helps beside the verses that need them. The reference edition is Proverbs
 1:29–2:12. Choose continuous scripture flow as in `bereshit002.jpg` or separate
@@ -30,6 +30,16 @@ If XeLaTeX is already installed, `uv sync --locked` is enough for Python setup.
 Set `READER_XELATEX` to its executable if needed; run `bible-reader doctor` to check
 fonts, TeX packages, and source hashes. Ezra SIL is bundled under its font license.
 SBL Hebrew is optional and must be installed separately.
+Greek uses bundled Gentium Plus. See [Greek sources and commands](docs/greek-sources.md)
+for edition identities, Rahlfs access requirements, alternate witnesses, and lexical gaps.
+
+```sh
+.venv/bin/bible-reader sources import --book John
+.venv/bin/bible-reader build --project examples/john.project.json --output build/john
+# After satisfying the documented Rahlfs access requirements:
+.venv/bin/bible-reader sources import --book LXXGen
+.venv/bin/bible-reader inspect --project examples/lxx.project.json --report build/lxx-review.json
+```
 
 ## CLI
 
@@ -62,7 +72,7 @@ text** (the default) and **One verse per line**. In a project file set
 `layout.verse_layout` to `"continuous"` or `"verse-per-line"`; long verses can wrap
 in either mode. Projects without this setting use continuous text.
 
-Check **Add lexicon appendix** above **Save settings** to add a Hebrew-sorted,
+Check **Add lexicon appendix** above **Save settings** to add an alphabetically sorted,
 four-column lexicon after the reader pages and before **Sources and edition**.
 It uses the selected passage's footnote helps, including the same **Maximum
 occurrences in this book** cutoff in **Uncommon in this book** mode, known-word
@@ -256,9 +266,11 @@ builds include the PDF and compiler log. Ezra exports include the font and licen
 
 - Pinned imports for all 39 OSHB books; source IDs, Unicode, segmentation,
   annotations, and written/read forms retained.
+- Pinned SBLGNT NT and Rahlfs LXX sources, TBESG and published lexical crosswalks,
+  separate witnesses, Greek source audit, and explicit mapping gaps.
 - Extended lexical-ID matching, explicit ambiguity review, gloss overrides,
   frequency and known-word policies, and chapter-local shared help labels.
-- Continuous RTL text or separate verse starts, chapter boxes, mixed Hebrew/English notes, running
+- Continuous RTL Hebrew or LTR Greek text, separate verse starts, chapter boxes, mixed-script notes, running
   references, five paper profiles plus custom sizes, and measured page-local apparatus placement.
 - Saved projects with revision-conflict checks, durable build jobs, cancellation,
   interrupted-job recovery, PDF preview, and export bundles.
@@ -272,7 +284,7 @@ note density and wording differ.
 Exact source-entry matching establishes provenance, not a context-specific sense;
 review lexical wording before publishing an edition.
 
-The release is a single-user local tool. Greek, remote hosting, user accounts,
+The release is a single-user local tool. Remote hosting, user accounts,
 arbitrary uploaded TeX, full-dictionary definitions, and automated scholarly sense
 selection are outside its scope. Extreme verse/note blocks that cannot fit fail
 with a layout error. See [operations and limits](docs/operations.md).

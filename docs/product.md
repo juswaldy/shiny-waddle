@@ -10,7 +10,8 @@ Confirmed delivery: Python **local browser app plus CLI**, using one shared buil
 service. The first print target is **Proverbs 1:29–2:12**, matching the supplied
 sample's structure. Hebrew Bible and English lexical helps are the initial scope.
 Aramaic passages need language tagging when real Hebrew Bible data is imported;
-Greek is a later adapter and typography milestone.
+Greek NT and LXX source adapters and LTR typography are implemented; see
+[Greek source support](greek-sources.md) for edition and alignment limits.
 
 The [reference-page specification](reference-page-spec.md) defines layout and
 acceptance criteria. The [Python app plan](python-app-plan.md) defines proposed

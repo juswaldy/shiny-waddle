@@ -23,8 +23,9 @@ flowchart LR
 | --- | --- |
 | `models.py` | Strict Pydantic settings, frozen source records, reader document |
 | `sources.py` | Pinned acquisition, hash checks, OSIS/TSV adapters, canonical exports |
+| `greek.py` | MorphGNT/Rahlfs/TBESG parsing and explicit Open Scriptures lexical crosswalk |
 | `editorial.py` | Crosswalk candidates, decisions, frequency, stable chapter help labels |
-| `appendix.py` | Hebrew sort keys and the source-traceable union of selected passage helps |
+| `appendix.py` | Hebrew/Greek sort keys and the source-traceable union of selected passage helps |
 | `book_helps.py` | Versioned whole-book editorial help files and source compatibility checks |
 | `word_classes.py` | Source-morphology display categories and preset word-color palette |
 | `tex.py` | Explicit language runs, TeX measurement, pagination, bounded compiler, PDF checks |
@@ -48,6 +49,15 @@ all defaults. Unknown settings are rejected. Project saves use an integer revisi
 a stale tab cannot overwrite newer work.
 
 Source `Verse` records preserve ordered `Token`s and serialized source annotations.
+Greek adapters add `source_record` for original non-XML rows/units and explicit
+`lexical_keys` for published lexical links. Book identities select a pinned
+edition/witness and its versification. `John` selects SBLGNT; `LXXProv` and `Prov`
+remain separate Greek and Hebrew sources. Greek records retain `grc`, use LTR
+rendering with Gentium Plus, and bind TBESG/crosswalk hashes in portable help files.
+See [Greek sources](greek-sources.md) for preservation, partial witnesses, lexical
+coverage, and license details. The following OSHB-specific behavior remains scoped
+to the Hebrew/Aramaic adapter.
+
 A token keeps its OSHB ID, raw surface, lemma/morphology codes, word/separator kind,
 normal/ketiv/qere reading, language, and source XML. Display strings remove slash
 segmentation. The default `hide` accent policy removes only U+0591–U+05AF;

@@ -189,3 +189,45 @@ logs contain no overfull boxes or missing characters.
 layouts, all paper profiles, large type, and portable bundle recompilation.
 `make demo`, `make pdf`, and browser acceptance pass. Browser artifacts are at
 `test-results/browser-20261009-154723/`.
+
+## Greek NT and LXX support — 2026-10-16
+
+Pinned SBLGNT (27 books) and Rahlfs MyBible artifacts (60 book/witness records)
+were parsed in full: **38,263 verse rows and 761,247 words**. Hashes, source counts,
+unique derived token IDs, and Greek language tags passed the offline audit in
+`scripts/audit_greek_sources.py`; its detailed output is
+`build/greek-source-audit.json`. [Greek sources](greek-sources.md) records the
+edition revisions, layer-specific terms, exact link coverage, numeric source
+versification, partial Joshua A coverage, and nonmonotonic Daniel references.
+
+Real John 1:1–2:12 and Genesis 1:1–2:12 proofs compiled in both verse layouts.
+Dense all-word proofs are under `build/greek2-John-verse-per-line/` and
+`build/greek2-LXXGen-verse-per-line/`. Final continuous proofs after correcting
+the two-line chapter inset are under `build/greek-final-John-continuous/` and
+`build/greek-final-LXXGen-continuous/`, each with eight reader pages, one lexicon
+page, and one source-credit page. Proof configurations explicitly exclude
+unresolved lexical joins for typography inspection; they are engineering proofs,
+not claims of contextual lexical review.
+
+First pages, the chapter 1/2 boundary, and Greek lexicon columns were rasterized
+and visually inspected. Accents, logical reading order, word-linked markers,
+note grouping, chapter insets, and appendix sorting were checked. PDF validation
+passed page membership, same-page note destinations, embedded fonts, appendix
+coverage, and overflow/missing-glyph checks. The Greek PDF regression also checks
+actual first/second-line glyph positions around the chapter box. Gentium Plus
+covers all 273 distinct nonspace characters found across the pinned Greek
+text/analysis artifacts and TBESG headwords.
+
+`make check` passes **280 tests and 8 subtests**, with the 17 opt-in browser tests
+skipped by default. All **17 browser review regressions** pass separately, including Greek review text and verse
+context direction, font delivery, edition selection, and Rahlfs terms. The local
+Chromium run uses the existing libraries in `.tools/browser-libs/`; proof output
+is `test-results/greek-review.png`. `make demo` and `make pdf` pass; the Hebrew
+regression proof is at `build/reader-20261016-173403-915008/`.
+
+Wheel and source-distribution builds pass offline. Packaged Greek resources and
+all CSV/JS/HTML provenance fixtures were verified, and raw downloads remain
+excluded. The extracted wheel built the John example successfully at
+`build/greek-wheel-smoke-proof/`, including the font/license/source-notice bundle.
+`doctor` verifies the NT crosswalk as well as text and lexicon checksums before
+reporting Greek readiness, and hashes shared LXX artifacts only once per check.
