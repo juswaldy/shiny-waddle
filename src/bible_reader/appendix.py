@@ -21,11 +21,10 @@ def hebrew_sort_key(headword: str) -> str:
 
 def greek_sort_key(headword: str) -> str:
     """A derived alphabetic key; preserve accents and case in the actual headword."""
+    # Case folding would turn the combining subscript iota into a separate letter.
     return "".join(
-        c
-        for c in unicodedata.normalize("NFD", headword.casefold())
-        if unicodedata.category(c).startswith("L")
-    )
+        c for c in unicodedata.normalize("NFD", headword) if unicodedata.category(c).startswith("L")
+    ).casefold()
 
 
 def collect_lexicon(helps: dict[str, dict]) -> list[dict]:

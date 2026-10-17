@@ -1,8 +1,9 @@
 import copy
+import unicodedata
 
 import pytest
 
-from bible_reader.appendix import collect_lexicon, hebrew_sort_key
+from bible_reader.appendix import collect_lexicon, greek_sort_key, hebrew_sort_key
 from bible_reader.editorial import build_document, require_resolved
 from bible_reader.models import Decision, ProjectConfig, ReaderError
 
@@ -14,6 +15,21 @@ def test_hebrew_order_ignores_points_and_collates_final_letters():
     assert hebrew_sort_key("מֶלֶךְ") == hebrew_sort_key("מלכ")
     assert hebrew_sort_key("כַּף־יָד") == "כפיד"
     assert headwords == original
+
+
+def test_greek_order_ignores_subscript_iota_before_case_folding(greek_state):
+    headword = "ᾠδή"
+    assert greek_sort_key(headword) == "ωδη"
+    assert greek_sort_key(unicodedata.normalize("NFD", headword)) == "ωδη"
+    assert greek_sort_key("ᾨΔΉ") == "ωδη"
+    assert greek_sort_key("ὁδός") == greek_sort_key("ΟΔΟΣ") == "οδοσ"
+    assert greek_sort_key("ωι") == "ωι"  # A separate iota letter remains significant.
+    document = build_document(
+        greek_state,
+        ProjectConfig(book="LXXOd", passage="1:0", selection="all", lexicon_appendix=True),
+    )
+    entry = next(e for e in document.lexicon_appendix if e["entry_id"] == "step-greek:G5603")
+    assert entry["headword"] == headword
 
 
 def test_appendix_deduplicates_chapters_but_keeps_entries_stems_and_editorial_wording():
