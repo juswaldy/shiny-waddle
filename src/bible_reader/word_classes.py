@@ -56,6 +56,7 @@ def word_class(morphology: str, language: str = "hbo") -> str | None:
             "N": "noun",
             "V": "verb",
             "A": "adjective",
+            "M": "number",
             "D": "adverb",
             "P": "preposition",
             "C": "conjunction",
