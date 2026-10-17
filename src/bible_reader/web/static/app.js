@@ -54,9 +54,10 @@ function showVerseContext(row, reference, pinned = false) {
   $("verse-context-reference").textContent = row.reference.replaceAll(".", " ");
   $("verse-context-state").textContent = pinned ? "Pinned" : "Click reference to pin";
   const text = $("verse-context-text"); text.replaceChildren();
+  setScript(text, row.language);
   let previous;
   for (const token of verse.tokens) {
-    const surface = token.source_surface.replaceAll("/", "");
+    const surface = token.language === "grc" ? token.source_surface : token.source_surface.replaceAll("/", "");
     if (!surface) continue;
     const kind = token.kind;
     if (previous !== undefined && !["x-maqqef", "x-sof-pasuq"].includes(kind) && previous !== "x-maqqef") text.append(" ");
@@ -103,12 +104,13 @@ async function refreshSources() {
     const selected = $(id).value;
     $(id).replaceChildren();
     Object.entries(sourceInfo.books).forEach(([code, book]) => {
-      const option = el("option", `${book.title}${sourceInfo.installed.includes(code) ? " · installed" : ""}`); option.value = code; $(id).append(option);
+      const option = el("option", `${book.title} · ${book.edition || "OSHB"}${book.coverage_note ? " · partial witness" : ""}${sourceInfo.installed.includes(code) ? " · installed" : ""}`); option.value = code; $(id).append(option);
     });
     $(id).value = selected || "Prov";
   }
-  $("source-status").textContent = `${sourceInfo.installed.length} books installed · ${sourceInfo.lexicon ? "Short-gloss lexicon installed" : "Lexicon not installed"}`;
+  $("source-status").textContent = `${sourceInfo.installed.length} books installed · ${sourceInfo.lexicon ? "Hebrew lexicon installed" : "Hebrew lexicon not installed"} · ${sourceInfo.greek_lexicon ? "Greek lexicon installed" : "Greek lexicon not installed"}`;
   $("source-credits").replaceChildren(...sourceInfo.attributions.map(n => el("p", n)));
+  updateImportTerms();
 }
 async function refreshProjects(selected) {
   const projects = await api("/projects");
@@ -137,8 +139,11 @@ function fillForm() {
   updatePaperFields();
   $("frequency").disabled = c.selection !== "book-frequency";
   $("edition-title").textContent = c.name;
-  $("edition-subtitle").textContent = `${sourceInfo.books[c.book]?.title || c.book} ${c.passage} · Hebrew text with English lexical helps`;
-  $("book-word").textContent = sourceInfo.books[c.book]?.hebrew || "";
+  const selectedBook = sourceInfo.books[c.book];
+  $("edition-subtitle").textContent = `${selectedBook?.title || c.book} ${c.passage} · ${selectedBook?.edition || "OSHB"} · ${selectedBook?.language === "grc" ? "Greek" : "Hebrew"} text with English lexical helps`;
+  $("book-word").textContent = selectedBook?.hebrew || (selectedBook?.source === "rahlfs" ? "LXX" : "SBLGNT");
+  setScript($("book-word"), selectedBook?.language);
+  updateLanguageFields();
 }
 function updatePaperFields() {
   const custom = $("paper").value === "custom";
@@ -297,7 +302,7 @@ function decisionPayload(row) {
   return {anchor: row.anchor, scope: edit.scope, decision: {
     action: edit.included ? "include" : "exclude", entry_id: edit.entry_id || null,
     gloss: gloss && gloss !== entry?.gloss ? gloss : null,
-    reason: edit.scope === "book" ? `Edited all occurrences of ${row.consonants} by consonants in ${current.config.book}, from ${row.anchor}` : "Edited in lexical review"
+    reason: edit.scope === "book" ? `Edited all occurrences of ${row.consonants} by ${row.language === "grc" ? "source spelling" : "consonants"} in ${current.config.book}, from ${row.anchor}` : "Edited in lexical review"
   }};
 }
 function validateReviewEdits(rows) {
@@ -319,7 +324,7 @@ function showEditResult(result, show) {
     const list = el("ul");
     result.skipped.forEach(item => {
       const li = el("li"); li.append(el("span", `${item.reference.replaceAll(".", " ")} · `));
-      const surface = el("bdi", item.source_surface.replaceAll("/", "")); surface.dir = "rtl";
+      const surface = el("bdi", item.source_surface.replaceAll("/", "")); setScript(surface, sourceInfo.books[current.config.book]?.language);
       li.append(surface, el("span", ` · ${item.anchor} · ${item.reason}`)); list.append(li);
     });
     outcome.append(list);
@@ -394,10 +399,10 @@ function createReviewEditor(row, grid) {
   const card = el(grid ? "tr" : "article", undefined, "help-row"); card.dataset.anchor = row.anchor;
   const include = el("input"); include.type = "checkbox"; include.setAttribute("aria-label", `Include ${row.reference} ${row.surface}`);
   const word = el("div"); const reference = verseReference(row); word.append(reference);
-  const surface = el("div", row.surface, "help-word"); surface.lang = "he"; surface.dir = "rtl"; word.append(surface);
+  const surface = el("div", row.surface, "help-word"); setScript(surface, row.language); word.append(surface);
   const source = el("div");
   const sourceLine = el("div", undefined, "row-source");
-  const headword = el("span", "", "headword"); headword.lang = "he"; headword.dir = "rtl";
+  const headword = el("span", "", "headword"); setScript(headword, row.language);
   sourceLine.append(headword, el("small", row.reading === "normal" ? row.lemma : `${row.lemma} · ${row.reading}`)); source.append(sourceLine);
   const choice = createReviewChoice(row, "source-entry", "Source entry",
     [["", grid ? "No source entry selected" : "Choose a source entry…"], ...row.candidates.map(candidate => [candidate.id, `${candidate.gloss} · ${candidate.id}`])], grid);
@@ -413,13 +418,13 @@ function createReviewEditor(row, grid) {
   const provenance = el("div", undefined, "gloss-provenance"); glossBox.append(provenance);
   const scopeBox = el("div");
   const scope = createReviewChoice(row, "apply-to", "Apply to",
-    [["occurrence", "This occurrence"], ["book", `All ${row.word_occurrences} occurrences in this book (consonants only)`]], grid);
+    [["occurrence", "This occurrence"], ["book", `All ${row.word_occurrences} occurrences in this book (${row.language === "grc" ? "source spelling" : "consonants only"})`]], grid);
   if (grid) scopeBox.append(scope.element);
   else {const scopeLabel = el("label", "Apply to", "source-detail"); scopeLabel.append(scope.element); scopeBox.append(scopeLabel);}
   const scopeHint = el("p", undefined, "hint"); scopeHint.append(el("span", "Matches "));
-  const key = el("bdi", row.consonants); key.dir = "rtl"; key.lang = "he"; scopeHint.append(key);
+  const key = el("bdi", row.consonants); setScript(key, row.language); scopeHint.append(key);
   scopeHint.append(el("span", " across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged."));
-  if (grid) scope.element.title = `Matches \u2067${row.consonants}\u2069 across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged.`;
+  if (grid) scope.element.title = `Matches \u2068${row.consonants}\u2069 across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged.`;
   else scopeBox.append(scopeHint);
   const actions = el(grid ? "td" : "div", undefined, "help-actions");
   actions.append(el("span", row.label === null ? "—" : String(row.label), "note-label"));
@@ -600,9 +605,10 @@ document.querySelectorAll("[data-word-class]").forEach(row => {
   $("word-color-" + category).onchange = updateWordColorFields;
   $("word-color-custom-" + category).oninput = () => {$("word-color-" + category).value = "custom";};
 });
-$("book").onchange = () => {if ($("book").value !== "Prov") {$("selection").value = "book-frequency"; $("passage").value = "1:1-10"; $("frequency").disabled = false;}};
+$("book").onchange = () => {updateLanguageFields(); if ($("book").value !== "Prov") {$("selection").value = "book-frequency"; $("passage").value = sourceInfo.books[$("book").value]?.default_passage || "1:1-10"; $("frequency").disabled = false;}};
 $("new-project").onclick = guard(async () => {requireSavedReview(); const config = structuredClone(current.config); config.name = "New reader edition"; const project = await api("/projects", "POST", config); await refreshProjects(project.id);});
 $("build").onclick = guard(async () => {requireSavedReview(); viewedJob = undefined; await saveConfig(formConfig()); const job = await api(`/projects/${current.id}/builds`, "POST"); allJobs.unshift(job); tab("preview"); renderJobs();});
+$("import-book").onchange = updateImportTerms;
 $("import-source").onclick = guard(async () => {const job = await api("/sources/import", "POST", {book: $("import-book").value}); allJobs.unshift(job); renderJobs(); notice("Source import queued");});
 $("check-environment").onclick = guard(async () => { $("environment").textContent = JSON.stringify(await api("/doctor"), null, 2); });
 $("reload-review").onclick = guard(refreshReview);
@@ -694,3 +700,23 @@ window.addEventListener("beforeunload", event => {
   if (reviewDrafts.size || reviewSaving) {event.preventDefault(); event.returnValue = "";}
 });
 (async () => {try {await refreshSources(); await refreshProjects(localStorage.getItem("reader-project")); await poll();} catch (error) {notice(error.message, true);}})();
+
+function setScript(node, language) {
+  node.lang = language === "grc" ? "el" : language === "arc" ? "arc" : "he";
+  node.dir = language === "grc" ? "ltr" : "rtl";
+}
+function updateLanguageFields() {
+  const greek = sourceInfo.books[$("book").value]?.language === "grc";
+  for (const id of ["hebrew-font", "cantillation", "readings"]) {
+    $(id).disabled = greek;
+    $(id).hidden = greek;
+    document.querySelector(`label[for="${id}"]`).hidden = greek;
+  }
+  $("greek-typeface").hidden = !greek;
+  $("hebrew-accent-hint").hidden = greek;
+}
+function updateImportTerms() {
+  const selected = sourceInfo.books[$("import-book").value];
+  const terms = sourceInfo.greek_terms?.[selected?.source];
+  $("source-terms").textContent = terms ? `${terms.edition}. ${terms.license || terms.text_license}. ${terms.access_requirements || ""} ${selected.coverage_note || ""}` : "WLC text: public domain; OSHB annotations and STEP Gloss: CC BY 4.0.";
+}

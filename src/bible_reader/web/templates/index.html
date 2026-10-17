@@ -46,12 +46,13 @@
             </div>
             {% endfor %}
           </details>
+          <p id="greek-typeface" class="hint" hidden>Greek typeface: Gentium Plus. Source accents are preserved.</p>
           <label for="hebrew-font">Hebrew typeface</label><select id="hebrew-font"><option>Ezra SIL</option><option>SBL Hebrew</option></select>
           <div class="paired"><div><label for="body-pt">Text size</label><input id="body-pt" type="number" min="12" max="26" step="0.5"></div><div><label for="leading-pt">Line spacing</label><input id="leading-pt" type="number" min="16" max="38" step="0.5"></div></div>
           <div class="paired"><div><label for="notes-pt">Note size</label><input id="notes-pt" type="number" min="7.5" max="14" step="0.5"></div><div><label for="folio">First page</label><input id="folio" type="number" min="1" max="99999"></div></div>
           <label for="readings">Written / read forms</label><select id="readings"><option value="both">Both, with K / Q labels</option><option value="qere">Read form (qere)</option><option value="ketiv">Written form (ketiv)</option></select>
           <label for="cantillation">Cantillation</label><select id="cantillation"><option value="hide">Hide accents; retain vowel points</option><option value="preserve">Preserve source accents</option><option value="consonants-only">Consonants only</option><option value="consonants">Consonants + maqqef</option><option value="consonants-maqqef-sof-pasuq">Consonants + maqqef + sof pasuq</option></select>
-          <p class="hint">Consonant options remove Hebrew points and accents.</p>
+          <p id="hebrew-accent-hint" class="hint">Consonant options remove Hebrew points and accents.</p>
         </details>
         <label for="build-content">Build content</label><select id="build-content"><option value="reader">Reader</option><option value="lexicon">Lexicon only</option></select>
         <label class="check-label build-option"><input id="lexicon-appendix" type="checkbox" aria-describedby="lexicon-appendix-hint"> Add lexicon appendix</label>
@@ -60,7 +61,7 @@
       </form>
       <button id="build" class="primary full">Build reader PDF <span>↗</span></button>
       <p class="hint">Text and lexical notes are measured together. Your PDF includes source credits.</p>
-      <div class="sidebar-bottom"><span class="section-label">SOURCE EDITION</span><p>Open Scriptures Hebrew Bible<br>STEP Bible short glosses</p><button class="text-button" id="show-sources">Manage sources →</button></div>
+      <div class="sidebar-bottom"><span class="section-label">SOURCE EDITION</span><p>OSHB · SBLGNT · Rahlfs LXX<br>STEP Bible short glosses</p><button class="text-button" id="show-sources">Manage sources →</button></div>
     </aside>
     <main>
       <div class="page-heading"><div><div class="section-label">READER STUDIO</div><h1 id="edition-title">Your original-language reader</h1><p id="edition-subtitle">Choose a passage, review its helps, and compose a reader.</p></div><span class="book-word" lang="he" id="book-word">משלי</span></div>
@@ -102,6 +103,7 @@
       </section>
       <section id="sources-panel" class="panel" hidden>
         <h2>Sources you can trace</h2><p class="muted">Install a book once. Reader builds then work offline against verified, pinned source revisions.</p>
+        <p id="source-terms" class="hint"></p>
         <div class="source-import"><select id="import-book" aria-label="Book to import"></select><button id="import-source" class="primary">Import book &amp; lexicon</button></div>
         <div id="source-status" class="info-card"></div><div id="source-credits"></div>
         <details><summary>Environment &amp; revision details</summary><button id="check-environment" class="secondary">Check environment</button><pre id="environment"></pre></details>

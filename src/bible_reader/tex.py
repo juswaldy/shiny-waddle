@@ -67,7 +67,9 @@ def engine_path() -> str:
 
 
 def font_path(name: str) -> Path:
-    if name == "Ezra SIL":
+    if name == "Gentium Plus":
+        paths = [Path(str(files("bible_reader").joinpath("resources/GentiumPlus-Regular.ttf")))]
+    elif name == "Ezra SIL":
         paths = [
             Path(str(files("bible_reader").joinpath("resources/SILEOT.ttf"))),
             Path.cwd() / ".tools/ezra/usr/share/fonts/truetype/ezra/SILEOT.ttf",
@@ -89,7 +91,7 @@ def font_path(name: str) -> Path:
 
 
 class Compiler:
-    def __init__(self, directory: Path, font: str, cancelled=lambda: False):
+    def __init__(self, directory: Path, font: str, cancelled=lambda: False, *, greek=False):
         self.directory = directory.resolve()
         self.directory.mkdir(parents=True, exist_ok=True)
         self.engine = engine_path()
@@ -97,6 +99,11 @@ class Compiler:
         source = font_path(font)
         shutil.copyfile(source, self.directory / "reader-hebrew.ttf")
         self.font_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        self.greek_font_hash = None
+        if greek:
+            greek_source = font_path("Gentium Plus")
+            shutil.copyfile(greek_source, self.directory / "reader-greek.ttf")
+            self.greek_font_hash = hashlib.sha256(greek_source.read_bytes()).hexdigest()
         self.environment = subprocess.run(
             [self.engine, "--version"], capture_output=True, text=True, timeout=10
         ).stdout.splitlines()[0]
@@ -203,9 +210,73 @@ def scripture_macros(layout: dict) -> str:
 """
 
 
-def preamble(layout: dict, *, lexicon_appendix=False) -> str:
+def greek_scripture_macros(layout: dict) -> str:
+    badge = r"\newcommand{\ChapterBadge}[1]{\fboxsep=1pt\fbox{\fbox{\parbox[c][9mm][c]{9mm}{\centering\fontsize{25}{28}\selectfont #1}}}}"
+    if layout.get("verse_layout", "continuous") == "verse-per-line":
+        return (
+            badge
+            + rf"""
+\newcommand{{\Scripture}}[1]{{#1}}
+\newcommand{{\Verse}}[2]{{%
+  \noindent\hbox to\linewidth{{%
+    \vtop{{\hsize=4mm\raggedright\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont\strut #1\par}}\hskip2mm
+    \vtop{{\hsize=\dimexpr\linewidth-6mm\relax
+      \setLTR\greekfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
+      \parindent=0pt\leftskip=0pt\rightskip=0pt plus 1fil\parfillskip=0pt
+      \noindent\strut #2\par}}%
+  }}\par\vskip2pt
+}}
+\newcommand{{\ChapterOpen}}[4]{{%
+  \vskip7pt\noindent\hbox to\linewidth{{%
+    \vtop{{\hsize=12mm\vskip0pt\hbox{{\ChapterBadge{{#1}}}}}}\hskip2mm
+    \vtop{{\hsize=\dimexpr\linewidth-14mm\relax\linewidth=\hsize\vskip0pt
+      \Verse{{}}{{#2}}\Verse{{#3}}{{#4}}}}%
+  }}\par
+}}
+"""
+        )
+    return (
+        badge
+        + rf"""
+\newif\ifChapterParagraph
+\newcommand{{\EndScriptureParagraph}}{{%
+  \par\ifChapterParagraph\ifnum\prevgraf<2\vskip{layout["leading_pt"]}pt\fi\fi
+  \ChapterParagraphfalse\parshape=0
+}}
+\newcommand{{\Scripture}}[1]{{\begingroup
+  \setLTR\greekfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
+  \parindent=0pt\leftskip=0pt\rightskip=0pt\parfillskip=0pt plus 1fil
+  \tolerance=9999\emergencystretch=3em\noindent #1\EndScriptureParagraph\endgroup
+}}
+\newcommand{{\Verse}}[2]{{%
+  \strut\textenglish{{\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont #1}}\nobreak\hspace{{0.35em}}#2%
+}}
+\newcommand{{\ChapterOpen}}[1]{{%
+  \EndScriptureParagraph\vskip7pt\ChapterParagraphtrue
+  \parshape=3 14mm \dimexpr\linewidth-14mm\relax 14mm \dimexpr\linewidth-14mm\relax 0pt \linewidth
+  \noindent\textenglish{{\makebox[0pt][r]{{\smash{{\raisebox{{-2mm}}{{\ChapterBadge{{#1}}}}}}\hspace{{2mm}}}}}}%
+}}
+"""
+    )
+
+
+def document_language(document: ReaderDocument) -> str:
+    return document.sources.get("language", "hbo")
+
+
+def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
     width, height, margin = paper_dimensions(layout)
     appendix_package = r"\usepackage{multicol}" if lexicon_appendix else ""
+    # All scripture words are atomic boxes, so Greek hyphenation is unnecessary.
+    # Use explicit script/font/direction runs even in minimal TeX installations.
+    greek_setup = (
+        r"\newfontfamily\greekfont[Script=Greek]{reader-greek.ttf}"
+        r"\newcommand{\ReaderGreek}[1]{{\setLTR\greekfont #1}}"
+        if language == "grc"
+        else ""
+    )
+    headword_command = "ReaderGreek" if language == "grc" else "texthebrew"
+    macros = greek_scripture_macros(layout) if language == "grc" else scripture_macros(layout)
     # Parameters are validated numeric values; external content is always escaped separately.
     return rf"""\documentclass{{article}}
 \usepackage[paperwidth={width}mm,paperheight={height}mm,margin={margin}mm]{{geometry}}
@@ -219,17 +290,18 @@ def preamble(layout: dict, *, lexicon_appendix=False) -> str:
 \setotherlanguage{{hebrew}}
 \setmainfont{{lmroman10-regular.otf}}[BoldFont=lmroman10-bold.otf,ItalicFont=lmroman10-italic.otf]
 \newfontfamily\hebrewfont[Script=Hebrew]{{reader-hebrew.ttf}}
+{greek_setup}
 \newfontfamily\booktitlefont{{lmromancaps10-regular.otf}}
 \pagestyle{{empty}}
 \setlength{{\parindent}}{{0pt}}
 \setlength{{\parskip}}{{0pt}}
 \setlength{{\fboxrule}}{{0.35pt}}
 \hfuzz=0.2pt
-{scripture_macros(layout)}
+{macros}
 \newcommand{{\HelpMarker}}[2]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{7}}{{8}}\selectfont\hyperlink{{#1}}{{#2}}}}}}}}
 \newcommand{{\ReadingMark}}[1]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{6}}{{7}}\selectfont #1}}}}}}
 \newcommand{{\NoteStem}}[1]{{\textenglish{{{{\fontsize{{{layout["notes_pt"] * 0.5}}}{{{layout["notes_pt"] * 1.35}}}\selectfont #1}}}}\enspace}}
-\newcommand{{\Note}}[5]{{\hypertarget{{#1}}{{}}\mbox{{\textsuperscript{{#2}}\texthebrew{{#3}}}}\nobreak\hspace{{0.2em}}#4#5.\hspace{{0.9em}}}}
+\newcommand{{\Note}}[5]{{\hypertarget{{#1}}{{}}\mbox{{\textsuperscript{{#2}}\{headword_command}{{#3}}}}\nobreak\hspace{{0.2em}}#4#5.\hspace{{0.9em}}}}
 \newcommand{{\Notes}}[1]{{\begingroup\setLTR\fontsize{{{layout["notes_pt"]}}}{{{layout["notes_pt"] * 1.35}}}\selectfont
   \raggedright\emergencystretch=3em #1\par\endgroup}}
 \newsavebox{{\BookTitleBox}}
@@ -365,11 +437,16 @@ def page_tex(groups: list, document: ReaderDocument, prefix: str, folio: int):
     if first != last:
         passage += f"–{last[-2]}:{last[-1]}"
     book = catalog()["books"][document.config["book"]]
-    title = (
-        rf"\HebrewBookTitle{{{escape_latex(book['hebrew'])}}}"
-        if folio % 2
-        else rf"\EnglishBookTitle{{{escape_latex(book['hebrew'])}}}{{{escape_latex(book['title'])}}}"
-    )
+    if document_language(document) == "grc":
+        title = (
+            rf"\textenglish{{\booktitlefont\fontsize{{18}}{{20}}\selectfont {escape_latex(book['title'])}}}"
+        )
+    else:
+        title = (
+            rf"\HebrewBookTitle{{{escape_latex(book['hebrew'])}}}"
+            if folio % 2
+            else rf"\EnglishBookTitle{{{escape_latex(book['hebrew'])}}}{{{escape_latex(book['title'])}}}"
+        )
     boxes = (
         "\\setbox\\BodyBox=\\vbox{\\hsize=\\linewidth\n" + scripture + "}\n"
         "\\setbox\\NotesBox=\\vbox{\\hsize=\\linewidth\n" + notes + "}\n"
@@ -383,6 +460,7 @@ def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDoc
             document.config["layout"],
             lexicon_appendix=document.config.get("lexicon_appendix", False)
             or document.config.get("lexicon_only", False),
+            language=document_language(document),
         ),
         r"\immediate\openout\Metrics=measure.metrics",
     ]
@@ -464,6 +542,7 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
 def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
     layout = document.config["layout"]
     book = catalog()["books"][document.config["book"]]
+    headword_command = "ReaderGreek" if document_language(document) == "grc" else "texthebrew"
     english_pt = layout["notes_pt"] * 0.5
     headword_pt = layout["notes_pt"]
     body = [
@@ -471,8 +550,8 @@ def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
         rf"\setcounter{{page}}{{{layout['first_folio'] + reader_pages}}}",
         r"\hypertarget{reader-lexicon}{}\noindent{\large\bfseries "
         + escape_latex(book["title"])
-        + r" — Lexicon}\hfill\texthebrew{"
-        + escape_latex(book["hebrew"])
+        + rf" — Lexicon}}\hfill\{headword_command}{{"
+        + escape_latex(book.get("hebrew") or book.get("edition", ""))
         + r"}\par\smallskip",
     ]
     subtitle = escape_latex(document.config["passage"])
@@ -491,7 +570,7 @@ def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
             r"\newcommand{\LexiconEntry}[4]{\par\begingroup",
             r"\hangindent=\dimexpr\LexiconWordWidth+1mm\relax\hangafter=1",
             r"\noindent\hypertarget{lexicon-entry-#1}{}%",
-            rf"\sbox{{\LexiconWordBox}}{{\texthebrew{{\fontsize{{{headword_pt}}}{{{headword_pt * 1.2}}}\selectfont #2}}}}%",
+            rf"\sbox{{\LexiconWordBox}}{{\{headword_command}{{\fontsize{{{headword_pt}}}{{{headword_pt * 1.2}}}\selectfont #2}}}}%",
             r"\makebox[\LexiconWordWidth][l]{\ifdim\wd\LexiconWordBox>\LexiconWordWidth",
             r"\resizebox{\LexiconWordWidth}{!}{\usebox{\LexiconWordBox}}\else\usebox{\LexiconWordBox}\fi}%",
             r"\nobreak\hspace{1mm}#3#4\par\endgroup}",
@@ -525,7 +604,11 @@ def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
 def final_tex(document: ReaderDocument, plans: list):
     only = document.config.get("lexicon_only", False)
     appendix_enabled = document.config.get("lexicon_appendix", False) or only
-    body = [preamble(document.config["layout"], lexicon_appendix=appendix_enabled)]
+    body = [
+        preamble(
+            document.config["layout"], lexicon_appendix=appendix_enabled, language=document_language(document)
+        )
+    ]
     reader_plans = [] if only else plans
     for plan in reader_plans:
         boxes, page = page_tex(plan["groups"], document, f"p{plan['page']}", plan["folio"])
@@ -539,10 +622,20 @@ def final_tex(document: ReaderDocument, plans: list):
         r"\raggedright\emergencystretch=3em\section*{Sources and edition}\hypertarget{reader-credits}{}"
     )
     body.append(escape_latex(document.config["name"]) + r"\par\bigskip")
+    if document_language(document) == "grc":
+        body.append(r"\fontsize{7}{9}\selectfont")
     for notice in document.sources["attributions"] + document.sources["transformations"] + document.warnings:
         body.append(escape_latex(notice) + r"\par\medskip")
-    body.append("Text revision: " + escape_latex(document.sources["oshb_revision"]) + r"\par")
-    body.append("Lexicon revision: " + escape_latex(document.sources["step_revision"]) + r"\par")
+    body.append(
+        "Text revision: "
+        + escape_latex(document.sources.get("text_revision", document.sources.get("oshb_revision", "")))
+        + r"\par"
+    )
+    body.append(
+        "Lexicon revision: "
+        + escape_latex(document.sources["lexicon"].get("revision", document.sources.get("step_revision", "")))
+        + r"\par"
+    )
     body.append(r"\end{document}")
     return "\n".join(body)
 

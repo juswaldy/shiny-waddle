@@ -44,6 +44,23 @@ def test_source_morphology_categories(morphology, category):
     assert word_class(morphology) == category
 
 
+def test_rahlfs_indeclinable_number_uses_number_palette_and_override(greek_state):
+    config = ProjectConfig(
+        book="LXXDanOG",
+        passage="4:12",
+        selection="all",
+        layout={"word_colors": "word-class", "word_color_overrides": {"number": "#123ABC"}},
+    )
+    document = build_document(greek_state, config)
+    token = next(t for v in document.verses for t in v["tokens"] if t["surface"] == "τριάκοντα")
+    assert token["morph"] == "lxx.M"
+    assert token["word_class"] == "number"
+    assert (
+        word_color(token["word_class"], {"word_colors": "word-class"}) == "#" + WORD_CLASS_COLORS["number"][1]
+    )
+    assert word_color(token["word_class"], document.config["layout"]) == "#123ABC"
+
+
 def test_names_use_existing_source_evidence_and_leave_common_candidates_explicit(source_state, name_review):
     config = ProjectConfig(
         passage="1:1",

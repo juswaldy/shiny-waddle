@@ -1,6 +1,8 @@
 # Pinned sources and editorial provenance
 
-The release imports two explicit source layers. The complete artifact catalog
+The Hebrew release imports two explicit source layers. Greek NT and LXX support,
+their separate editions, terms, lexical crosswalks, and complete source-audit counts
+are documented in [greek-sources.md](greek-sources.md). The Hebrew artifact catalog
 with 39 book hashes, download URLs, notices, and transformations is
 [`sources.json`](../src/bible_reader/resources/sources.json).
 
@@ -11,7 +13,9 @@ with 39 book hashes, download URLs, notices, and transformations is
 
 Verified 2026-10-02. Raw artifacts are immutable under the chosen state's `raw/`
 directory. Each is checked against its pinned SHA-256 before parsing. Download
-installation is atomic and bounded to 30 MB per source artifact. No live fetch
+installation is atomic and normally bounded to 30 MB per source artifact. The
+pinned 36 MB Rahlfs main artifact uses its cataloged size, with an absolute 50 MB
+ceiling. No live fetch
 occurs during render/build. License notices are imported alongside source files.
 
 ## The TBESH column distinction

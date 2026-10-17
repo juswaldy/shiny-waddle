@@ -36,12 +36,16 @@ def main(argv=None):
     commands.add_parser("doctor", help="Check TeX, fonts, and verified sources")
     init = commands.add_parser("init", help="Write a default project JSON file")
     init.add_argument("--project", type=Path, default=Path("reader.json"))
+    init.add_argument("--book", choices=list(catalog()["books"]), default="Prov")
     sources = commands.add_parser("sources", help="Install or list pinned source artifacts")
     source_commands = sources.add_subparsers(dest="source_command", required=True)
     source_commands.add_parser("list")
     imp = source_commands.add_parser("import")
     imp.add_argument("--book", choices=list(catalog()["books"]), default="Prov")
     imp.add_argument("--all", action="store_true")
+    imp.add_argument(
+        "--corpus", choices=["oshb", "sblgnt", "rahlfs"], help="Import all books in one source corpus"
+    )
     helps = commands.add_parser("helps", help="Save or load editorial helps for an entire book")
     help_commands = helps.add_subparsers(dest="help_command", required=True)
     for name in ("save", "load"):
@@ -86,7 +90,17 @@ def main(argv=None):
         if args.command == "init":
             if args.project.exists():
                 raise ReaderError("Project file already exists")
-            write_json(args.project, ProjectConfig().model_dump())
+            config = (
+                ProjectConfig()
+                if args.book == "Prov"
+                else ProjectConfig(
+                    book=args.book,
+                    name=f"{catalog()['books'][args.book]['title']} reader",
+                    passage=catalog()["books"][args.book].get("default_passage", "1:1-10"),
+                    selection="book-frequency",
+                )
+            )
+            write_json(args.project, config.model_dump())
             print(f"Created {args.project}")
         elif args.command == "sources":
             if args.source_command == "list":
@@ -97,12 +111,25 @@ def main(argv=None):
                             "books": list(info["books"]),
                             "text_revision": info["oshb_revision"],
                             "lexicon_revision": info["step_revision"],
+                            "greek_sources": info["greek"]["layers"],
+                            "greek_books": {
+                                k: {f: v[f] for f in ("title", "edition", "revision", "versification")}
+                                for k, v in info["greek"]["books"].items()
+                            },
                         },
                         indent=2,
                     )
                 )
             else:
-                for book in catalog()["books"] if args.all else [args.book]:
+                books = catalog()["books"]
+                selected = (
+                    [code for code, value in books.items() if value.get("source", "oshb") == args.corpus]
+                    if args.corpus
+                    else list(books)
+                    if args.all
+                    else [args.book]
+                )
+                for book in selected:
                     print(json.dumps(import_sources(state, book, print), ensure_ascii=False))
         elif args.command == "helps":
             if args.output.exists():

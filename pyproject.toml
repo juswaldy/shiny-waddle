@@ -9,7 +9,7 @@ description = "Sources and lexical helps to LaTeX and PDF reader editions"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-license-files = ["LICENSE", "THIRD_PARTY.md", "src/bible_reader/resources/Ezra-LICENSE.txt"]
+license-files = ["LICENSE", "THIRD_PARTY.md", "src/bible_reader/resources/Ezra-LICENSE.txt", "src/bible_reader/resources/GentiumPlus-LICENSE.txt"]
 dependencies = [
   "fastapi>=0.115,<1",
   "pydantic>=2.9,<3",

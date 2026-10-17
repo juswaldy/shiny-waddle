@@ -71,8 +71,10 @@ measurement invocations. The browser remains responsive to status and cancellati
 The PDF includes one source-credit page. Reference layout parameters are visual
 approximations because the scan's physical size, exact font, and lexical edition
 are unknown. All K/Q markers explicitly identify OSHB readings; unexplained marks
-in the scan have not been invented. Greek and detailed Aramaic stem glossing are
-not part of this release.
+in the scan have not been invented. Greek NT/LXX support and its edition,
+partial-witness, lexical, and license limits are documented in
+[Greek sources](greek-sources.md). Detailed Aramaic stem glossing remains outside
+this release.
 
 ## Troubleshooting
 

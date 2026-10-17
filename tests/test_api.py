@@ -23,6 +23,26 @@ def test_home_and_local_request_protection(client):
     assert client.post("/api/projects", json={}, headers={"X-Reader-Token": "wrong"}).status_code == 403
 
 
+def test_greek_catalog_review_and_source_job_use_selected_edition(greek_state):
+    app = create_app(greek_state, start_worker=False)
+    with TestClient(app) as client:
+        client.headers["X-Reader-Token"] = app.state.csrf_token
+        info = client.get("/api/sources").json()
+        assert len(info["books"]) == 126
+        assert info["books"]["John"]["edition"] == "SBLGNT"
+        assert info["books"]["LXXJoshA"]["witness"] == "alternate"
+        assert info["greek_lexicon"] and "John" in info["installed"]
+        assert client.get("/font/greek.ttf").content[:4] == b"\x00\x01\x00\x00"
+        project = client.post(
+            "/api/projects", json={"book": "John", "passage": "1:1-18", "selection": "all"}
+        ).json()
+        review = client.get(f"/api/projects/{project['id']}/review").json()
+        assert review["verse_count"] == 18
+        assert all(row["language"] == "grc" for row in review["rows"])
+        job = client.post("/api/sources/import", json={"book": "LXXGen"}).json()
+        assert job["config"]["book"] == "LXXGen"
+
+
 def test_project_review_edit_build_snapshot_and_conflict(client):
     created = client.post("/api/projects", json=ProjectConfig().model_dump())
     assert created.status_code == 201

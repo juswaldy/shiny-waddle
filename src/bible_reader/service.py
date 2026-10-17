@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .editorial import build_document, require_resolved
 from .models import ProjectConfig, ReaderError, digest
-from .sources import catalog
+from .sources import book_artifact, catalog, read_verified
 from .tex import Compiler, engine_path, final_tex, font_path, paginate, preamble, verify_pdf
 
 
@@ -42,30 +42,60 @@ def doctor(state: Path):
                 result["packages"][name] = probe.returncode == 0
     except ReaderError as error:
         result["engine_error"] = str(error)
-    for font in ("Ezra SIL", "SBL Hebrew"):
+    for font in ("Ezra SIL", "SBL Hebrew", "Gentium Plus"):
         try:
             result["fonts"][font] = str(font_path(font))
         except ReaderError:
             result["fonts"][font] = None
     info = catalog()
+    verified_artifacts = {}
+
+    def verified_asset(path, expected):
+        key = (path, expected)
+        if key not in verified_artifacts:
+            verified_artifacts[key] = (
+                path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == expected
+            )
+        return verified_artifacts[key]
+
     for code, book in info["books"].items():
-        path = state / "raw" / f"{code}.xml"
+        path, asset = book_artifact(state, code)
         installed = path.is_file()
-        verified = installed and hashlib.sha256(path.read_bytes()).hexdigest() == book["sha256"]
+        verified = verified_asset(path, asset["sha256"])
         result["sources"].append(
-            {"book": code, "title": book["title"], "installed": installed, "verified": verified}
+            {
+                "book": code,
+                "title": book["title"],
+                "language": book.get("language", "hbo"),
+                "source": book.get("source", "oshb"),
+                "installed": installed,
+                "verified": verified,
+            }
         )
     lex = state / "raw/TBESH.txt"
-    result["lexicon"] = (
-        lex.is_file() and hashlib.sha256(lex.read_bytes()).hexdigest() == info["lexicon"]["sha256"]
+    result["lexicon"] = verified_asset(lex, info["lexicon"]["sha256"])
+    greek_lexicon = state / "raw/greek/TBESG.txt"
+    result["greek_lexicon"] = verified_asset(greek_lexicon, info["greek"]["lexicon"]["sha256"])
+    result["greek_crosswalk"] = all(
+        verified_asset(state / "raw/greek" / asset["filename"], asset["sha256"])
+        for asset in info["greek"]["crosswalk"]["assets"]
     )
     result["ready"] = bool(
         result["engine"]
         and result["packages"]
         and all(result["packages"].values())
         and any(result["fonts"].values())
-        and result["lexicon"]
-        and any(s["verified"] for s in result["sources"])
+        and any(
+            s["verified"]
+            and (
+                result["greek_lexicon"]
+                and result["fonts"]["Gentium Plus"]
+                and (s["source"] != "sblgnt" or result["greek_crosswalk"])
+                if s["language"] == "grc"
+                else result["lexicon"]
+            )
+            for s in result["sources"]
+        )
     )
     return result
 
@@ -106,7 +136,8 @@ def build(
     write_json(output / "sources.lock.json", document.sources)
     write_json(output / "note-registry.json", document.registry)
     require_resolved(document)
-    compiler = Compiler(output, config.layout.hebrew_font, cancelled)
+    greek = document.sources.get("language") == "grc"
+    compiler = Compiler(output, "Ezra SIL" if greek else config.layout.hebrew_font, cancelled, greek=greek)
     plans = [] if config.lexicon_only else paginate(document, compiler, progress)
     write_json(output / "page-plan.json", plans)
     text = final_tex(document, plans)
@@ -126,7 +157,9 @@ def build(
         # A lexicon-only TeX export has no scripture measurements. Load its TeX
         # dependencies once so the source bundle still records their hashes.
         compiler.compile(
-            "measure", preamble(config.layout.model_dump(), lexicon_appendix=True) + r"\end{document}"
+            "measure",
+            preamble(config.layout.model_dump(), lexicon_appendix=True, language="grc" if greek else "hbo")
+            + r"\end{document}",
         )
     notices = "\n\n".join(
         document.sources["attributions"] + document.sources["transformations"] + document.warnings
@@ -144,10 +177,21 @@ def build(
         "credits.txt",
         "layout-diagnostics.json",
     ]
+    if greek:
+        (output / "GentiumPlus-LICENSE.txt").write_bytes(
+            files("bible_reader").joinpath("resources/GentiumPlus-LICENSE.txt").read_bytes()
+        )
+        artifacts += ["reader-greek.ttf", "GentiumPlus-LICENSE.txt"]
+        # Include the exact source notices in addition to the printed credits.
+        for asset in document.sources["notices"].values():
+            name = asset["filename"]
+            notice = state / "raw/greek" / name
+            (output / name).write_bytes(read_verified(notice, asset["sha256"]))
+            artifacts.append(name)
     if config.lexicon_appendix or config.lexicon_only:
         write_json(output / "lexicon-appendix.json", document.lexicon_appendix)
         artifacts.append("lexicon-appendix.json")
-    if config.layout.hebrew_font == "Ezra SIL":
+    if greek or config.layout.hebrew_font == "Ezra SIL":
         (output / "Ezra-LICENSE.txt").write_bytes(
             files("bible_reader").joinpath("resources/Ezra-LICENSE.txt").read_bytes()
         )
@@ -159,6 +203,7 @@ def build(
         "Rebuild this edition offline with XeLaTeX, fontspec, xcolor, polyglossia, bidi, hyperref, geometry, multicol, and Latin Modern.\n"
         "Run twice from this directory: xelatex -no-shell-escape -halt-on-error reader.tex\n"
         + font_instructions
+        + ("\nGentium Plus is included under its accompanying SIL Open Font License." if greek else "")
         + "\nSee manifest.json for engine, font, source and application fingerprints.\n",
         encoding="utf-8",
     )
@@ -187,8 +232,10 @@ def build(
         "engine": compiler.environment,
         "engine_sha256": hashlib.sha256(Path(compiler.engine).read_bytes()).hexdigest(),
         "tex_inputs": tex_inputs,
-        "font": config.layout.hebrew_font,
-        "font_sha256": compiler.font_hash,
+        "font": config.layout.greek_font if greek else config.layout.hebrew_font,
+        "font_sha256": compiler.greek_font_hash if greek else compiler.font_hash,
+        "greek_font": config.layout.greek_font if greek else None,
+        "greek_font_sha256": compiler.greek_font_hash,
         "checks": checks,
         "artifacts": {name: hashlib.sha256((output / name).read_bytes()).hexdigest() for name in artifacts},
     }

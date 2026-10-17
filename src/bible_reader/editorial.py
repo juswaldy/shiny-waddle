@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .appendix import collect_lexicon
 from .models import Decision, Entry, ProjectConfig, ReaderDocument, ReaderError, Token, digest, parse_passage
-from .sources import catalog, lemma_keys, load_book, load_lexicon
+from .sources import catalog, lemma_keys, load_book, load_lexicon, source_lock, token_keys
 from .word_classes import word_class
 
 STEMS = {"q": "Qal", "N": "Nif", "p": "Piel", "P": "Pual", "h": "Hif", "H": "Hof", "t": "Hitp"}
@@ -53,8 +53,14 @@ def consonant_key(raw: str) -> str:
     return display_surface(raw, "consonants-only")
 
 
+def token_spelling_key(token: Token) -> str:
+    """Prefer an explicit source spelling; otherwise use the existing surface key."""
+    return token.spelling_key if token.spelling_key is not None else consonant_key(token.surface)
+
+
 def lexical_candidates(lemma: str, crosswalk: dict[str, list[str]]) -> list[str]:
-    return crosswalk.get(lemma, crosswalk.get(lemma[:5], []))
+    base = re.fullmatch(r"([HG]\d{4,5})[A-Za-z]+", lemma)
+    return crosswalk.get(lemma, crosswalk.get(base.group(1), []) if base else [])
 
 
 def default_entry_id(lemma: str, crosswalk: dict[str, list[str]], gloss_selection: str) -> str | None:
@@ -72,6 +78,8 @@ def is_name_morphology(morphology: str) -> bool:
 
 def lexical_morphology(token: Token, index: int) -> str:
     """Use parallel source slash segments when they identify one lexical component each."""
+    if token.language == "grc":
+        return token.morph
     lemmas, morphs = token.lemma.split("/"), token.morph.split("/")
     if len(lemmas) == len(morphs) and all(len(lemma_keys(part)) <= 1 for part in lemmas):
         components = [morph for lemma, morph in zip(lemmas, morphs, strict=True) if lemma_keys(lemma)]
@@ -103,13 +111,13 @@ def edit_decisions(state: Path, config: ProjectConfig, edits: list[tuple[str, De
     if len({anchor for anchor, _, _ in edits}) != len(edits):
         raise ReaderError("A review page cannot submit the same source anchor twice.")
     book = load_book(state, config.book)
-    entries, crosswalk = load_lexicon(state)
+    entries, crosswalk = load_lexicon(state, config.book)
     anchors = {
         f"{token.id}:{index}": (verse, token, lemma, lexical_morphology(token, index))
         for verse in book
         for token in verse.tokens
         if token.kind == "word"
-        for index, lemma in enumerate(lemma_keys(token.lemma))
+        for index, lemma in enumerate(token_keys(token))
     }
     decisions = dict(config.decisions)
     pending: dict[str, Decision] = {}
@@ -139,13 +147,13 @@ def edit_decisions(state: Path, config: ProjectConfig, edits: list[tuple[str, De
             raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
         if scope == "book" and (decision.action == "include" or decision.gloss) and not decision.entry_id:
             raise ReaderError(f"Choose a source entry before applying a help to all occurrences: {anchor}")
-        key = consonant_key(origin.surface)
+        key = token_spelling_key(origin)
         if scope == "book" and not key:
-            raise ReaderError("This source word has no consonants to match.")
+            raise ReaderError("This source word has no spelling to match.")
         applied, skipped = [], []
         targets = anchors.items() if scope == "book" else [(anchor, anchors[anchor])]
         for target, (verse, token, lemma, morphology) in targets:
-            if scope == "book" and (token.language != origin.language or consonant_key(token.surface) != key):
+            if scope == "book" and (token.language != origin.language or token_spelling_key(token) != key):
                 continue
             if decision.entry_id and decision.entry_id not in lexical_candidates(lemma, crosswalk):
                 skipped.append(
@@ -200,8 +208,8 @@ def reference_map():
 
 def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
     book = load_book(state, config.book)
-    entries, crosswalk = load_lexicon(state)
-    start, end = parse_passage(config.passage)
+    entries, crosswalk = load_lexicon(state, config.book)
+    start, end = parse_passage(config.passage, allow_zero=config.book.startswith("LXX"))
     available = {(v.chapter, v.verse) for v in book}
     if start not in available or end not in available:
         raise ReaderError("Passage endpoints do not exist in the selected source versification.")
@@ -216,13 +224,13 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
         for verse in book
         for token in verse.tokens
         if token.kind == "word" and token.reading != "ketiv"
-        for key in lemma_keys(token.lemma)
+        for key in token_keys(token)
     )
     word_counts = Counter(
-        (token.language, consonant_key(token.surface))
+        (token.language, token_spelling_key(token))
         for verse in book
         for token in verse.tokens
-        if token.kind == "word" and lemma_keys(token.lemma)
+        if token.kind == "word" and token_keys(token)
     )
     registries: dict[int, dict[str, int]] = defaultdict(dict)
     helps = {}
@@ -243,20 +251,32 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
         for token in verse.tokens:
             if token.reading != "normal" and config.readings not in {"both", token.reading}:
                 continue
-            surface = display_surface(token.surface, config.cantillation)
+            surface = (
+                token.surface
+                if token.language == "grc"
+                else display_surface(token.surface, config.cantillation)
+            )
             record = {
                 "id": token.id,
                 "surface": surface,
                 "source_surface": token.surface,
+                "spelling_key": token_spelling_key(token),
                 "reading": token.reading,
                 "kind": token.kind,
                 "language": token.language,
                 "morph": token.morph,
-                "word_class": word_class(token.morph) if token.kind == "word" else None,
-                "word_class_source": "OSHB morphology" if token.kind == "word" else None,
+                "word_class": word_class(token.morph, token.language) if token.kind == "word" else None,
+                "word_class_source": (
+                    "Greek source morphology" if token.language == "grc" else "OSHB morphology"
+                )
+                if token.kind == "word"
+                else None,
+                "lemma": token.lemma,
+                "lexical_keys": token_keys(token),
+                "source_record": token.source_record,
                 "helps": [],
             }
-            for index, lemma in enumerate(lemma_keys(token.lemma)):
+            for index, lemma in enumerate(token_keys(token)):
                 anchor = f"{token.id}:{index}"
                 exact = lemma in crosswalk
                 candidate_ids = lexical_candidates(lemma, crosswalk)
@@ -311,7 +331,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                         record["word_class"] = "name"
                         record["word_class_source"] = name_reason
                 status = "resolved" if choice else ("ambiguous" if candidate_ids else "unmatched")
-                stem = stem_label(token.morph)
+                stem = "" if token.language == "grc" else stem_label(token.morph)
                 gloss = (
                     decision.gloss
                     if decision and decision.gloss
@@ -358,7 +378,10 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                         "stem": stem,
                         "status": status,
                         "editorial": bool(decision and decision.gloss),
-                        "source": "STEP Gloss; OSHB verb-stem code",
+                        "source": "STEP TBESG Gloss; published Greek lexical crosswalk"
+                        if token.language == "grc"
+                        else "STEP Gloss; OSHB verb-stem code",
+                        "language": token.language,
                         "lemma": lemma,
                     }
                 if in_passage:
@@ -368,10 +391,11 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "token_id": token.id,
                             "reference": verse.reference,
                             "chapter": verse.chapter,
+                            "language": token.language,
                             "surface": surface,
                             "source_surface": token.surface,
-                            "consonants": consonant_key(token.surface),
-                            "word_occurrences": word_counts[(token.language, consonant_key(token.surface))],
+                            "consonants": token_spelling_key(token),
+                            "word_occurrences": word_counts[(token.language, token_spelling_key(token))],
                             "lemma": lemma,
                             "morphology": token.morph,
                             "lexical_morphology": component_morphology,
@@ -389,7 +413,15 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "label": label,
                             "help_id": help_id if selected else None,
                             "book_frequency": counts[lemma],
-                            "method": ("exact extended ID" if exact else "base ID candidates")
+                            "method": (
+                                (
+                                    "published MorphGNT crosswalk"
+                                    if lemma.startswith("morphgnt:")
+                                    else "exact extended ID"
+                                )
+                                if exact
+                                else "base ID candidates"
+                            )
                             + {
                                 "exact": "",
                                 "first-entry": "; first listed source entry (project default)",
@@ -403,7 +435,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
             rendered.append(verse_record)
     stale = set(config.decisions) - seen_decisions
     # Decisions in other chapters remain valid project history; invalid source IDs never do.
-    all_anchors = {f"{t.id}:{i}" for v in book for t in v.tokens for i, _ in enumerate(lemma_keys(t.lemma))}
+    all_anchors = {f"{t.id}:{i}" for v in book for t in v.tokens for i, _ in enumerate(token_keys(t))}
     if stale - all_anchors:
         raise ReaderError(
             "Editorial decisions refer to missing source anchors; re-review after the source change."
@@ -412,6 +444,13 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
     passage_helps = {h: helps[h] for h in sorted(used_helps)}
     info = catalog()
     warnings = []
+    selected_source = info["books"][config.book]
+    if selected_source.get("coverage_note"):
+        warnings.append(selected_source["coverage_note"])
+    if selected_source.get("nonmonotonic_references"):
+        warnings.append(
+            "The selected Rahlfs artifact has nonmonotonic verse references; original file and word order are preserved."
+        )
     if config.selection == "reference":
         warnings.append(
             "Reference labels/anchors are editorial mappings to the scan; glosses are STEP short Gloss fields and differ from the scan."
@@ -427,14 +466,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
         passage_helps,
         reviews,
         {str(k): v for k, v in registries.items()},
-        {
-            "text": info["books"][config.book],
-            "lexicon": info["lexicon"],
-            "oshb_revision": info["oshb_revision"],
-            "step_revision": info["step_revision"],
-            "attributions": info["attributions"],
-            "transformations": info["transformations"] + [DISPLAY_TRANSFORMATIONS[config.cantillation]],
-        },
+        source_lock(config.book, config.cantillation, DISPLAY_TRANSFORMATIONS[config.cantillation]),
         warnings=warnings,
         lexicon_appendix=collect_lexicon(passage_helps)
         if config.lexicon_appendix or config.lexicon_only

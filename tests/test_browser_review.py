@@ -23,9 +23,16 @@ pytestmark = [
 
 
 @pytest.fixture
-def review_server(source_state):
-    app = create_app(source_state, start_worker=False)
-    project = app.state.store.create_project(ProjectConfig(selection="all"))
+def review_server(source_state, request):
+    greek = getattr(request, "param", None) == "greek"
+    state = request.getfixturevalue("greek_state") if greek else source_state
+    app = create_app(state, start_worker=False)
+    config = (
+        ProjectConfig(book="John", passage="1:1-18", selection="all")
+        if greek
+        else ProjectConfig(selection="all")
+    )
+    project = app.state.store.create_project(config)
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
@@ -63,6 +70,39 @@ def expect_review_choice(row, field, value):
         expect(group.locator(f"input[value='{value}']")).to_be_checked()
     else:
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
+
+
+@pytest.mark.parametrize("review_server", ["greek"], indirect=True)
+def test_greek_review_context_and_source_controls_are_left_to_right(review_server, monkeypatch):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, _, _ = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page()
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(url)
+        row = page.locator(".help-row").first
+        expect(row).to_be_visible()
+        expect(row.locator(".help-word")).to_have_attribute("dir", "ltr")
+        expect(row.locator(".help-word")).to_have_attribute("lang", "el")
+        row.locator(".verse-reference").focus()
+        expect(page.locator("#verse-context")).to_be_visible()
+        assert page.locator("#verse-context-text").evaluate("n => getComputedStyle(n).direction") == "ltr"
+        assert page.locator(".verse-context-token").first.text_content() == "Ἐν"
+        page.keyboard.press("Escape")
+        page.get_by_text("Page & reading settings", exact=True).click()
+        expect(page.locator("#greek-typeface")).to_be_visible()
+        expect(page.locator("#cantillation")).to_be_hidden()
+        page.get_by_role("button", name="Sources", exact=True).click()
+        page.locator("#import-book").select_option("LXXGen")
+        expect(page.locator("#source-terms")).to_contain_text("CCAT")
+        expect(page.locator("#source-terms")).to_contain_text("CC-BY-NC-SA-4.0")
+        proof = ROOT / "test-results/greek-review.png"
+        proof.parent.mkdir(exist_ok=True)
+        page.screenshot(path=str(proof), full_page=True)
+        assert not errors
+        browser.close()
 
 
 @pytest.mark.parametrize("lexicon_only", [False, True])

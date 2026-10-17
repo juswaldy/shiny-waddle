@@ -64,6 +64,7 @@ class Layout(StrictModel):
     notes_pt: float = Field(default=9.0, ge=7.5, le=14)
     first_folio: int = Field(default=1, ge=1, le=99999)
     hebrew_font: Literal["Ezra SIL", "SBL Hebrew"] = "Ezra SIL"
+    greek_font: Literal["Gentium Plus"] = "Gentium Plus"
 
     @field_validator("word_color_overrides")
     @classmethod
@@ -107,8 +108,8 @@ class ProjectConfig(StrictModel):
 
     @field_validator("passage")
     @classmethod
-    def passage_format(cls, value):
-        parse_passage(value)
+    def passage_format(cls, value, info):
+        parse_passage(value, allow_zero=info.data.get("book", "Prov").startswith("LXX"))
         return value
 
     @model_validator(mode="after")
@@ -118,13 +119,17 @@ class ProjectConfig(StrictModel):
         return self
 
 
-def parse_passage(value: str) -> tuple[tuple[int, int], tuple[int, int]]:
-    match = re.fullmatch(r"([1-9]\d{0,2}):([1-9]\d{0,2})(?:[-–](?:([1-9]\d{0,2}):)?([1-9]\d{0,2}))?", value)
+def parse_passage(value: str, *, allow_zero=False) -> tuple[tuple[int, int], tuple[int, int]]:
+    match = re.fullmatch(
+        r"(0|[1-9]\d{0,2}):(0|[1-9]\d{0,2})(?:[-–](?:(0|[1-9]\d{0,2}):)?(0|[1-9]\d{0,2}))?", value
+    )
     if not match:
         raise ValueError("Use a passage such as 1:29-2:12 or 2:1-12")
     chapter, verse, last_chapter, last_verse = match.groups()
     start = (int(chapter), int(verse))
     end = (int(last_chapter or chapter), int(last_verse or verse))
+    if not allow_zero and 0 in (*start, *end):
+        raise ValueError("Chapter and verse numbers start at one for this edition")
     if end < start:
         raise ValueError("Passage end must follow its start")
     return start, end
@@ -140,6 +145,11 @@ class Token:
     reading: str = "normal"
     language: str = "hbo"
     source_xml: str = ""
+    # Non-XML adapters retain the complete original row/unit separately.
+    source_record: str = ""
+    lexical_keys: tuple[str, ...] = ()
+    # Optional source-supplied spelling, separate from punctuation-bearing text.
+    spelling_key: str | None = None
 
     def json(self):
         return asdict(self)

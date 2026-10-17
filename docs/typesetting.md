@@ -7,6 +7,10 @@ the pinned TeX setup and checked by `doctor`.
 Trusted macros live in `src/bible_reader/tex.py`; all external plain text is escaped
 once at the TeX boundary. Hebrew words are kept with their superscript markers.
 English note flow contains explicitly delimited Hebrew headwords.
+Greek editions use LTR scripture and explicitly delimited Gentium Plus headwords,
+with the same measured page-local apparatus. Font files and notices are bundled
+for offline rebuilding. See [Greek sources](greek-sources.md) for supported
+editions, glyph coverage, and source limitations.
 
 ```sh
 bash scripts/bootstrap.sh
