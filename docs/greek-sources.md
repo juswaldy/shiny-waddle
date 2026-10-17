@@ -114,6 +114,11 @@ locally imported Greek corpus without network access with:
 .venv/bin/python scripts/audit_greek_sources.py
 ```
 
+Only installed book artifacts are audited. NT-only, Rahlfs-only, and mixed
+installations are supported; each corpus's lexical mapping is loaded only when
+an installed book needs it. Missing book artifacts are skipped. Corrupt installed
+books or required lexical inputs still fail checksum verification.
+
 The 2026-10-16 complete pinned-source audit found:
 
 | Corpus | Book/witness records | Verse rows | Words | Single-entry links | Ambiguous links | Unmatched links |

@@ -5,7 +5,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from bible_reader.sources import catalog, load_book, load_lexicon, token_keys
+from bible_reader.sources import book_artifact, catalog, load_book, load_lexicon, token_keys
 
 
 def main():
@@ -14,13 +14,15 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("build/greek-source-audit.json"))
     args = parser.parse_args()
     info = catalog()["greek"]
-    mappings = {
-        source: load_lexicon(args.state, book)[1]
-        for source, book in [("sblgnt", "John"), ("rahlfs", "LXXGen")]
-    }
+    mappings = {}
     report = {"books": {}, "totals": Counter()}
     for code, selected in info["books"].items():
+        if not book_artifact(args.state, code)[0].exists():
+            continue
         verses = load_book(args.state, code)
+        source = selected["source"]
+        if source not in mappings:
+            mappings[source] = load_lexicon(args.state, code)[1]
         words = sum(t.kind == "word" for v in verses for t in v.tokens)
         if (len(verses), words) != (selected["verse_count"], selected["word_count"]):
             raise RuntimeError(f"Pinned counts changed: {code}")
@@ -33,7 +35,7 @@ def main():
                 if token.language != "grc":
                     raise RuntimeError(f"Lost Greek language: {token.id}")
                 for key in token_keys(token):
-                    candidates = mappings[selected["source"]].get(key, [])
+                    candidates = mappings[source].get(key, [])
                     coverage[
                         "resolved" if len(candidates) == 1 else "ambiguous" if candidates else "unmatched"
                     ] += 1
