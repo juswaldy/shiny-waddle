@@ -54,3 +54,6 @@
 .word-color-row { display: flex; align-items: center; gap: 8px; }
 .word-color-row select { flex: 1; min-width: 0; }
 .word-color-row input[type="color"] { width: 38px; height: 38px; padding: 3px; flex-shrink: 0; }
+
+@font-face{font-family:GentiumPlus;src:url('/font/greek.ttf')}
+.help-word[lang=el],.headword[lang=el],.book-word[lang=el],.verse-context-text[lang=el]{font-family:GentiumPlus,serif;text-align:left}

@@ -20,7 +20,7 @@ from ..book_helps import MAX_HELP_FILE_BYTES, BookHelps, load_book_helps, save_b
 from ..editorial import edit_decision, edit_decisions
 from ..models import Decision, ProjectConfig, ReaderError, StrictModel
 from ..service import doctor, inspect_project
-from ..sources import catalog
+from ..sources import book_artifact, catalog
 from ..store import Store
 from ..tex import font_path
 from ..word_classes import WORD_CLASS_COLORS
@@ -123,6 +123,10 @@ def create_app(state: Path | None = None, *, start_worker=True):
     def font():
         return FileResponse(font_path("Ezra SIL"), media_type="font/ttf")
 
+    @app.get("/font/greek.ttf")
+    def greek_font():
+        return FileResponse(font_path("Gentium Plus"), media_type="font/ttf")
+
     @app.get("/api/health")
     def health():
         return {"status": "ok", "version": "0.2.0"}
@@ -136,9 +140,13 @@ def create_app(state: Path | None = None, *, start_worker=True):
         info = catalog()
         return {
             "books": info["books"],
-            "attributions": info["attributions"],
-            "installed": [code for code in info["books"] if (state / "raw" / f"{code}.xml").is_file()],
+            "attributions": info["attributions"]
+            + info["greek"]["attributions"]
+            + [n for layer in info["greek"]["layers"].values() for n in layer["attributions"]],
+            "installed": [code for code in info["books"] if book_artifact(state, code)[0].is_file()],
             "lexicon": (state / "raw/TBESH.txt").is_file(),
+            "greek_lexicon": (state / "raw/greek/TBESG.txt").is_file(),
+            "greek_terms": info["greek"]["layers"],
             "revisions": {"oshb": info["oshb_revision"], "step": info["step_revision"]},
         }
 
