@@ -131,7 +131,7 @@ def test_ambiguity_requires_choice_or_explicit_exclusion(source_state, monkeypat
     other = replace(original, id="step:test-alternative", gloss="Synthetic alternate")
     entries[other.id] = other
     crosswalk[selected["lemma"]] = [original.id, other.id]
-    monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
+    monkeypatch.setattr(editorial, "load_lexicon", lambda _, book="Prov": (entries, crosswalk))
     config = ProjectConfig()
     doc = build_document(source_state, config)
     with pytest.raises(ReaderError, match="unresolved"):
@@ -148,7 +148,7 @@ def test_missing_mapping_stays_unmatched(source_state, monkeypatch):
     row = next(r for r in build_document(source_state, ProjectConfig()).review if r["selected"])
     crosswalk.pop(row["lemma"])
     crosswalk.pop(row["lemma"][:5], None)
-    monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
+    monkeypatch.setattr(editorial, "load_lexicon", lambda _, book="Prov": (entries, crosswalk))
     document = build_document(source_state, ProjectConfig())
     assert any(r["status"] == "unmatched" and r["selected"] for r in document.review)
     with pytest.raises(ReaderError, match="unresolved"):
@@ -242,7 +242,7 @@ def test_single_base_id_candidate_still_requires_review(source_state, monkeypatc
         for v in book
     ]
     monkeypatch.setattr(editorial, "load_book", lambda *_: modified)
-    monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
+    monkeypatch.setattr(editorial, "load_lexicon", lambda _, book="Prov": (entries, crosswalk))
     document = build_document(source_state, ProjectConfig())
     candidate = next(r for r in document.review if r["anchor"] == row["anchor"])
     assert candidate["candidates"]

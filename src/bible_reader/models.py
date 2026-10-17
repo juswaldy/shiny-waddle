@@ -107,8 +107,8 @@ class ProjectConfig(StrictModel):
 
     @field_validator("passage")
     @classmethod
-    def passage_format(cls, value):
-        parse_passage(value)
+    def passage_format(cls, value, info):
+        parse_passage(value, allow_zero=info.data.get("book", "Prov").startswith("LXX"))
         return value
 
     @model_validator(mode="after")
@@ -118,13 +118,17 @@ class ProjectConfig(StrictModel):
         return self
 
 
-def parse_passage(value: str) -> tuple[tuple[int, int], tuple[int, int]]:
-    match = re.fullmatch(r"([1-9]\d{0,2}):([1-9]\d{0,2})(?:[-–](?:([1-9]\d{0,2}):)?([1-9]\d{0,2}))?", value)
+def parse_passage(value: str, *, allow_zero=False) -> tuple[tuple[int, int], tuple[int, int]]:
+    match = re.fullmatch(
+        r"(0|[1-9]\d{0,2}):(0|[1-9]\d{0,2})(?:[-–](?:(0|[1-9]\d{0,2}):)?(0|[1-9]\d{0,2}))?", value
+    )
     if not match:
         raise ValueError("Use a passage such as 1:29-2:12 or 2:1-12")
     chapter, verse, last_chapter, last_verse = match.groups()
     start = (int(chapter), int(verse))
     end = (int(last_chapter or chapter), int(last_verse or verse))
+    if not allow_zero and 0 in (*start, *end):
+        raise ValueError("Chapter and verse numbers start at one for this edition")
     if end < start:
         raise ValueError("Passage end must follow its start")
     return start, end

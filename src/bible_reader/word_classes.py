@@ -45,8 +45,28 @@ WORD_CLASS_COLORS = {
 }
 
 
-def word_class(morphology: str) -> str | None:
+def word_class(morphology: str, language: str = "hbo") -> str | None:
     """Color an orthographic word by its main component; unknown/compound stays plain."""
+    if language == "grc":
+        if morphology.startswith("lxx."):
+            pos = morphology[4:].split(".", 1)[0]
+        else:
+            pos = morphology.split(" ", 1)[0].rstrip("-")
+        return {
+            "N": "noun",
+            "V": "verb",
+            "A": "adjective",
+            "D": "adverb",
+            "P": "preposition",
+            "C": "conjunction",
+            "X": "particle",
+            "I": "particle",
+            "RA": "particle",
+            "RD": "pronoun",
+            "RI": "pronoun",
+            "RP": "pronoun",
+            "RR": "pronoun",
+        }.get(pos)
     if not morphology.startswith(("H", "A")):
         return None
     components = morphology[1:].split("/")

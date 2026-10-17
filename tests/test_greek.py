@@ -1,13 +1,81 @@
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
+from bible_reader import editorial, sources, tex
+from bible_reader.book_helps import load_book_helps, save_book_helps
 from bible_reader.greek import morphgnt_crosswalk, parse_morphgnt, parse_rahlfs, parse_tbesg
-from bible_reader.models import ReaderError
+from bible_reader.models import Decision, ProjectConfig, ReaderError
 
 FIXTURES = Path(__file__).parent / "fixtures/greek"
+
+
+@pytest.fixture
+def greek_state(tmp_path, monkeypatch):
+    state = tmp_path / "state"
+    raw = state / "raw/greek"
+    raw.mkdir(parents=True)
+    info = sources.catalog()
+    for name in ["TBESG.txt", "gntLookups.js", "GreekWordList.js", "LXX-main.csv", "LXX-alternate.csv"]:
+        shutil.copyfile(FIXTURES / name, raw / name)
+    for code, name in [("John", "John.txt"), ("Mark", "Mark16.txt")]:
+        shutil.copyfile(FIXTURES / name, raw / info["books"][code]["artifact"]["filename"])
+    for selected in info["books"].values():
+        if selected.get("language") != "grc":
+            continue
+        asset = selected["artifact"]
+        path = raw / asset["filename"]
+        if path.exists():
+            asset["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    for asset in [info["greek"]["lexicon"], *info["greek"]["crosswalk"]["assets"]]:
+        asset["sha256"] = hashlib.sha256((raw / asset["filename"]).read_bytes()).hexdigest()
+    for module in [sources, editorial, tex]:
+        monkeypatch.setattr(module, "catalog", lambda: info)
+    return state
+
+
+def test_greek_projects_align_offline_preserve_surfaces_and_round_trip_helps(greek_state):
+    config = ProjectConfig(book="John", passage="1:1-18", selection="all")
+    document = editorial.build_document(greek_state, config)
+    assert document.sources["language"] == "grc" and document.sources["direction"] == "ltr"
+    assert len(document.review) == sum(t["kind"] == "word" for v in document.verses for t in v["tokens"])
+    assert all(t["surface"] == t["source_surface"] for v in document.verses for t in v["tokens"])
+    assert any(row["name_excluded"] for row in document.review)
+    assert all(row["entry_id"].startswith("step-greek:") for row in document.review if row["entry_id"])
+    row = next(r for r in document.review if r["selected"] and r["entry_id"])
+    config, result = editorial.edit_decision(
+        greek_state,
+        config,
+        row["anchor"],
+        Decision(entry_id=row["entry_id"], gloss="Editorial Greek gloss"),
+        "book",
+    )
+    assert row["anchor"] in result["applied"]
+    saved = save_book_helps(greek_state, config)
+    assert saved.sources.text_source == "sblgnt" and saved.sources.crosswalk_sha256
+    assert load_book_helps(greek_state, config, saved) == config
+    config.cantillation = "consonants-only"
+    assert [
+        t["surface"] for v in editorial.build_document(greek_state, config).verses for t in v["tokens"]
+    ] == [t["surface"] for v in document.verses for t in v["tokens"]]
+
+
+def test_lxx_missing_lexical_links_stay_explicit_and_verse_zero_is_addressable(greek_state):
+    config = ProjectConfig(book="LXXGen", passage="1:1-2", selection="all")
+    document = editorial.build_document(greek_state, config)
+    missing = next(r for r in document.review if r["surface"] == "ἀκατασκεύαστος")
+    assert missing["status"] == "unmatched" and missing["selected"] and not missing["candidates"]
+    with pytest.raises(ReaderError, match="unresolved"):
+        editorial.require_resolved(document)
+    odes = editorial.build_document(greek_state, ProjectConfig(book="LXXOd", passage="1:0", selection="all"))
+    assert odes.verses[0]["verse"] == 0
+    assert "MyBible" in document.sources["text"]["versification"]
+    with pytest.raises(ReaderError, match="checksum"):
+        (greek_state / "raw/greek/TBESG.txt").write_text("changed")
+        editorial.build_document(greek_state, config)
 
 
 def test_greek_fixtures_are_attributable_and_unchanged():

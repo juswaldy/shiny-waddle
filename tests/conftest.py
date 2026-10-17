@@ -78,7 +78,7 @@ def consonant_review(source_state, monkeypatch):
         ),
     ]
     monkeypatch.setattr(editorial, "load_book", lambda *_: book)
-    monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
+    monkeypatch.setattr(editorial, "load_lexicon", lambda _, book="Prov": (entries, crosswalk))
     return book
 
 
@@ -118,5 +118,5 @@ def name_review(source_state, monkeypatch):
         )
     ]
     monkeypatch.setattr(editorial, "load_book", lambda *_: book)
-    monkeypatch.setattr(editorial, "load_lexicon", lambda _: (entries, crosswalk))
+    monkeypatch.setattr(editorial, "load_lexicon", lambda _, book="Prov": (entries, crosswalk))
     return book

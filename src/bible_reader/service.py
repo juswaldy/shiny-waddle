@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .editorial import build_document, require_resolved
 from .models import ProjectConfig, ReaderError, digest
-from .sources import catalog
+from .sources import book_artifact, catalog
 from .tex import Compiler, engine_path, final_tex, font_path, paginate, preamble, verify_pdf
 
 
@@ -49,11 +49,17 @@ def doctor(state: Path):
             result["fonts"][font] = None
     info = catalog()
     for code, book in info["books"].items():
-        path = state / "raw" / f"{code}.xml"
+        path, asset = book_artifact(state, code)
         installed = path.is_file()
-        verified = installed and hashlib.sha256(path.read_bytes()).hexdigest() == book["sha256"]
+        verified = installed and hashlib.sha256(path.read_bytes()).hexdigest() == asset["sha256"]
         result["sources"].append(
-            {"book": code, "title": book["title"], "installed": installed, "verified": verified}
+            {
+                "book": code,
+                "title": book["title"],
+                "language": book.get("language", "hbo"),
+                "installed": installed,
+                "verified": verified,
+            }
         )
     lex = state / "raw/TBESH.txt"
     result["lexicon"] = (

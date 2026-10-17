@@ -13,11 +13,12 @@ MAX_HELP_FILE_BYTES = 64_000_000
 
 
 class HelpSources(StrictModel):
-    text_source: Literal["oshb"]
+    text_source: Literal["oshb", "sblgnt", "rahlfs"]
     text_revision: str
     text_sha256: str
-    lexicon_source: Literal["step"]
+    lexicon_source: Literal["step", "step-greek"]
     lexicon_revision: str
+    crosswalk_sha256: dict[str, str] = Field(default_factory=dict)
     lexicon_sha256: str
 
 
@@ -34,6 +35,20 @@ def help_sources(book: str) -> HelpSources:
     info = sources.catalog()
     if book not in info["books"]:
         raise ReaderError(f"Unsupported book: {book}")
+    selected = info["books"][book]
+    if selected.get("language") == "grc":
+        greek = info["greek"]
+        return HelpSources(
+            text_source=selected["source"],
+            text_revision=selected["revision"],
+            text_sha256=selected["artifact"]["sha256"],
+            lexicon_source="step-greek",
+            lexicon_revision=greek["lexicon"]["revision"],
+            lexicon_sha256=greek["lexicon"]["sha256"],
+            crosswalk_sha256={a["filename"]: a["sha256"] for a in greek["crosswalk"]["assets"]}
+            if selected["source"] == "sblgnt"
+            else {},
+        )
     return HelpSources(
         text_source="oshb",
         text_revision=info["oshb_revision"],
@@ -51,13 +66,13 @@ def validate_book_helps(state: Path, config: ProjectConfig):
     reader's existing name-omission rule still applies when rendering them.
     """
     book = editorial.load_book(state, config.book)
-    _, crosswalk = editorial.load_lexicon(state)
+    _, crosswalk = editorial.load_lexicon(state, config.book)
     anchors = {
         f"{token.id}:{index}": lemma
         for verse in book
         for token in verse.tokens
         if token.kind == "word"
-        for index, lemma in enumerate(sources.lemma_keys(token.lemma))
+        for index, lemma in enumerate(sources.token_keys(token))
     }
     for anchor, decision in config.decisions.items():
         if anchor not in anchors:
