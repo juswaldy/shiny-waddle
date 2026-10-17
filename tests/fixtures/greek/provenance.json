@@ -1,0 +1,58 @@
+{
+  "catalog": "src/bible_reader/resources/greek-sources.json",
+  "selections": {
+    "John.txt": {
+      "artifact": "64-Jn-morphgnt.txt",
+      "transformation": "Selected complete source rows in original order"
+    },
+    "Mark16.txt": {
+      "artifact": "62-Mk-morphgnt.txt",
+      "transformation": "Selected complete source rows in original order"
+    },
+    "LXX-main.csv": {
+      "artifact": "LXX-main.csv",
+      "transformation": "Selected complete source rows in original file order; no verse sorting"
+    },
+    "LXX-alternate.csv": {
+      "artifact": "LXX-alternate.csv",
+      "transformation": "Selected complete source rows in original file order; no verse sorting"
+    },
+    "gntLookups.js": {
+      "artifact": "gntLookups.js",
+      "transformation": "Subset of exact source keys; word-list definitions excluded"
+    },
+    "GreekWordList.js": {
+      "artifact": "GreekWordList.js",
+      "transformation": "Subset of exact source keys; word-list definitions excluded"
+    },
+    "TBESG.txt": {
+      "artifact": "TBESG.txt",
+      "transformation": "Selected cross-reference rows, metadata/Gloss only; Meaning blanked"
+    },
+    "SBLGNT-README.md": {
+      "artifact": "SBLGNT-README.md",
+      "transformation": "Unmodified upstream notice"
+    },
+    "RAHLFS-README.md": {
+      "artifact": "RAHLFS-README.md",
+      "transformation": "Unmodified upstream notice"
+    },
+    "README.md": {
+      "artifact": "README.md",
+      "transformation": "Unmodified upstream notice"
+    }
+  },
+  "files": {
+    "Mark16.txt": "f8b122e2548df75be783914c2ff9228e477262e86f08acb53dd9cee32aa7c451",
+    "README.md": "3e7f9d9202a4c09f604ba7a79be15df919e9d32901b14b968ded89756bfadf18",
+    "John.txt": "53144b72f17bd3e232694b0cd126dd9ecd0eb51d3e89b1927df6a8b5249bc5b4",
+    "gntLookups.js": "8c126d4f0e19ce425b9b6574fd61687cb7fc8a1f81697c6135f8e8000ef0f196",
+    "RAHLFS-README.md": "a9ea79acfa1b4d4186ec5d254e146672381b51cba401c0975436816bdc14bd3d",
+    "TBESG.txt": "8660f1a84f0423154385a9a89127b58c5217a3cbf537f563995800665b2138b3",
+    "LXX-alternate.csv": "4848323a63af49f8e1a6eb3a8689906715e48d5e0a4c7cd44b8e0c6becae3ecd",
+    "LXX-main.csv": "8fe6af384df8c5c537951a186f4436f1ac6864e624c3047435b1ec1eb8c3b0bc",
+    "SBLGNT-README.md": "043bb6c0d654e85fa8a8db19e177ee035623e23b7ff1556e5431ad95184d5830",
+    "GreekWordList.js": "3f5a2fe426f212b7877bcf9f5a0d4f4b9e934cce6b12489ce30f5b9f52fa6a04"
+  },
+  "terms": "Each source retains its separate upstream terms. Rahlfs fixture CC BY-NC-SA 4.0 with upstream CCAT conditions; selected source rows are not MIT."
+}

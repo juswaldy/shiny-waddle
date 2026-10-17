@@ -140,6 +140,9 @@ class Token:
     reading: str = "normal"
     language: str = "hbo"
     source_xml: str = ""
+    # Non-XML adapters retain the complete original row/unit separately.
+    source_record: str = ""
+    lexical_keys: tuple[str, ...] = ()
 
     def json(self):
         return asdict(self)
