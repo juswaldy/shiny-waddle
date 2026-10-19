@@ -4,7 +4,7 @@ import pytest
 
 from bible_reader.editorial import build_document
 from bible_reader.models import ProjectConfig, ReaderDocument
-from bible_reader.tex import blocks, contents, page_tex, word_tex
+from bible_reader.tex import blocks, contents, page_tex, split_points, split_verse, word_tex
 
 
 @pytest.mark.parametrize(
@@ -52,3 +52,30 @@ def test_color_scope_preserves_markers_readings_punctuation_and_escaping(source_
     assert r"\textcolor" not in word_tex({**token, "word_class": None}, document, "p1")
     document.config["layout"]["word_color_overrides"]["noun"] = "auto"
     assert word_tex(token, document, "p1") == plain
+
+
+def test_verse_fragments_preserve_source_order_and_unbreakable_runs(source_state):
+    document = build_document(source_state, ProjectConfig(passage="1:29"))
+    word = document.verses[0]["tokens"][0]
+    tokens = [
+        {**word, "surface": "א"},
+        {**word, "surface": "־", "kind": "x-maqqef"},
+        {**word, "surface": "ב"},
+        {**word, "surface": "", "kind": "x-sof-pasuq"},
+        {**word, "surface": "ג", "reading": "ketiv"},
+        {**word, "surface": "ד", "reading": "qere"},
+        {**word, "surface": "׃", "kind": "x-sof-pasuq"},
+        {**word, "surface": "ה"},
+    ]
+    verse = {**document.verses[0], "tokens": tokens}
+    assert split_points(verse) == [4, 7]
+    head, tail = split_verse(verse, 4)
+    middle, end = split_verse(tail, 3)
+    assert head["tokens"] + middle["tokens"] + end["tokens"] == tokens
+    assert (head["token_start"], head["token_end"]) == (0, 4)
+    assert (middle["token_start"], middle["token_end"]) == (4, 7)
+    assert (end["token_start"], end["token_end"]) == (7, 8)
+    assert middle["continued"] and end["continued"]
+    scripture, _, _ = contents([[tail]], document, "p2")
+    assert r"\Verse" not in scripture
+    assert verse["tokens"] == tokens and "continued" not in verse

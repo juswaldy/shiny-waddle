@@ -177,10 +177,10 @@ def scripture_macros(layout: dict) -> str:
       \parindent=0pt\leftskip=0pt plus 1fil\rightskip=0pt\parfillskip=0pt
       \noindent\strut #2\par}}%
     \hskip2mm\vtop{{\hsize=4mm\raggedleft\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont\strut #1\par}}%
-  }}\par\vskip2pt
+  }}\par\vskip0.8pt
 }}
 \newcommand{{\ChapterOpen}}[4]{{%
-  \vskip7pt\noindent\hbox to\linewidth{{%
+  \vskip4pt\noindent\hbox to\linewidth{{%
     \vtop{{\hsize=\dimexpr\linewidth-14mm\relax\linewidth=\hsize\vskip0pt
       \Verse{{}}{{#2}}\Verse{{#3}}{{#4}}}}%
     \hskip2mm\vtop{{\hsize=12mm\vskip0pt
@@ -202,7 +202,7 @@ def scripture_macros(layout: dict) -> str:
   \strut\textenglish{{\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont #1}}\nobreak\hspace{{0.35em}}#2%
 }}
 \newcommand{{\ChapterOpen}}[1]{{%
-  \EndScriptureParagraph\vskip7pt\ChapterParagraphtrue\hangindent=-14mm\hangafter=-2\noindent
+  \EndScriptureParagraph\vskip4pt\ChapterParagraphtrue\hangindent=-14mm\hangafter=-2\noindent
   \textenglish{{\makebox[0pt][l]{{\hspace{{2mm}}\smash{{\raisebox{{-2mm}}{{%
     \fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont #1}}}}}}%
   }}}}}}}}%
@@ -224,10 +224,10 @@ def greek_scripture_macros(layout: dict) -> str:
       \setLTR\greekfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
       \parindent=0pt\leftskip=0pt\rightskip=0pt plus 1fil\parfillskip=0pt
       \noindent\strut #2\par}}%
-  }}\par\vskip2pt
+  }}\par\vskip0.8pt
 }}
 \newcommand{{\ChapterOpen}}[4]{{%
-  \vskip7pt\noindent\hbox to\linewidth{{%
+  \vskip4pt\noindent\hbox to\linewidth{{%
     \vtop{{\hsize=12mm\vskip0pt\hbox{{\ChapterBadge{{#1}}}}}}\hskip2mm
     \vtop{{\hsize=\dimexpr\linewidth-14mm\relax\linewidth=\hsize\vskip0pt
       \Verse{{}}{{#2}}\Verse{{#3}}{{#4}}}}%
@@ -252,7 +252,7 @@ def greek_scripture_macros(layout: dict) -> str:
   \strut\textenglish{{\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont #1}}\nobreak\hspace{{0.35em}}#2%
 }}
 \newcommand{{\ChapterOpen}}[1]{{%
-  \EndScriptureParagraph\vskip7pt\ChapterParagraphtrue
+  \EndScriptureParagraph\vskip4pt\ChapterParagraphtrue
   \parshape=3 14mm \dimexpr\linewidth-14mm\relax 14mm \dimexpr\linewidth-14mm\relax 0pt \linewidth
   \noindent\textenglish{{\makebox[0pt][r]{{\smash{{\raisebox{{-2mm}}{{\ChapterBadge{{#1}}}}}}\hspace{{2mm}}}}}}%
 }}
@@ -300,10 +300,10 @@ def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
 {macros}
 \newcommand{{\HelpMarker}}[2]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{7}}{{8}}\selectfont\hyperlink{{#1}}{{#2}}}}}}}}
 \newcommand{{\ReadingMark}}[1]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{6}}{{7}}\selectfont #1}}}}}}
-\newcommand{{\NoteStem}}[1]{{\textenglish{{{{\fontsize{{{layout["notes_pt"] * 0.5}}}{{{layout["notes_pt"] * 1.35}}}\selectfont #1}}}}\enspace}}
-\newcommand{{\Note}}[5]{{\hypertarget{{#1}}{{}}\mbox{{\textsuperscript{{#2}}\{headword_command}{{#3}}}}\nobreak\hspace{{0.2em}}#4#5.\hspace{{0.9em}}}}
-\newcommand{{\Notes}}[1]{{\begingroup\setLTR\fontsize{{{layout["notes_pt"]}}}{{{layout["notes_pt"] * 1.35}}}\selectfont
-  \raggedright\emergencystretch=3em #1\par\endgroup}}
+\newcommand{{\NoteStem}}[1]{{\textenglish{{{{\fontsize{{{layout["notes_pt"] * 0.5}}}{{{layout["notes_pt"] * 1.15}}}\selectfont #1}}}}\hspace{{0.3em}}}}
+\newcommand{{\Note}}[5]{{\hypertarget{{#1}}{{}}\mbox{{\textsuperscript{{#2}}\{headword_command}{{#3}}}}\nobreak\hspace{{0.2em}}#4#5.\hspace{{0.45em plus 0.1em minus 0.1em}}\ignorespaces}}
+\newcommand{{\Notes}}[1]{{\begingroup\setLTR\fontsize{{{layout["notes_pt"]}}}{{{layout["notes_pt"] * 1.15}}}\selectfont
+  \raggedright\lineskip=0.5pt\tolerance=9999\emergencystretch=3em\noindent #1\par\endgroup}}
 \newsavebox{{\BookTitleBox}}
 \newcommand{{\HebrewBookTitle}}[1]{{\texthebrew{{\fontsize{{18}}{{20}}\selectfont #1}}}}
 % Match the English caps to the selected Hebrew font's full title height.
@@ -319,8 +319,8 @@ def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
 \newbox\PageBox
 \newcommand{{\ReaderPage}}[3]{{%
   \Header{{#1}}{{#2}}{{#3}}%
-  \copy\BodyBox\vfil\vskip8pt\hrule height0.35pt\vskip5pt
-  \copy\NotesBox\kern0pt
+  \copy\BodyBox\vskip3pt\hrule height0.35pt\vskip3pt
+  \copy\NotesBox\vfil\kern0pt
 }}
 \newwrite\Metrics
 \begin{{document}}
@@ -377,6 +377,40 @@ def blocks(document: ReaderDocument):
     return result
 
 
+def split_points(verse: dict) -> list[int]:
+    """Legal word boundaries; keep maqaf chains and source reading pairs intact."""
+    tokens = verse["tokens"]
+    result = []
+    previous = None
+    for index, token in enumerate(tokens):
+        if not token["surface"]:
+            continue
+        if (
+            previous is not None
+            and token["kind"] == "word"
+            and previous["kind"] != "x-maqqef"
+            and not (previous["reading"] == "ketiv" and token["reading"] == "qere")
+        ):
+            result.append(index)
+        previous = token
+    return result
+
+
+def split_verse(verse: dict, index: int) -> tuple[dict, dict]:
+    start = verse.get("token_start", 0)
+    end = verse.get("token_end", start + len(verse["tokens"]))
+    return (
+        {**verse, "tokens": verse["tokens"][:index], "token_start": start, "token_end": start + index},
+        {
+            **verse,
+            "tokens": verse["tokens"][index:],
+            "token_start": start + index,
+            "token_end": end,
+            "continued": True,
+        },
+    )
+
+
 def contents(groups: list, document: ReaderDocument, prefix: str):
     scripture = []
     verses = [v for group in groups for v in group]
@@ -398,7 +432,9 @@ def contents(groups: list, document: ReaderDocument, prefix: str):
     else:
         for verse in verses:
             content = verse_content(verse, document, prefix)
-            if verse["verse"] == 1:
+            if verse.get("continued"):
+                scripture.append(content)
+            elif verse["verse"] == 1:
                 scripture.append(rf"\ChapterOpen{{{verse['chapter']}}}" + content)
             else:
                 scripture.append(rf"\Verse{{{verse['verse']}}}{{{content}}}")
@@ -411,7 +447,7 @@ def contents(groups: list, document: ReaderDocument, prefix: str):
     for identity in note_ids:
         note = document.helps[identity]
         if chapter is not None and chapter != note["chapter"]:
-            notes.append(r"\par\vskip7pt\noindent\hspace*{1em}")
+            notes.append(r"\par\vskip3pt\noindent\hspace*{1em}")
         chapter = note["chapter"]
         stem = rf"\NoteStem{{{escape_latex(note['stem'].upper())}}}" if note["stem"] else ""
         headword = "".join(c for c in note["headword"] if not ("\u0591" <= c <= "\u05af"))
@@ -511,12 +547,36 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
             if not metrics[-1].fits:
                 break
         fitting = [i for i, measurement in enumerate(metrics) if measurement.fits]
-        if not fitting:
+        consumed = max(fitting) + 1 if fitting else 0
+        groups = remaining[:consumed]
+        measurement = metrics[consumed - 1] if consumed else None
+        # In continuous mode the next verse may start on the current last line.
+        # Measure its word prefixes with exactly the helps those words require.
+        # Chapter openings remain intact so their badge retains its two lines.
+        if (
+            layout.get("verse_layout", "continuous") == "continuous"
+            and consumed < len(remaining)
+            and len(remaining[consumed]) == 1
+            and remaining[consumed][0]["verse"] != 1
+        ):
+            verse = remaining[consumed][0]
+            splits = [split_verse(verse, point) for point in split_points(verse)]
+            partials = [groups + [[head]] for head, _ in splits]
+            partial_metrics = measure_candidates(compiler, partials, document, folio) if partials else []
+            partial_fitting = [i for i, metric in enumerate(partial_metrics) if metric.fits]
+            if partial_fitting:
+                index = max(partial_fitting)
+                groups = partials[index]
+                measurement = partial_metrics[index]
+                remaining = [[splits[index][1]]] + remaining[consumed + 1 :]
+            else:
+                remaining = remaining[consumed:]
+        else:
+            remaining = remaining[consumed:]
+        if measurement is None:
             raise ReaderError(
                 f"Layout overflow at {remaining[0][0]['reference']}: a verse/opening and its notes cannot fit. Increase page size or shorten reviewed glosses."
             )
-        chosen = max(fitting)
-        groups = candidates[chosen]
         _, _, notes = contents(groups, document, f"p{len(plans) + 1}")
         verses = [v for g in groups for v in g]
         plans.append(
@@ -527,15 +587,14 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
                 "last": verses[-1]["reference"],
                 "references": [v["reference"] for v in verses],
                 "help_ids": notes,
-                "text_height_sp": metrics[chosen].text_height_sp,
-                "notes_height_sp": metrics[chosen].notes_height_sp,
-                "page_height_sp": metrics[chosen].page_height_sp,
-                "usable_height_sp": metrics[chosen].usable_height_sp,
-                "budget_sp": metrics[chosen].budget_sp,
+                "text_height_sp": measurement.text_height_sp,
+                "notes_height_sp": measurement.notes_height_sp,
+                "page_height_sp": measurement.page_height_sp,
+                "usable_height_sp": measurement.usable_height_sp,
+                "budget_sp": measurement.budget_sp,
                 "groups": groups,
             }
         )
-        remaining = remaining[chosen + 1 :]
     return plans
 
 
@@ -674,9 +733,22 @@ def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
     if re.search(r"Overfull \\[hv]box", log):
         raise ReaderError("The PDF has overflowing content; inspect reader.log and adjust the layout.")
     expected = [v["reference"] for v in document.verses]
-    actual = [ref for p in plans for ref in p["references"]]
+    actual = []
+    reconstructed = []
+    for plan in plans:
+        fragments = [verse for group in plan["groups"] for verse in group]
+        if [verse["reference"] for verse in fragments] != plan["references"]:
+            raise ReaderError("Page references do not match their scripture fragments")
+        for verse in fragments:
+            if actual and actual[-1] == verse["reference"]:
+                reconstructed[-1].extend(verse["tokens"])
+            else:
+                actual.append(verse["reference"])
+                reconstructed.append(list(verse["tokens"]))
     if not only and actual != expected:
         raise ReaderError("Page plan lost or duplicated verses")
+    if not only and reconstructed != [verse["tokens"] for verse in document.verses]:
+        raise ReaderError("Page plan lost, duplicated, or reordered source tokens")
     for plan in plans:
         used = {h for g in plan["groups"] for v in g for t in v["tokens"] for h in t["helps"]}
         if used != set(plan["help_ids"]):

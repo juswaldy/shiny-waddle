@@ -207,12 +207,15 @@ Measure this complete assembly with the final page macros and actual selected
 font. Fixed header/separator allowances must not leave usable space unavailable
 to scripture and notes.
 
-**R17 — Breaking rules.** Prefer page breaks between verses. Keep a chapter box
-with its opening group. Keep ordinary short verses and all their notes on one
-page. For an exceptionally tall verse-plus-apparatus unit, fail with an actionable
-layout-overflow report in the first release; never shrink fonts or omit notes
-silently. Later allow explicitly configured splitting with continued verse labels
-and line/anchor-aware note assignment.
+**R17 — Breaking rules.** In continuous mode, use available space before starting
+a new page, including the end of the last line. Split ordinary verses at word
+boundaries as needed, keeping maqaf chains and adjacent ketiv/qere pairs intact.
+Preserve source token offsets for each fragment and repeat its reference in the
+next page's running head; do not repeat its inline verse number. Assign helps
+from the actual words on each page. Keep a chapter box with its opening group.
+In verse-per-line mode, retain whole verse blocks. If an indivisible block and its
+helps cannot fit, fail with an actionable overflow report; never shrink fonts or
+omit notes silently.
 
 **R18 — Header and whitespace.** Derive the running reference from the first and
 last visible verse on that page, not the full requested passage. Keep book title
@@ -220,9 +223,11 @@ centered geometrically, in Hebrew on odd printed folios and English on even prin
 folios. Hebrew titles use 18 pt. English titles use true small capitals with taller
 title initials, scaled to match the full height of the same book's Hebrew title.
 The alternation follows `layout.first_folio`, rather than the export's page
-index. Use a page-local, full-width apparatus separator. Place
-extra vertical space between text and apparatus when bottom-aligning the notes;
-do not stretch Hebrew baselines to fill the page.
+index. Use a page-local, full-width apparatus separator with a small fixed gap
+above and below it. Helps follow scripture directly, including on sparse final
+pages; leave unused space below the apparatus. Keep note leading, entry gaps,
+and chapter-group spacing compact without colliding pointed glyphs. Do not
+stretch Hebrew baselines to fill the page.
 
 ## 6. First proof profile
 

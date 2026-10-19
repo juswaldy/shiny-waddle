@@ -234,7 +234,7 @@ def test_real_pdf_pagination_links_fonts_and_portable_bundle(
         assert float(page.mediabox.height) * 25.4 / 72 == pytest.approx(height, abs=0.01)
     plans = json.loads((output / "page-plan.json").read_text())
     assert [p["folio"] for p in plans] == list(range(1329, 1329 + pages))
-    assert sum(len(p["references"]) for p in plans) == 17
+    assert len({ref for p in plans for ref in p["references"]}) == 17
     assert all(p["text_height_sp"] + p["notes_height_sp"] <= p["budget_sp"] for p in plans)
     assert all(p["page_height_sp"] <= p["usable_height_sp"] for p in plans)
     if paper == "reference":
@@ -410,6 +410,70 @@ def test_many_short_run_in_verses_fill_a_page(source_state, tmp_path, tex_availa
     assert len(plans[0]["references"]) == 60
     log = compiler.compile("reader", final_tex(document, plans), passes=2)
     assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 60
+
+
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+def test_run_in_verse_uses_available_space_and_continues_with_local_helps(
+    request, tmp_path, tex_available, language
+):
+    state = request.getfixturevalue("greek_state" if language == "grc" else "source_state")
+    config = (
+        ProjectConfig(book="John", passage="1:1-18", selection="all")
+        if language == "grc"
+        else ProjectConfig()
+    )
+    document = build_document(state, config)
+    # Synthetic repetition tests pagination only; it is not a source passage.
+    token = max(
+        (t for v in document.verses for t in v["tokens"] if t["helps"]),
+        key=lambda t: len(t["surface"]),
+    )
+    book = config.book
+    document.verses = [
+        {"reference": f"{book}.1.2", "chapter": 1, "verse": 2, "tokens": [{**token, "helps": []}]},
+        {"reference": f"{book}.1.3", "chapter": 1, "verse": 3, "tokens": [token] * 80},
+    ]
+    compiler = Compiler(tmp_path / "split-verse", "Ezra SIL", greek=language == "grc")
+    plans = paginate(document, compiler)
+    assert len(plans) >= 2
+    assert plans[0]["references"] == [f"{book}.1.2", f"{book}.1.3"]
+    assert plans[1]["first"] == f"{book}.1.3"
+    assert plans[1]["groups"][0][0]["continued"]
+    fragments = [v for p in plans for g in p["groups"] for v in g if v["verse"] == 3]
+    assert [t for v in fragments for t in v["tokens"]] == document.verses[1]["tokens"]
+    assert all(p["page_height_sp"] <= p["usable_height_sp"] for p in plans)
+    log = compiler.compile("reader", final_tex(document, plans), passes=2)
+    assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 2
+    pdf = PdfReader(compiler.directory / "reader.pdf")
+    digits = {}
+
+    def collect_digits(text, cm, tm, font, size):
+        if 10.5 < size < 11.5 and text.strip() in {"2", "3"}:
+            digits[text.strip()] = cm[1] * tm[4] + cm[3] * tm[5] + cm[5]
+
+    pdf.pages[0].extract_text(visitor_text=collect_digits)
+    assert set(digits) == {"2", "3"}
+    assert digits["2"] == pytest.approx(digits["3"], abs=0.1)
+    assert all(p["help_ids"] == token["helps"] for p in plans)
+    # Even a sparse final page has the same small text-to-apparatus gap.
+    for page_index, page in enumerate(pdf.pages[: len(plans)], 1):
+        baseline = []
+
+        def collect_scripture(text, cm, tm, font, size, baseline=baseline):
+            if text.strip() and size == pytest.approx(config.layout.body_pt * 72 / 72.27, abs=0.01):
+                baseline.append(cm[1] * tm[4] + cm[3] * tm[5] + cm[5])
+
+        page.extract_text(visitor_text=collect_scripture)
+        assert baseline
+        # Destinations measure the actual first help baseline beneath the text.
+        destination = next(
+            dest for name, dest in pdf.named_destinations.items() if name.startswith(f"p{page_index}-")
+        )
+        assert 0 < min(baseline) - float(destination.top) < 25
+    corrupted = json.loads(json.dumps(plans))
+    corrupted[1]["groups"][0][0]["tokens"].pop()
+    with pytest.raises(ReaderError, match="source tokens"):
+        verify_pdf(compiler.directory / "reader.pdf", corrupted, document, log)
 
 
 @pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])

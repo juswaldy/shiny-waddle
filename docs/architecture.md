@@ -206,12 +206,16 @@ scripture. CLI `--lexicon-only` / `--no-lexicon-only` override the saved mode.
 `ReaderDocument` version 2 contains resolved config, ordered verses/tokens, referenced
 helps, review rows, chapter registry, source lock, and warnings. The source lock
 contains actual artifact hashes and upstream revisions. `page-plan.json` contains
-verse blocks, first/last references, folios, measured heights in TeX scaled points,
+verse blocks/fragments, first/last references, folios, measured heights in TeX scaled points,
 and unique help IDs per page. Each candidate's complete page height includes its
 actual running head and separator spacing, measured using the same box assembly
 as final output. Fit is checked against TeX's usable text height; there is no fixed
 header allowance. Final TeX uses exactly those boxes, blocks, and page breaks.
-Verse blocks are pagination units. `layout.verse_layout` selects continuous
+Continuous mode can split ordinary verses at legal word boundaries, recording
+`token_start`, `token_end` (exclusive), and `continued` on fragments. References
+can span successive pages; validation reconstructs every source verse's exact
+ordered tokens and checks each page's marker destinations. Whole chapter openings
+and separate-verse blocks remain indivisible. `layout.verse_layout` selects continuous
 justified RTL paragraphs with inline verse numbers, or separately started,
 right-aligned verse paragraphs with a number gutter. Chapter boxes reserve the
 first two lines in continuous mode and the first two verses in verse-per-line mode.

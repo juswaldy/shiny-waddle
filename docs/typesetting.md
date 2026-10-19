@@ -34,7 +34,7 @@ The app's **Paper size** selector offers these profiles. Custom requires both
 `layout.paper_width_mm` and `layout.paper_height_mm`, each a finite number from
 21 to 1000 mm. Dimensions may include decimals and may specify landscape paper.
 The same dimensions govern TeX measurement, page budgets, and final PDF geometry;
-an atomic verse/opening that cannot fit still reports a layout overflow.
+an indivisible word/help or chapter opening that cannot fit still reports a layout overflow.
 Omitted paper settings use `reader`; an explicitly selected profile keeps its size.
 `examples/reference.project.json` explicitly selects the larger reference proof.
 
@@ -71,15 +71,22 @@ Continuous scripture flows in justified RTL paragraphs with inline LTR verse
 numbers, as in `bereshit002.jpg`. Numbers stay with the first word of their verse.
 Chapter openings start a new paragraph; its first two lines share an inset beside
 a double chapter box, then the text returns to full width. The first two verses
-remain one page-planning unit. A passage containing only verse 1 keeps its chapter
+remain one page-planning unit. Other continuous verses may split at word boundaries
+to fill the current page, including available space on its last line. Each fragment
+retains its source reference and token offsets in the page plan; continuation text
+does not repeat the inline verse number. Maqaf chains and adjacent ketiv/qere pairs
+stay together, and each page includes only its own words' helps.
+A passage containing only verse 1 keeps its chapter
 marker and reserves at least two lines for the box. Candidate measurement windows
 extend when more short verses fit, since several verses may share a line.
 In `verse-per-line` mode each verse starts its own right-aligned RTL paragraph
 with an LTR digit in a right-side gutter; longer verses wrap without repeating
 the number. The first two verses share the chapter-box inset, as in `mishle002.jpg`.
 Both measurement and final rendering use the selected mode. The final page may be
-sparse: there is no global paragraph/page balancing pass. Notes align at the page
-bottom with flexible whitespace above them.
+sparse: there is no global paragraph/page balancing pass. The apparatus follows
+scripture directly, with 3 pt on either side of its separator; unused space stays
+below the helps. Run-in notes use 1.15-times-size leading (with at least 0.5 pt
+between tall line boxes), 0.45 em entry gaps, and a 3 pt chapter-group gap.
 
 General labels come from the full relevant chapter registry. The reference map
 supplies the sample's chapter-1 labels 90–104 and chapter-2 labels 1–22, including
@@ -129,7 +136,7 @@ Folios start at the saved first folio. `--emit tex` supports both lexicon modes.
 The compiler uses an argument list, no shell escape, restricted TeX file access,
 unique output directories, captured logs, cancellation, and a 90-second timeout
 per invocation. It compiles final TeX twice. Measurement still requires TeX even
-with `--emit tex`. Oversized atomic verse/opening groups fail explicitly.
+with `--emit tex`. Oversized indivisible word/help or chapter-opening groups fail explicitly.
 
 A successful PDF build checks:
 

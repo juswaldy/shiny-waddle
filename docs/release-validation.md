@@ -231,3 +231,33 @@ excluded. The extracted wheel built the John example successfully at
 `build/greek-wheel-smoke-proof/`, including the font/license/source-notice bundle.
 `doctor` verifies the NT crosswalk as well as text and lexicon checksums before
 reporting Greek readiness, and hashes shared LXX artifacts only once per check.
+
+## Compact spacing and verse continuations — 2026-10-19
+
+Helps now follow scripture directly, with 3 pt on either side of the separator
+and unused space below the apparatus. Note leading is 1.15 times the note size;
+entry and chapter-group gaps are smaller, with tall glyph boxes kept apart.
+Continuous pages can include a word-level prefix of the next verse, with source
+token offsets retained and only those words' helps printed on that page.
+Chapter openings, maqaf chains, and adjacent ketiv/qere pairs stay together.
+PDF validation reconstructs exact source token order across continuations.
+
+The default Proverbs proof at `build/reader-20261019-141021-935373/` advances the
+first page's end from 2:8 to 2:9. Its first-page apparatus shrinks from 104.7 pt to
+85.8 pt despite including another verse. Both reader pages were rasterized and
+inspected, including the sparse final page's text-to-help spacing.
+
+The existing Genesis engineering project's final proof at
+`build/spacing-genesis-final/` retains 139 verses and 193 helps over 12 reader
+pages, with nine verse continuations. First pages, a chapter transition, and the
+final page were visually inspected. The saved Greek engineering proof at
+`build/spacing-greek-final/` retains 63 verses and 87 helps over eight reader
+pages, plus the lexicon and credits. Inspection covered dense notes, continued
+verses, and the chapter 1/2 boundary. Both proofs pass same-page marker links,
+source-token coverage, embedded fonts, and overflow/missing-glyph checks. Their
+existing editorial decisions remain engineering-proof inputs.
+
+`make check` passes **297 tests and 8 subtests**, with 17 opt-in browser checks
+skipped. New regressions cover Hebrew and Greek verse continuations, same-line
+verse starts, compact apparatus placement on every page, exact source-token
+coverage, and intact maqaf/K/Q boundaries. `make demo` and `make pdf` pass.
