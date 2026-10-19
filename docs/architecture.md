@@ -214,8 +214,11 @@ header allowance. Final TeX uses exactly those boxes, blocks, and page breaks.
 Continuous mode can split ordinary verses at legal word boundaries, recording
 `token_start`, `token_end` (exclusive), and `continued` on fragments. References
 can span successive pages; validation reconstructs every source verse's exact
-ordered tokens and checks each page's marker destinations. Whole chapter openings
-and separate-verse blocks remain indivisible. `layout.verse_layout` selects continuous
+ordered tokens and checks each page's marker destinations. Continuous chapter
+openings can split once TeX measures at least two actual text lines beside the
+badge; `chapter_lines` records that measurement for the last paragraph on a page
+(zero for a paragraph without a chapter opening). Separate-verse blocks remain
+indivisible. `layout.verse_layout` selects continuous
 justified RTL paragraphs with inline verse numbers, or separately started,
 right-aligned verse paragraphs with a number gutter. Chapter boxes reserve the
 first two lines in continuous mode and the first two verses in verse-per-line mode.

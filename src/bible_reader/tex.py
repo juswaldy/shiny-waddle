@@ -36,6 +36,7 @@ class PageMeasurement:
     notes_height_sp: int
     page_height_sp: int
     usable_height_sp: int
+    chapter_lines: int = 0
 
     @property
     def fits(self):
@@ -190,13 +191,16 @@ def scripture_macros(layout: dict) -> str:
 """
     return rf"""\newif\ifChapterParagraph
 \newcommand{{\EndScriptureParagraph}}{{%
-  \par\ifChapterParagraph\ifnum\prevgraf<2\vskip{layout["leading_pt"]}pt\fi\fi
+  \par\global\ChapterLines=0
+  \ifChapterParagraph\global\ChapterLines=\prevgraf
+    \ifnum\prevgraf<2\vskip{layout["leading_pt"]}pt\fi\fi
   \ChapterParagraphfalse
 }}
-\newcommand{{\Scripture}}[1]{{\begingroup
+\newcommand{{\Scripture}}[2][0]{{\begingroup
   \setRTL\hebrewfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
   \parindent=0pt\leftskip=0pt\rightskip=0pt\parfillskip=0pt plus 1fil
-  \tolerance=9999\emergencystretch=3em\noindent #1\EndScriptureParagraph\endgroup
+  \tolerance=9999\emergencystretch=3em\noindent #2%
+  \ifnum#1=1\parfillskip=0pt\fi\EndScriptureParagraph\endgroup
 }}
 \newcommand{{\Verse}}[2]{{%
   \strut\textenglish{{\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont #1}}\nobreak\hspace{{0.35em}}#2%
@@ -240,13 +244,16 @@ def greek_scripture_macros(layout: dict) -> str:
         + rf"""
 \newif\ifChapterParagraph
 \newcommand{{\EndScriptureParagraph}}{{%
-  \par\ifChapterParagraph\ifnum\prevgraf<2\vskip{layout["leading_pt"]}pt\fi\fi
+  \par\global\ChapterLines=0
+  \ifChapterParagraph\global\ChapterLines=\prevgraf
+    \ifnum\prevgraf<2\vskip{layout["leading_pt"]}pt\fi\fi
   \ChapterParagraphfalse\parshape=0
 }}
-\newcommand{{\Scripture}}[1]{{\begingroup
+\newcommand{{\Scripture}}[2][0]{{\begingroup
   \setLTR\greekfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
   \parindent=0pt\leftskip=0pt\rightskip=0pt\parfillskip=0pt plus 1fil
-  \tolerance=9999\emergencystretch=3em\noindent #1\EndScriptureParagraph\endgroup
+  \tolerance=9999\emergencystretch=3em\noindent #2%
+  \ifnum#1=1\parfillskip=0pt\fi\EndScriptureParagraph\endgroup
 }}
 \newcommand{{\Verse}}[2]{{%
   \strut\textenglish{{\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont #1}}\nobreak\hspace{{0.35em}}#2%
@@ -319,10 +326,11 @@ def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
 \newbox\PageBox
 \newcommand{{\ReaderPage}}[3]{{%
   \Header{{#1}}{{#2}}{{#3}}%
-  \copy\BodyBox\vskip3pt\hrule height0.35pt\vskip3pt
+  \copy\BodyBox\vskip9pt\hrule height0.35pt\vskip3pt
   \copy\NotesBox\vfil\kern0pt
 }}
 \newwrite\Metrics
+\newcount\ChapterLines
 \begin{{document}}
 """
 
@@ -411,6 +419,30 @@ def split_verse(verse: dict, index: int) -> tuple[dict, dict]:
     )
 
 
+def split_group(group: list[dict]) -> list[tuple[list[dict], list[dict]]]:
+    """Prefixes of a verse or chapter opening, retaining all source fragments."""
+    result = []
+    for index, verse in enumerate(group):
+        if index:
+            result.append((group[:index], group[index:]))
+        for point in split_points(verse):
+            head, tail = split_verse(verse, point)
+            result.append((group[:index] + [head], [tail] + group[index + 1 :]))
+    return result
+
+
+def continues_chapter(groups: list, document: ReaderDocument) -> bool:
+    last = groups[-1][-1]
+    for index, verse in enumerate(document.verses):
+        if verse["reference"] == last["reference"]:
+            if last.get("token_end", len(last["tokens"])) < len(verse["tokens"]):
+                return True
+            return (
+                index + 1 < len(document.verses) and document.verses[index + 1]["chapter"] == last["chapter"]
+            )
+    raise ReaderError("Page fragment has an unknown source reference")
+
+
 def contents(groups: list, document: ReaderDocument, prefix: str):
     scripture = []
     verses = [v for group in groups for v in group]
@@ -462,7 +494,9 @@ def contents(groups: list, document: ReaderDocument, prefix: str):
             + escape_latex(gloss)
             + "}"
         )
-    return r"\Scripture{" + "\n".join(scripture) + "}", r"\Notes{" + "\n".join(notes) + "}", note_ids
+    run_in = document.config["layout"].get("verse_layout", "continuous") == "continuous"
+    command = r"\Scripture[1]{" if run_in and continues_chapter(groups, document) else r"\Scripture{"
+    return command + "\n".join(scripture) + "}", r"\Notes{" + "\n".join(notes) + "}", note_ids
 
 
 def page_tex(groups: list, document: ReaderDocument, prefix: str, folio: int):
@@ -506,17 +540,17 @@ def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDoc
             [
                 boxes,
                 r"\setbox\PageBox=\vbox{\hsize=\linewidth " + page + "}",
-                rf"\immediate\write\Metrics{{{index}|\number\dimexpr\ht\BodyBox+\dp\BodyBox\relax|\number\dimexpr\ht\NotesBox+\dp\NotesBox\relax|\number\dimexpr\ht\PageBox+\dp\PageBox\relax|\number\textheight}}",
+                rf"\immediate\write\Metrics{{{index}|\number\dimexpr\ht\BodyBox+\dp\BodyBox\relax|\number\dimexpr\ht\NotesBox+\dp\NotesBox\relax|\number\dimexpr\ht\PageBox+\dp\PageBox\relax|\number\textheight|\number\ChapterLines}}",
             ]
         )
     body.extend([r"\immediate\closeout\Metrics", r"\end{document}"])
     compiler.compile("measure", "\n".join(body))
     result = []
     for line in (compiler.directory / "measure.metrics").read_text().splitlines():
-        index, scripture, notes, page, usable = map(int, line.split("|"))
+        index, scripture, notes, page, usable, chapter_lines = map(int, line.split("|"))
         if index != len(result):
             raise ReaderError("TeX measurement records are out of order")
-        result.append(PageMeasurement(scripture, notes, page, usable))
+        result.append(PageMeasurement(scripture, notes, page, usable, chapter_lines))
     if len(result) != len(candidates):
         raise ReaderError("Missing TeX measurements")
     return result
@@ -552,23 +586,19 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
         measurement = metrics[consumed - 1] if consumed else None
         # In continuous mode the next verse may start on the current last line.
         # Measure its word prefixes with exactly the helps those words require.
-        # Chapter openings remain intact so their badge retains its two lines.
-        if (
-            layout.get("verse_layout", "continuous") == "continuous"
-            and consumed < len(remaining)
-            and len(remaining[consumed]) == 1
-            and remaining[consumed][0]["verse"] != 1
-        ):
-            verse = remaining[consumed][0]
-            splits = [split_verse(verse, point) for point in split_points(verse)]
-            partials = [groups + [[head]] for head, _ in splits]
+        # An opening can continue after two actual lines beside its badge.
+        if layout.get("verse_layout", "continuous") == "continuous" and consumed < len(remaining):
+            splits = split_group(remaining[consumed])
+            partials = [groups + [head] for head, _ in splits]
             partial_metrics = measure_candidates(compiler, partials, document, folio) if partials else []
-            partial_fitting = [i for i, metric in enumerate(partial_metrics) if metric.fits]
+            partial_fitting = [
+                i for i, metric in enumerate(partial_metrics) if metric.fits and metric.chapter_lines != 1
+            ]
             if partial_fitting:
                 index = max(partial_fitting)
                 groups = partials[index]
                 measurement = partial_metrics[index]
-                remaining = [[splits[index][1]]] + remaining[consumed + 1 :]
+                remaining = [splits[index][1]] + remaining[consumed + 1 :]
             else:
                 remaining = remaining[consumed:]
         else:
@@ -592,6 +622,7 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
                 "page_height_sp": measurement.page_height_sp,
                 "usable_height_sp": measurement.usable_height_sp,
                 "budget_sp": measurement.budget_sp,
+                "chapter_lines": measurement.chapter_lines,
                 "groups": groups,
             }
         )

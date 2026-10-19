@@ -288,8 +288,8 @@ review lexical wording before publishing an edition.
 
 The release is a single-user local tool. Remote hosting, user accounts,
 arbitrary uploaded TeX, full-dictionary definitions, and automated scholarly sense
-selection are outside its scope. Indivisible words/helps, chapter openings, or
-separate-verse blocks that cannot fit fail
+selection are outside its scope. A word with its helps, a chapter box with its
+first two lines, or a separate-verse block that cannot fit fails
 with a layout error. See [operations and limits](docs/operations.md).
 
 ## Develop and verify

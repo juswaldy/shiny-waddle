@@ -70,12 +70,15 @@ The `layout.verse_layout` setting chooses `continuous` (default) or
 Continuous scripture flows in justified RTL paragraphs with inline LTR verse
 numbers, as in `bereshit002.jpg`. Numbers stay with the first word of their verse.
 Chapter openings start a new paragraph; its first two lines share an inset beside
-a double chapter box, then the text returns to full width. The first two verses
-remain one page-planning unit. Other continuous verses may split at word boundaries
+a double chapter box, then the text returns to full width. Chapter openings may
+continue onto another page once at least two actual text lines accompany the box.
+Continuous verses may split at word boundaries
 to fill the current page, including available space on its last line. Each fragment
 retains its source reference and token offsets in the page plan; continuation text
 does not repeat the inline verse number. Maqaf chains and adjacent ketiv/qere pairs
-stay together, and each page includes only its own words' helps.
+stay together, and each page includes only its own words' helps. Last lines are
+fully justified when the same chapter continues onto another page; chapter and
+passage endings retain their natural final-line alignment.
 A passage containing only verse 1 keeps its chapter
 marker and reserves at least two lines for the box. Candidate measurement windows
 extend when more short verses fit, since several verses may share a line.
@@ -84,7 +87,8 @@ with an LTR digit in a right-side gutter; longer verses wrap without repeating
 the number. The first two verses share the chapter-box inset, as in `mishle002.jpg`.
 Both measurement and final rendering use the selected mode. The final page may be
 sparse: there is no global paragraph/page balancing pass. The apparatus follows
-scripture directly, with 3 pt on either side of its separator; unused space stays
+scripture directly, with 9 pt above the separator and 3 pt below it. The 9 pt
+scripture gap matches the header rule's gap. Any unusable remainder stays
 below the helps. Run-in notes use 1.15-times-size leading (with at least 0.5 pt
 between tall line boxes), 0.45 em entry gaps, and a 3 pt chapter-group gap.
 

@@ -455,6 +455,7 @@ def test_run_in_verse_uses_available_space_and_continues_with_local_helps(
     assert set(digits) == {"2", "3"}
     assert digits["2"] == pytest.approx(digits["3"], abs=0.1)
     assert all(p["help_ids"] == token["helps"] for p in plans)
+    rendered = pdfium.PdfDocument(compiler.directory / "reader.pdf")
     # Even a sparse final page has the same small text-to-apparatus gap.
     for page_index, page in enumerate(pdf.pages[: len(plans)], 1):
         baseline = []
@@ -469,11 +470,80 @@ def test_run_in_verse_uses_available_space_and_continues_with_local_helps(
         destination = next(
             dest for name, dest in pdf.named_destinations.items() if name.startswith(f"p{page_index}-")
         )
-        assert 0 < min(baseline) - float(destination.top) < 25
+        assert 0 < min(baseline) - float(destination.top) < 32
+        rendered_page = rendered[page_index - 1]
+        rules = []
+        for obj in rendered_page.get_objects():
+            if obj.type != pdfium.raw.FPDF_PAGEOBJ_PATH:
+                continue
+            left, bottom, right, top = obj.get_bounds()
+            if right - left > rendered_page.get_width() * 0.8 and top - bottom < 1:
+                rules.append((bottom + top) / 2)
+        lower, upper = sorted(rules)
+        text_page = rendered_page.get_textpage()
+        body = [
+            text_page.get_charbox(index)
+            for index in range(text_page.count_chars())
+            if text_page.get_text_range(index, 1).strip()
+            and lower < text_page.get_charbox(index)[1] < text_page.get_charbox(index)[3] < upper
+        ]
+        assert 8 < min(box[1] for box in body) - lower < 14
+        if page_index < len(plans):
+            # A continued paragraph fills both physical edges of its last line.
+            last_line = [
+                box
+                for box in body
+                if min(baseline) - config.layout.body_pt * 0.5 < box[1]
+                and box[3] < min(baseline) + config.layout.body_pt
+            ]
+            margin = 10 * 72 / 25.4
+            assert min(box[0] for box in last_line) - margin < 3
+            assert rendered_page.get_width() - margin - max(box[2] for box in last_line) < 3
+        text_page.close()
+        rendered_page.close()
     corrupted = json.loads(json.dumps(plans))
     corrupted[1]["groups"][0][0]["tokens"].pop()
     with pytest.raises(ReaderError, match="source tokens"):
         verify_pdf(compiler.directory / "reader.pdf", corrupted, document, log)
+
+
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+def test_long_chapter_opening_continues_after_two_real_lines(request, tmp_path, tex_available, language):
+    state = request.getfixturevalue("greek_state" if language == "grc" else "source_state")
+    layout = {"body_pt": 26, "leading_pt": 38}
+    config = (
+        ProjectConfig(book="John", passage="1:1-18", selection="all", layout=layout)
+        if language == "grc"
+        else ProjectConfig(layout=layout)
+    )
+    document = build_document(state, config)
+    # Synthetic long opening tests the badge/page boundary, not source content.
+    token = max(
+        (t for v in document.verses if v["chapter"] == 1 for t in v["tokens"] if t["helps"]),
+        key=lambda t: len(t["surface"]),
+    )
+    document.verses = [
+        {"reference": f"{config.book}.1.1", "chapter": 1, "verse": 1, "tokens": [token] * 60},
+        {"reference": f"{config.book}.1.2", "chapter": 1, "verse": 2, "tokens": [token] * 4},
+    ]
+    compiler = Compiler(tmp_path / "opening", "Ezra SIL", greek=language == "grc")
+    plans = paginate(document, compiler)
+    assert len(plans) >= 2
+    assert plans[0]["chapter_lines"] >= 2
+    assert plans[0]["last"] == f"{config.book}.1.1"
+    assert plans[1]["groups"][0][0]["continued"]
+    assert plans[1]["chapter_lines"] == 0
+    log = compiler.compile("reader", final_tex(document, plans), passes=2)
+    assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 2
+    badges = []
+
+    def collect_badges(text, cm, tm, font, size):
+        if size == pytest.approx(25 * 72 / 72.27, abs=0.01) and text.strip():
+            badges.append(text.strip())
+
+    for page in PdfReader(compiler.directory / "reader.pdf").pages[: len(plans)]:
+        page.extract_text(visitor_text=collect_badges)
+    assert badges == ["1"]
 
 
 @pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
