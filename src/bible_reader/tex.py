@@ -556,6 +556,176 @@ def measure_candidates(compiler: Compiler, candidates: list, document: ReaderDoc
     return result
 
 
+def page_plan(groups: list, document: ReaderDocument, measurement: PageMeasurement, page: int, folio: int):
+    _, _, notes = contents(groups, document, f"p{page}")
+    verses = [verse for group in groups for verse in group]
+    return {
+        "page": page,
+        "folio": folio,
+        "first": verses[0]["reference"],
+        "last": verses[-1]["reference"],
+        "references": [verse["reference"] for verse in verses],
+        "help_ids": notes,
+        "text_height_sp": measurement.text_height_sp,
+        "notes_height_sp": measurement.notes_height_sp,
+        "page_height_sp": measurement.page_height_sp,
+        "usable_height_sp": measurement.usable_height_sp,
+        "budget_sp": measurement.budget_sp,
+        "chapter_lines": measurement.chapter_lines,
+        "groups": groups,
+    }
+
+
+def merge_fragments(verses: list[dict]) -> list[list[dict]]:
+    """Rejoin adjacent parts of a source verse when a page boundary moves."""
+    result = []
+    for verse in verses:
+        if result and result[-1]["reference"] == verse["reference"]:
+            previous = result[-1]
+            start = previous.get("token_start", 0)
+            end = start + len(previous["tokens"])
+            if verse.get("token_start", 0) != end:
+                raise ReaderError("Cannot join noncontiguous source verse fragments")
+            result[-1] = {
+                **previous,
+                "tokens": previous["tokens"] + verse["tokens"],
+                "token_start": start,
+                "token_end": end + len(verse["tokens"]),
+            }
+        else:
+            result.append(verse)
+    return [[verse] for verse in result]
+
+
+def page_cuts(groups: list) -> list[tuple[list[dict], list[dict]]]:
+    verses = [verse for group in groups for verse in group]
+    cuts = []
+    for index in range(max(0, len(verses) - 3), len(verses)):
+        verse = verses[index]
+        if index:
+            cuts.append((verses[:index], verses[index:]))
+        for point in split_points(verse):
+            head, tail = split_verse(verse, point)
+            cuts.append((verses[:index] + [head], [tail] + verses[index + 1 :]))
+    return cuts[-40:]
+
+
+def balance_three_pages(document: ReaderDocument, compiler: Compiler, plans: list):
+    """Try a bounded set of two-boundary moves when one move is insufficient."""
+    first, middle, last = plans
+    gaps = [plan["usable_height_sp"] - plan["page_height_sp"] for plan in plans]
+    best_score = (max(gaps), sum(gaps), 0)
+    ceiling = best_score[0] - 65536
+    first_cuts, last_cuts = page_cuts(first["groups"]), page_cuts(middle["groups"])
+    if not first_cuts or not last_cuts:
+        return plans
+    first_groups = [merge_fragments(head) for head, _ in first_cuts]
+    last_verses = [verse for group in last["groups"] for verse in group]
+    last_groups = [merge_fragments(tail + last_verses) for _, tail in last_cuts]
+    first_metrics = measure_candidates(compiler, first_groups, document, first["folio"])
+    last_metrics = measure_candidates(compiler, last_groups, document, last["folio"])
+
+    def options(metrics):
+        legal = [
+            index
+            for index, metric in enumerate(metrics)
+            if metric.fits
+            and metric.chapter_lines != 1
+            and metric.usable_height_sp - metric.page_height_sp <= ceiling
+        ]
+        # Keep representative cuts across the feasible range, at most eight.
+        if len(legal) > 8:
+            return [legal[round(i * (len(legal) - 1) / 7)] for i in range(8)]
+        return legal
+
+    pairs = [(left, right) for left in options(first_metrics) for right in options(last_metrics)]
+    if not pairs:
+        return plans
+    middle_groups = [merge_fragments(first_cuts[left][1] + last_cuts[right][0]) for left, right in pairs]
+    middle_metrics = []
+    for start in range(0, len(pairs), 32):
+        middle_metrics.extend(
+            measure_candidates(compiler, middle_groups[start : start + 32], document, middle["folio"])
+        )
+    chosen = None
+    for index, (left, right) in enumerate(pairs):
+        metric = middle_metrics[index]
+        if not metric.fits or metric.chapter_lines == 1:
+            continue
+        candidate_gaps = [
+            value.usable_height_sp - value.page_height_sp
+            for value in (first_metrics[left], metric, last_metrics[right])
+        ]
+        moved = sum(len(verse["tokens"]) for verse in first_cuts[left][1] + last_cuts[right][1])
+        score = (max(candidate_gaps), sum(candidate_gaps), moved)
+        if score < best_score:
+            best_score, chosen = score, index
+    if chosen is None or max(gaps) - best_score[0] < 65536:
+        return plans
+    left, right = pairs[chosen]
+    return [
+        page_plan(first_groups[left], document, first_metrics[left], first["page"], first["folio"]),
+        page_plan(middle_groups[chosen], document, middle_metrics[chosen], middle["page"], middle["folio"]),
+        page_plan(last_groups[right], document, last_metrics[right], last["page"], last["folio"]),
+    ]
+
+
+def rebalance_pages(document: ReaderDocument, compiler: Compiler, plans: list, progress=lambda _: None):
+    """Reduce chapter-end gaps by moving a bounded amount of preceding text."""
+    layout = document.config["layout"]
+    if layout.get("verse_layout", "continuous") != "continuous":
+        return plans
+    result = list(plans)
+    threshold = layout["leading_pt"] * 1.25 * 65536
+    for index in range(1, len(result) - 1):
+        if compiler.cancelled():
+            raise Cancelled("Build cancelled")
+        previous, current, following = result[index - 1 : index + 2]
+        current_gap = current["usable_height_sp"] - current["page_height_sp"]
+        if (
+            current_gap <= threshold
+            or current["groups"][-1][-1]["chapter"] == following["groups"][0][0]["chapter"]
+        ):
+            continue
+        progress(f"Balancing chapter end on page {current['page']}")
+        after = [verse for group in current["groups"] for verse in group]
+        # Search at most 40 legal cuts in the preceding page's last three verses.
+        cuts = page_cuts(previous["groups"])
+        if not cuts:
+            continue
+        left = [merge_fragments(head) for head, _ in cuts]
+        right = [merge_fragments(tail + after) for _, tail in cuts]
+        left_metrics = measure_candidates(compiler, left, document, previous["folio"])
+        right_metrics = measure_candidates(compiler, right, document, current["folio"])
+        previous_gap = previous["usable_height_sp"] - previous["page_height_sp"]
+        best_score = (max(previous_gap, current_gap), previous_gap + current_gap, 0)
+        chosen = None
+        for candidate, (first, second) in enumerate(zip(left_metrics, right_metrics, strict=True)):
+            if not first.fits or not second.fits or first.chapter_lines == 1 or second.chapter_lines == 1:
+                continue
+            gaps = (
+                first.usable_height_sp - first.page_height_sp,
+                second.usable_height_sp - second.page_height_sp,
+            )
+            moved = sum(len(verse["tokens"]) for verse in cuts[candidate][1])
+            score = (max(gaps), sum(gaps), moved)
+            if score < best_score:
+                best_score, chosen = score, candidate
+        # Avoid changing boundaries for an imperceptible improvement.
+        if chosen is not None and max(previous_gap, current_gap) - best_score[0] >= 65536:
+            result[index - 1] = page_plan(
+                left[chosen], document, left_metrics[chosen], previous["page"], previous["folio"]
+            )
+            result[index] = page_plan(
+                right[chosen], document, right_metrics[chosen], current["page"], current["folio"]
+            )
+        if index >= 2 and best_score[0] > threshold:
+            result[index - 2 : index + 1] = balance_three_pages(
+                document, compiler, result[index - 2 : index + 1]
+            )
+    return result
+
+
 def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: None):
     layout = document.config["layout"]
     _, height, margin = paper_dimensions(layout)
@@ -607,26 +777,8 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
             raise ReaderError(
                 f"Layout overflow at {remaining[0][0]['reference']}: a verse/opening and its notes cannot fit. Increase page size or shorten reviewed glosses."
             )
-        _, _, notes = contents(groups, document, f"p{len(plans) + 1}")
-        verses = [v for g in groups for v in g]
-        plans.append(
-            {
-                "page": len(plans) + 1,
-                "folio": folio,
-                "first": verses[0]["reference"],
-                "last": verses[-1]["reference"],
-                "references": [v["reference"] for v in verses],
-                "help_ids": notes,
-                "text_height_sp": measurement.text_height_sp,
-                "notes_height_sp": measurement.notes_height_sp,
-                "page_height_sp": measurement.page_height_sp,
-                "usable_height_sp": measurement.usable_height_sp,
-                "budget_sp": measurement.budget_sp,
-                "chapter_lines": measurement.chapter_lines,
-                "groups": groups,
-            }
-        )
-    return plans
+        plans.append(page_plan(groups, document, measurement, len(plans) + 1, folio))
+    return rebalance_pages(document, compiler, plans, progress)
 
 
 def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:

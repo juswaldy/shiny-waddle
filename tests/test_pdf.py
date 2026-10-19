@@ -1,3 +1,4 @@
+import copy
 import hashlib
 import json
 import zipfile
@@ -9,7 +10,17 @@ from pypdf import PdfReader
 from bible_reader.editorial import build_document
 from bible_reader.models import Cancelled, Decision, ProjectConfig, ReaderError
 from bible_reader.service import build
-from bible_reader.tex import Compiler, final_tex, paginate, paper_dimensions, verify_pdf
+from bible_reader.tex import (
+    Compiler,
+    final_tex,
+    measure_candidates,
+    page_plan,
+    paginate,
+    paper_dimensions,
+    rebalance_pages,
+    split_verse,
+    verify_pdf,
+)
 from bible_reader.word_classes import word_color
 
 pytestmark = pytest.mark.integration
@@ -544,6 +555,63 @@ def test_long_chapter_opening_continues_after_two_real_lines(request, tmp_path, 
     for page in PdfReader(compiler.directory / "reader.pdf").pages[: len(plans)]:
         page.extract_text(visitor_text=collect_badges)
     assert badges == ["1"]
+
+
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+def test_chapter_end_balance_reflows_preceding_pages_and_reassigns_helps(
+    request, tmp_path, tex_available, language
+):
+    state = request.getfixturevalue("greek_state" if language == "grc" else "source_state")
+    config = (
+        ProjectConfig(book="John", passage="1:1-18", selection="all")
+        if language == "grc"
+        else ProjectConfig()
+    )
+    document = build_document(state, config)
+    tokens = [t for v in document.verses if v["chapter"] == 1 for t in v["tokens"] if t["helps"]]
+    main = min(tokens, key=lambda t: abs(sum(c.isalpha() for c in t["surface"]) - 6))
+    rare = next(t for t in tokens if set(t["helps"]).isdisjoint(main["helps"]))
+    # Synthetic repetition creates an underfilled chapter end with a help on
+    # the preceding page that must move when the two boundaries are adjusted.
+    document.verses = [
+        {
+            "reference": f"{config.book}.1.3",
+            "chapter": 1,
+            "verse": 3,
+            "tokens": [main] * 95 + [rare] + [main] * 36,
+        },
+        {"reference": f"{config.book}.2.1", "chapter": 2, "verse": 1, "tokens": [{**main, "helps": []}] * 18},
+        {"reference": f"{config.book}.2.2", "chapter": 2, "verse": 2, "tokens": [{**main, "helps": []}] * 4},
+    ]
+    source = copy.deepcopy(document.json())
+    first, rest = split_verse(document.verses[0], 48)
+    middle, last = split_verse(rest, 48)
+    pages = [[[first]], [[middle]], [[last]], [document.verses[1:]]]
+    compiler = Compiler(tmp_path / "balanced", "Ezra SIL", greek=language == "grc")
+    original = []
+    for number, groups in enumerate(pages, 1):
+        measurement = measure_candidates(compiler, [groups], document, number)[0]
+        assert measurement.fits
+        original.append(page_plan(groups, document, measurement, number, number))
+    saved = copy.deepcopy(original)
+    balanced = rebalance_pages(document, compiler, original)
+    assert original == saved and document.json() == source
+    assert len(balanced) == len(original)
+    assert balanced[0]["groups"] != original[0]["groups"]
+    assert balanced[-1] == original[-1]
+
+    def largest_gap(plans):
+        return max(p["usable_height_sp"] - p["page_height_sp"] for p in plans[:3])
+
+    assert largest_gap(balanced) < largest_gap(original) - 65536
+    assert set(rare["helps"]) <= set(original[1]["help_ids"])
+    assert set(rare["helps"]).isdisjoint(balanced[1]["help_ids"])
+    assert set(rare["helps"]) <= set(balanced[2]["help_ids"])
+    assert sum(len(v["tokens"]) for g in balanced[2]["groups"] for v in g) > len(last["tokens"])
+    assert all(p["page_height_sp"] <= p["usable_height_sp"] for p in balanced)
+    log = compiler.compile("reader", final_tex(document, balanced), passes=2)
+    result = verify_pdf(compiler.directory / "reader.pdf", balanced, document, log)
+    assert result["verse_count"] == 3 and result["pdf_marker_destinations"] == "verified"
 
 
 @pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])

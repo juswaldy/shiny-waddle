@@ -218,6 +218,9 @@ Preserve source token offsets for each fragment and repeat its reference in the
 next page's running head; do not repeat its inline verse number. Assign helps
 from the actual words on each page. Keep a chapter box with at least two actual
 text lines before continuing its chapter onto another page.
+When the next chapter cannot fit and leaves a large chapter-end gap, remeasure
+the preceding page breaks to distribute text more evenly. Keep the page count,
+type sizes, leading, and chapter-box minimum; move each word's helps with it.
 In verse-per-line mode, retain whole verse blocks. If an indivisible block and its
 helps cannot fit, fail with an actionable overflow report; never shrink fonts or
 omit notes silently.

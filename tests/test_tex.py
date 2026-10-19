@@ -3,8 +3,8 @@ import copy
 import pytest
 
 from bible_reader.editorial import build_document
-from bible_reader.models import ProjectConfig, ReaderDocument
-from bible_reader.tex import blocks, contents, page_tex, split_points, split_verse, word_tex
+from bible_reader.models import ProjectConfig, ReaderDocument, ReaderError
+from bible_reader.tex import blocks, contents, merge_fragments, page_tex, split_points, split_verse, word_tex
 
 
 @pytest.mark.parametrize(
@@ -79,3 +79,22 @@ def test_verse_fragments_preserve_source_order_and_unbreakable_runs(source_state
     scripture, _, _ = contents([[tail]], document, "p2")
     assert r"\Verse" not in scripture
     assert verse["tokens"] == tokens and "continued" not in verse
+
+
+def test_joined_fragments_keep_offsets_readings_and_source_tokens(source_state):
+    document = build_document(source_state, ProjectConfig(passage="1:29"))
+    verse = copy.deepcopy(document.verses[0])
+    first, rest = split_verse(verse, 2)
+    middle, last = split_verse(rest, 2)
+    joined = merge_fragments([first, middle, last])
+    assert len(joined) == 1
+    assert joined[0][0]["tokens"] == verse["tokens"]
+    assert joined[0][0]["token_start"] == 0
+    assert joined[0][0]["token_end"] == len(verse["tokens"])
+    assert not joined[0][0].get("continued")
+    continuation = merge_fragments([middle, last])[0][0]
+    assert continuation["continued"] and continuation["token_start"] == 2
+    assert continuation["tokens"] == verse["tokens"][2:]
+    with pytest.raises(ReaderError, match="noncontiguous"):
+        merge_fragments([first, {**rest, "token_start": 3}])
+    assert document.verses[0] == verse

@@ -226,6 +226,17 @@ Measurements and the final PDF use the same selected construction. Saved project
 and immutable build snapshots retain the choice; omitted settings default to
 continuous through project validation.
 
+After greedy pagination, continuous mode revisits non-final chapter-ending pages
+with more than 1.25 lines of unused height. It measures at most 40 legal cuts in
+the preceding page's last three verses, minimizing the largest unused height
+across the two pages, then total unused height, then moved token count. If that
+leaves a large gap, a three-page fallback considers the preceding two boundaries:
+at most eight feasible cuts per boundary and 64 middle-page combinations, measured
+in batches of 32. A move must improve the largest gap by at least 1 pt. Each
+candidate uses its actual folio, merges contiguous source fragments, recomputes
+page-local helps, and retains the two-line chapter-box minimum. Page count, fonts,
+and leading remain fixed; verse-per-line and final reader pages are unchanged.
+
 `layout.paper` defaults to `reader` (140 × 216 mm). Existing named profiles retain
 their dimensions. Selecting `custom` requires validated `paper_width_mm` and
 `paper_height_mm`; project revisions, immutable build snapshots, and reader JSON

@@ -295,3 +295,40 @@ with 3.17–4.71 before. Audit details remain in
 skipped. New PDF checks cover both languages' long chapter openings, a single
 chapter box across continuations, full last-line width, and the lower rule's
 actual glyph clearance. `make demo` and `make pdf` pass.
+
+## Chapter-end whitespace balancing — 2026-10-19
+
+The supplied `bottom-extra-space.pdf` shows Genesis folios 6, 72, and 77. All
+three end a chapter where its successor's opening and helps cannot fit. The
+planner now remeasures the preceding break, or the preceding two breaks if
+needed, to reduce the largest gap without adding pages or changing type size,
+leading, or chapter-box clearance. Source fragments and their page-local helps
+move together.
+
+Against `build/genesis-spacing-refined/`, the rebuilt proof at
+`build/genesis-balanced/` reduces those three gaps from 47.93 / 29.00 / 40.31 pt
+to 19.01 / 11.42 / 21.31 pt. Across non-final pages the maximum falls from
+47.93 to 21.31 pt and the mean from 8.96 to 7.72 pt. The three-page adjustment
+at folios 4–6 also reduces folio 4's gap from 4.32 to 2.81 pt; folio 5 changes
+from 12.13 to 12.31 pt. No large gap is transferred to its neighbor. The final
+page remains outside this balancing pass.
+
+The normal full-book CLI build preserves the exact reader JSON: all 1,533 verses
+and 2,187 helps across 84 reader pages plus credits. Its page plan and TeX are
+identical to the inspected proof. PDF checks verify source coverage, same-page
+note destinations, embedded fonts, and no overflow or missing glyphs; the final
+comparison is in `build/bottom-space-review/final-validation.json`.
+
+Rasterized review covers the three reported pages, both preceding breaks at
+folios 4–6, the other adjusted endings at 9–10 and 19–20, and the default
+Proverbs chapter transition with dense helps. The
+PDF audit finds no short continuing last lines, and the apparatus rule's ink
+clearance remains 9.15–10.69 PDF points. Measurements and review images remain
+under `build/bottom-space-review/`.
+
+`make check` passes **302 tests and 8 subtests**, with 17 opt-in browser tests
+skipped. Hebrew and Greek PDF regressions require both preceding boundaries to
+move, preserve the exact input document and final page, reassign a help from the
+middle page to the chapter-ending page, and verify all marker destinations.
+The fragment-join unit check retains source offsets and rejects noncontiguous
+fragments. `make demo` and `make pdf` pass.

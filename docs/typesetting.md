@@ -85,8 +85,13 @@ extend when more short verses fit, since several verses may share a line.
 In `verse-per-line` mode each verse starts its own right-aligned RTL paragraph
 with an LTR digit in a right-side gutter; longer verses wrap without repeating
 the number. The first two verses share the chapter-box inset, as in `mishle002.jpg`.
-Both measurement and final rendering use the selected mode. The final page may be
-sparse: there is no global paragraph/page balancing pass. The apparatus follows
+Both measurement and final rendering use the selected mode. In continuous mode,
+a chapter-ending page with more than 1.25 lines of unused height triggers a
+bounded remeasurement of the preceding page break. If needed, it also adjusts
+the break before that, choosing the smallest worst gap across the affected pages.
+This retains the page count, type sizes, leading, and chapter-box clearance;
+helps move with their source words. The final page may still be sparse.
+The apparatus follows
 scripture directly, with 9 pt above the separator and 3 pt below it. The 9 pt
 scripture gap matches the header rule's gap. Any unusable remainder stays
 below the helps. Run-in notes use 1.15-times-size leading (with at least 0.5 pt
