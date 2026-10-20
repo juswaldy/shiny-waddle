@@ -102,6 +102,9 @@ def load_reader_data(value: dict) -> ReaderDocument:
         document = ReaderDocument(**data)
         if document.config["book"] not in catalog()["books"]:
             raise ValueError("Unsupported source book")
+        for chapter_registry in document.registry.values():
+            if len(chapter_registry) != len(set(chapter_registry.values())):
+                raise ValueError("Help labels must be unique within each chapter")
         used = set()
         references = set()
         for verse in document.verses:
