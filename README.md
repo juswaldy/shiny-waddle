@@ -272,6 +272,8 @@ builds include the PDF and compiler log. Ezra exports include the font and licen
   frequency and known-word policies, and chapter-local shared help labels.
 - Continuous RTL Hebrew or LTR Greek text, separate verse starts, chapter boxes, mixed-script notes, running
   references, five paper profiles plus custom sizes, and measured page-local apparatus placement.
+- Compact helps directly below scripture; continuous verses can start in remaining
+  line space and continue on the next page with their words' own helps.
 - Saved projects with revision-conflict checks, durable build jobs, cancellation,
   interrupted-job recovery, PDF preview, and export bundles.
 - Offline regression fixtures, real PDF checks, browser acceptance tests, and CI.
@@ -286,7 +288,8 @@ review lexical wording before publishing an edition.
 
 The release is a single-user local tool. Remote hosting, user accounts,
 arbitrary uploaded TeX, full-dictionary definitions, and automated scholarly sense
-selection are outside its scope. Extreme verse/note blocks that cannot fit fail
+selection are outside its scope. A word with its helps, a chapter box with its
+first two lines, or a separate-verse block that cannot fit fails
 with a layout error. See [operations and limits](docs/operations.md).
 
 ## Develop and verify

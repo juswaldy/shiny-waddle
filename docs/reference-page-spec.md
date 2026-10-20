@@ -81,8 +81,10 @@ order and is shaped by TeX.
 mode, flow consecutive verses through a justified RTL
 paragraph, as in `bereshit002.jpg`. Verse numbers appear inline; adjacent verses
 may share a line and longer verses wrap naturally without repeating the number.
-The final line is right-aligned. Start a new paragraph at each chapter opening or
-page boundary. Preserve source section signs. Verse boundaries remain explicit
+The final line is right-aligned at a chapter or passage end. When the same chapter
+continues onto the next page, justify its last line to both text edges. Start a
+new paragraph at each chapter opening or page boundary. Preserve source section
+signs. Verse boundaries remain explicit
 in source records and page plans, even though they no longer force line breaks.
 In verse-per-line mode, start each verse in its own RTL paragraph with a shared
 right edge and ragged left edge. Long verses may wrap without repeating the number.
@@ -117,8 +119,10 @@ such as `104` must remain internally LTR and must not collide with Hebrew marks.
 inside two fine square outlines. In continuous mode reserve space on the right
 beside the first two lines of the chapter paragraph, then return to full width.
 In verse-per-line mode, inset the first two verse blocks beside the box; the
-third verse returns to full width. Treat the opening and its first two verses as
-a measured page group; the box is not an independent floating object. Reserve two lines even for
+third verse returns to full width. Measure the opening together with its text;
+the box is not an independent floating object. In continuous mode an opening may
+continue onto the next page after at least two actual text lines beside the box.
+In verse-per-line mode keep the first two verse blocks together. Reserve two lines even for
 a passage containing only a short verse 1, so the box remains inside the measured
 scripture area.
 
@@ -207,12 +211,22 @@ Measure this complete assembly with the final page macros and actual selected
 font. Fixed header/separator allowances must not leave usable space unavailable
 to scripture and notes.
 
-**R17 — Breaking rules.** Prefer page breaks between verses. Keep a chapter box
-with its opening group. Keep ordinary short verses and all their notes on one
-page. For an exceptionally tall verse-plus-apparatus unit, fail with an actionable
-layout-overflow report in the first release; never shrink fonts or omit notes
-silently. Later allow explicitly configured splitting with continued verse labels
-and line/anchor-aware note assignment.
+**R17 — Breaking rules.** In continuous mode, use available space before starting
+a new page, including the end of the last line. Split ordinary verses at word
+boundaries as needed, keeping maqaf chains and adjacent ketiv/qere pairs intact.
+Preserve source token offsets for each fragment and repeat its reference in the
+next page's running head; do not repeat its inline verse number. Assign helps
+from the actual words on each page. Keep a chapter box with at least two actual
+text lines before continuing its chapter onto another page.
+Try a fitting prefix of the following verse before rejecting a one-line opening.
+If none supplies a second actual line, backtrack the whole opening or report
+overflow. Padding remains valid when that chapter or the selected passage ends.
+When the next chapter cannot fit and leaves a large chapter-end gap, remeasure
+the preceding page breaks to distribute text more evenly. Keep the page count,
+type sizes, leading, and chapter-box minimum; move each word's helps with it.
+In verse-per-line mode, retain whole verse blocks. If an indivisible block and its
+helps cannot fit, fail with an actionable overflow report; never shrink fonts or
+omit notes silently.
 
 **R18 — Header and whitespace.** Derive the running reference from the first and
 last visible verse on that page, not the full requested passage. Keep book title
@@ -220,9 +234,13 @@ centered geometrically, in Hebrew on odd printed folios and English on even prin
 folios. Hebrew titles use 18 pt. English titles use true small capitals with taller
 title initials, scaled to match the full height of the same book's Hebrew title.
 The alternation follows `layout.first_folio`, rather than the export's page
-index. Use a page-local, full-width apparatus separator. Place
-extra vertical space between text and apparatus when bottom-aligning the notes;
-do not stretch Hebrew baselines to fill the page.
+index. Use a page-local, full-width apparatus separator, with a minimum 9 pt
+scripture gap above it matching the header rule's gap, and a compact 3 pt gap below
+it. Anchor the helps and their separator to the bottom margin on every reader
+page, including sparse final pages; leave unused height above the separator.
+Keep note leading, entry gaps,
+and chapter-group spacing compact without colliding pointed glyphs. Do not
+stretch Hebrew baselines to fill the page.
 
 ## 6. First proof profile
 

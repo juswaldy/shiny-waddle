@@ -59,7 +59,11 @@ an earlier chapter decision can renumber later helps. Changing page size or pass
 endpoints within a chapter does not independently renumber unchanged helps.
 
 Pagination measures candidate text and unique notes together with XeLaTeX. It
-keeps each verse and each two-verse chapter opening intact. An oversized atomic
+splits continuous verses at word boundaries to fill available space, with their
+helps assigned to the actual words on each page. Maqaf chains, adjacent ketiv/qere
+pairs stay intact. A continuous chapter opening can continue onto another page
+after two actual text lines beside its box. Verse-per-line mode keeps whole verses
+and two-verse openings intact. An oversized indivisible
 block fails rather than dropping text, shrinking type silently, or separating
 notes from their words. Shorten reviewed notes, lower type size within validation
 limits, or increase page size. No general-purpose arbitrary-TeX upload is accepted.

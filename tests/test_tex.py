@@ -3,8 +3,8 @@ import copy
 import pytest
 
 from bible_reader.editorial import build_document
-from bible_reader.models import ProjectConfig, ReaderDocument
-from bible_reader.tex import blocks, contents, page_tex, word_tex
+from bible_reader.models import ProjectConfig, ReaderDocument, ReaderError
+from bible_reader.tex import blocks, contents, merge_fragments, page_tex, split_points, split_verse, word_tex
 
 
 @pytest.mark.parametrize(
@@ -52,3 +52,49 @@ def test_color_scope_preserves_markers_readings_punctuation_and_escaping(source_
     assert r"\textcolor" not in word_tex({**token, "word_class": None}, document, "p1")
     document.config["layout"]["word_color_overrides"]["noun"] = "auto"
     assert word_tex(token, document, "p1") == plain
+
+
+def test_verse_fragments_preserve_source_order_and_unbreakable_runs(source_state):
+    document = build_document(source_state, ProjectConfig(passage="1:29"))
+    word = document.verses[0]["tokens"][0]
+    tokens = [
+        {**word, "surface": "א"},
+        {**word, "surface": "־", "kind": "x-maqqef"},
+        {**word, "surface": "ב"},
+        {**word, "surface": "", "kind": "x-sof-pasuq"},
+        {**word, "surface": "ג", "reading": "ketiv"},
+        {**word, "surface": "ד", "reading": "qere"},
+        {**word, "surface": "׃", "kind": "x-sof-pasuq"},
+        {**word, "surface": "ה"},
+    ]
+    verse = {**document.verses[0], "tokens": tokens}
+    assert split_points(verse) == [4, 7]
+    head, tail = split_verse(verse, 4)
+    middle, end = split_verse(tail, 3)
+    assert head["tokens"] + middle["tokens"] + end["tokens"] == tokens
+    assert (head["token_start"], head["token_end"]) == (0, 4)
+    assert (middle["token_start"], middle["token_end"]) == (4, 7)
+    assert (end["token_start"], end["token_end"]) == (7, 8)
+    assert middle["continued"] and end["continued"]
+    scripture, _, _ = contents([[tail]], document, "p2")
+    assert r"\Verse" not in scripture
+    assert verse["tokens"] == tokens and "continued" not in verse
+
+
+def test_joined_fragments_keep_offsets_readings_and_source_tokens(source_state):
+    document = build_document(source_state, ProjectConfig(passage="1:29"))
+    verse = copy.deepcopy(document.verses[0])
+    first, rest = split_verse(verse, 2)
+    middle, last = split_verse(rest, 2)
+    joined = merge_fragments([first, middle, last])
+    assert len(joined) == 1
+    assert joined[0][0]["tokens"] == verse["tokens"]
+    assert joined[0][0]["token_start"] == 0
+    assert joined[0][0]["token_end"] == len(verse["tokens"])
+    assert not joined[0][0].get("continued")
+    continuation = merge_fragments([middle, last])[0][0]
+    assert continuation["continued"] and continuation["token_start"] == 2
+    assert continuation["tokens"] == verse["tokens"][2:]
+    with pytest.raises(ReaderError, match="noncontiguous"):
+        merge_fragments([first, {**rest, "token_start": 3}])
+    assert document.verses[0] == verse

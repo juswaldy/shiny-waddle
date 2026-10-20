@@ -1,3 +1,4 @@
+import copy
 import hashlib
 import json
 import zipfile
@@ -9,7 +10,18 @@ from pypdf import PdfReader
 from bible_reader.editorial import build_document
 from bible_reader.models import Cancelled, Decision, ProjectConfig, ReaderError
 from bible_reader.service import build
-from bible_reader.tex import Compiler, final_tex, paginate, paper_dimensions, verify_pdf
+from bible_reader.tex import (
+    Compiler,
+    final_tex,
+    measure_candidates,
+    page_plan,
+    paginate,
+    paper_dimensions,
+    rebalance_pages,
+    split_group,
+    split_verse,
+    verify_pdf,
+)
 from bible_reader.word_classes import word_color
 
 pytestmark = pytest.mark.integration
@@ -234,7 +246,7 @@ def test_real_pdf_pagination_links_fonts_and_portable_bundle(
         assert float(page.mediabox.height) * 25.4 / 72 == pytest.approx(height, abs=0.01)
     plans = json.loads((output / "page-plan.json").read_text())
     assert [p["folio"] for p in plans] == list(range(1329, 1329 + pages))
-    assert sum(len(p["references"]) for p in plans) == 17
+    assert len({ref for p in plans for ref in p["references"]}) == 17
     assert all(p["text_height_sp"] + p["notes_height_sp"] <= p["budget_sp"] for p in plans)
     assert all(p["page_height_sp"] <= p["usable_height_sp"] for p in plans)
     if paper == "reference":
@@ -410,6 +422,313 @@ def test_many_short_run_in_verses_fill_a_page(source_state, tmp_path, tex_availa
     assert len(plans[0]["references"]) == 60
     log = compiler.compile("reader", final_tex(document, plans), passes=2)
     assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 60
+
+
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+def test_run_in_verse_uses_available_space_and_continues_with_local_helps(
+    request, tmp_path, tex_available, language
+):
+    state = request.getfixturevalue("greek_state" if language == "grc" else "source_state")
+    config = (
+        ProjectConfig(book="John", passage="1:1-18", selection="all")
+        if language == "grc"
+        else ProjectConfig()
+    )
+    document = build_document(state, config)
+    # Synthetic repetition tests pagination only; it is not a source passage.
+    token = max(
+        (t for v in document.verses for t in v["tokens"] if t["helps"]),
+        key=lambda t: len(t["surface"]),
+    )
+    book = config.book
+    document.verses = [
+        {"reference": f"{book}.1.2", "chapter": 1, "verse": 2, "tokens": [{**token, "helps": []}]},
+        {"reference": f"{book}.1.3", "chapter": 1, "verse": 3, "tokens": [token] * 80},
+    ]
+    compiler = Compiler(tmp_path / "split-verse", "Ezra SIL", greek=language == "grc")
+    plans = paginate(document, compiler)
+    assert len(plans) >= 2
+    assert plans[0]["references"] == [f"{book}.1.2", f"{book}.1.3"]
+    assert plans[1]["first"] == f"{book}.1.3"
+    assert plans[1]["groups"][0][0]["continued"]
+    fragments = [v for p in plans for g in p["groups"] for v in g if v["verse"] == 3]
+    assert [t for v in fragments for t in v["tokens"]] == document.verses[1]["tokens"]
+    assert all(p["page_height_sp"] <= p["usable_height_sp"] for p in plans)
+    log = compiler.compile("reader", final_tex(document, plans), passes=2)
+    assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 2
+    pdf = PdfReader(compiler.directory / "reader.pdf")
+    digits = {}
+
+    def collect_digits(text, cm, tm, font, size):
+        if 10.5 < size < 11.5 and text.strip() in {"2", "3"}:
+            digits[text.strip()] = cm[1] * tm[4] + cm[3] * tm[5] + cm[5]
+
+    pdf.pages[0].extract_text(visitor_text=collect_digits)
+    assert set(digits) == {"2", "3"}
+    assert digits["2"] == pytest.approx(digits["3"], abs=0.1)
+    assert all(p["help_ids"] == token["helps"] for p in plans)
+    rendered = pdfium.PdfDocument(compiler.directory / "reader.pdf")
+    # Notes end at the bottom margin on every page, including sparse endings.
+    for page_index, page in enumerate(pdf.pages[: len(plans)], 1):
+        baseline = []
+
+        def collect_scripture(text, cm, tm, font, size, baseline=baseline):
+            if text.strip() and size == pytest.approx(config.layout.body_pt * 72 / 72.27, abs=0.01):
+                baseline.append(cm[1] * tm[4] + cm[3] * tm[5] + cm[5])
+
+        page.extract_text(visitor_text=collect_scripture)
+        assert baseline
+        # Destinations measure the actual first help baseline beneath the text.
+        destination = next(
+            dest for name, dest in pdf.named_destinations.items() if name.startswith(f"p{page_index}-")
+        )
+        extra = (
+            (plans[page_index - 1]["usable_height_sp"] - plans[page_index - 1]["page_height_sp"])
+            / 65536
+            * 72
+            / 72.27
+        )
+        assert 0 < min(baseline) - float(destination.top) - extra < 32
+        rendered_page = rendered[page_index - 1]
+        rules = []
+        for obj in rendered_page.get_objects():
+            if obj.type != pdfium.raw.FPDF_PAGEOBJ_PATH:
+                continue
+            left, bottom, right, top = obj.get_bounds()
+            if right - left > rendered_page.get_width() * 0.8 and top - bottom < 1:
+                rules.append((bottom + top) / 2)
+        lower, upper = sorted(rules)
+        text_page = rendered_page.get_textpage()
+        body = [
+            text_page.get_charbox(index)
+            for index in range(text_page.count_chars())
+            if text_page.get_text_range(index, 1).strip()
+            and lower < text_page.get_charbox(index)[1] < text_page.get_charbox(index)[3] < upper
+        ]
+        assert 8 < min(box[1] for box in body) - lower - extra < 14
+        margin = 10 * 72 / 25.4
+        notes = [
+            text_page.get_charbox(index)
+            for index in range(text_page.count_chars())
+            if text_page.get_text_range(index, 1).strip() and text_page.get_charbox(index)[3] < lower
+        ]
+        assert min(box[1] for box in notes) == pytest.approx(margin, abs=3)
+        if page_index < len(plans):
+            # A continued paragraph fills both physical edges of its last line.
+            last_line = [
+                box
+                for box in body
+                if min(baseline) - config.layout.body_pt * 0.5 < box[1]
+                and box[3] < min(baseline) + config.layout.body_pt
+            ]
+            assert min(box[0] for box in last_line) - margin < 3
+            assert rendered_page.get_width() - margin - max(box[2] for box in last_line) < 3
+        text_page.close()
+        rendered_page.close()
+    corrupted = json.loads(json.dumps(plans))
+    corrupted[1]["groups"][0][0]["tokens"].pop()
+    with pytest.raises(ReaderError, match="source tokens"):
+        verify_pdf(compiler.directory / "reader.pdf", corrupted, document, log)
+
+
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+def test_long_chapter_opening_continues_after_two_real_lines(request, tmp_path, tex_available, language):
+    state = request.getfixturevalue("greek_state" if language == "grc" else "source_state")
+    layout = {"body_pt": 26, "leading_pt": 38}
+    config = (
+        ProjectConfig(book="John", passage="1:1-18", selection="all", layout=layout)
+        if language == "grc"
+        else ProjectConfig(layout=layout)
+    )
+    document = build_document(state, config)
+    # Synthetic long opening tests the badge/page boundary, not source content.
+    token = max(
+        (t for v in document.verses if v["chapter"] == 1 for t in v["tokens"] if t["helps"]),
+        key=lambda t: len(t["surface"]),
+    )
+    document.verses = [
+        {"reference": f"{config.book}.1.1", "chapter": 1, "verse": 1, "tokens": [token] * 60},
+        {"reference": f"{config.book}.1.2", "chapter": 1, "verse": 2, "tokens": [token] * 4},
+    ]
+    compiler = Compiler(tmp_path / "opening", "Ezra SIL", greek=language == "grc")
+    plans = paginate(document, compiler)
+    assert len(plans) >= 2
+    assert plans[0]["chapter_lines"] >= 2
+    assert plans[0]["last"] == f"{config.book}.1.1"
+    assert plans[1]["groups"][0][0]["continued"]
+    assert plans[1]["chapter_lines"] == 0
+    log = compiler.compile("reader", final_tex(document, plans), passes=2)
+    assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 2
+    badges = []
+
+    def collect_badges(text, cm, tm, font, size):
+        if size == pytest.approx(25 * 72 / 72.27, abs=0.01) and text.strip():
+            badges.append(text.strip())
+
+    for page in PdfReader(compiler.directory / "reader.pdf").pages[: len(plans)]:
+        page.extract_text(visitor_text=collect_badges)
+    assert badges == ["1"]
+
+
+def short_opening_document(request, language):
+    state = request.getfixturevalue("greek_state" if language == "grc" else "source_state")
+    config = (
+        ProjectConfig(book="John", passage="1:1-18", selection="all")
+        if language == "grc"
+        else ProjectConfig()
+    )
+    document = build_document(state, config)
+    words = [t for v in document.verses for t in v["tokens"] if t["kind"] == "word" and t["helps"]]
+    word = min(words, key=lambda t: abs(sum(c.isalpha() for c in t["surface"]) - 6))
+    plain = {**word, "helps": []}
+    # Synthetic repetition and gloss isolate layout constraints; neither is
+    # scholarly content or a proposed source reading.
+    document.config["name"] = "Layout test"
+    document.sources = {
+        "language": language,
+        "text_revision": "synthetic",
+        "lexicon": {"revision": "synthetic"},
+        "attributions": ["Synthetic layout fixture derived from the attributed test tokens."],
+        "transformations": [],
+    }
+    document.warnings = []
+    for identity in word["helps"]:
+        document.helps[identity]["gloss"] = "Synthetic layout note. " * 12
+    document.verses = [
+        {"reference": f"{config.book}.1.3", "chapter": 1, "verse": 3, "tokens": [plain] * 30},
+        {"reference": f"{config.book}.2.1", "chapter": 2, "verse": 1, "tokens": [plain]},
+        {"reference": f"{config.book}.2.2", "chapter": 2, "verse": 2, "tokens": [plain]},
+        {"reference": f"{config.book}.2.3", "chapter": 2, "verse": 3, "tokens": [word] * 24},
+    ]
+    return document
+
+
+def fit_short_opening_page(document, compiler, groups):
+    partials = [groups + [head] for head, _ in split_group([document.verses[-1]])]
+    metrics = measure_candidates(compiler, [groups] + partials, document, 1)
+    assert metrics[0].chapter_lines == 1
+    capacity = metrics[0].page_height_sp + 65536
+    assert all(metric.page_height_sp > capacity for metric in metrics[1:])
+    width, _, margin = paper_dimensions(document.config["layout"])
+    document.config["layout"].update(
+        paper="custom",
+        paper_width_mm=width,
+        paper_height_mm=2 * margin + capacity / 65536 * 25.4 / 72.27,
+    )
+
+
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+def test_one_line_whole_opening_looks_ahead_before_backtracking(request, tmp_path, tex_available, language):
+    document = short_opening_document(request, language)
+    compiler = Compiler(tmp_path / "backtrack-opening", "Ezra SIL", greek=language == "grc")
+    fit_short_opening_page(document, compiler, [[document.verses[0]], document.verses[1:3]])
+    source = copy.deepcopy(document.json())
+    plans = paginate(document, compiler)
+    assert plans[0]["references"] == [document.verses[0]["reference"]]
+    assert plans[1]["first"] == document.verses[1]["reference"]
+    assert plans[1]["chapter_lines"] >= 2
+    assert document.json() == source
+    log = compiler.compile("reader", final_tex(document, plans), passes=2)
+    assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 4
+
+    # Without the large note, a prefix supplies a real second opening line.
+    # Look ahead before rejecting the one-line complete verses 1–2 group.
+    lookahead = copy.deepcopy(document)
+    lookahead.verses[-1]["tokens"] = [{**t, "helps": []} for t in lookahead.verses[-1]["tokens"]]
+    plans = paginate(lookahead, compiler)
+    assert plans[0]["last"] == lookahead.verses[-1]["reference"]
+    assert plans[0]["chapter_lines"] >= 2
+    assert plans[0]["groups"][-1][-1]["token_end"] < len(lookahead.verses[-1]["tokens"])
+    log = compiler.compile("lookahead", final_tex(lookahead, plans), passes=2)
+    assert verify_pdf(compiler.directory / "lookahead.pdf", plans, lookahead, log)["verse_count"] == 4
+
+
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+def test_one_line_opening_overflows_only_when_its_chapter_continues(
+    request, tmp_path, tex_available, language
+):
+    document = short_opening_document(request, language)
+    document.verses = document.verses[1:]
+    compiler = Compiler(tmp_path / "short-opening", "Ezra SIL", greek=language == "grc")
+    fit_short_opening_page(document, compiler, [document.verses[:2]])
+    with pytest.raises(ReaderError, match="Layout overflow") as error:
+        paginate(document, compiler)
+    assert f"Layout overflow at {document.verses[0]['reference']}:" in str(error.value)
+
+    ending = copy.deepcopy(document)
+    ending.verses = ending.verses[:2]
+    plans = paginate(ending, compiler)
+    assert len(plans) == 1 and plans[0]["chapter_lines"] == 1
+    log = compiler.compile("passage-end", final_tex(ending, plans), passes=2)
+    assert verify_pdf(compiler.directory / "passage-end.pdf", plans, ending, log)["verse_count"] == 2
+
+    plain = ending.verses[0]["tokens"][0]
+    ending.verses.append(
+        {"reference": f"{ending.config['book']}.3.1", "chapter": 3, "verse": 1, "tokens": [plain] * 12}
+    )
+    plans = paginate(ending, compiler)
+    assert plans[0]["chapter_lines"] == 1
+    assert plans[0]["last"] == ending.verses[1]["reference"]
+    assert plans[1]["first"] == ending.verses[2]["reference"]
+    log = compiler.compile("chapter-end", final_tex(ending, plans), passes=2)
+    assert verify_pdf(compiler.directory / "chapter-end.pdf", plans, ending, log)["verse_count"] == 3
+
+
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+def test_chapter_end_balance_reflows_preceding_pages_and_reassigns_helps(
+    request, tmp_path, tex_available, language
+):
+    state = request.getfixturevalue("greek_state" if language == "grc" else "source_state")
+    config = (
+        ProjectConfig(book="John", passage="1:1-18", selection="all")
+        if language == "grc"
+        else ProjectConfig()
+    )
+    document = build_document(state, config)
+    tokens = [t for v in document.verses if v["chapter"] == 1 for t in v["tokens"] if t["helps"]]
+    main = min(tokens, key=lambda t: abs(sum(c.isalpha() for c in t["surface"]) - 6))
+    rare = next(t for t in tokens if set(t["helps"]).isdisjoint(main["helps"]))
+    # Synthetic repetition creates an underfilled chapter end with a help on
+    # the preceding page that must move when the two boundaries are adjusted.
+    document.verses = [
+        {
+            "reference": f"{config.book}.1.3",
+            "chapter": 1,
+            "verse": 3,
+            "tokens": [main] * 95 + [rare] + [main] * 36,
+        },
+        {"reference": f"{config.book}.2.1", "chapter": 2, "verse": 1, "tokens": [{**main, "helps": []}] * 18},
+        {"reference": f"{config.book}.2.2", "chapter": 2, "verse": 2, "tokens": [{**main, "helps": []}] * 4},
+    ]
+    source = copy.deepcopy(document.json())
+    first, rest = split_verse(document.verses[0], 48)
+    middle, last = split_verse(rest, 48)
+    pages = [[[first]], [[middle]], [[last]], [document.verses[1:]]]
+    compiler = Compiler(tmp_path / "balanced", "Ezra SIL", greek=language == "grc")
+    original = []
+    for number, groups in enumerate(pages, 1):
+        measurement = measure_candidates(compiler, [groups], document, number)[0]
+        assert measurement.fits
+        original.append(page_plan(groups, document, measurement, number, number))
+    saved = copy.deepcopy(original)
+    balanced = rebalance_pages(document, compiler, original)
+    assert original == saved and document.json() == source
+    assert len(balanced) == len(original)
+    assert balanced[0]["groups"] != original[0]["groups"]
+    assert balanced[-1] == original[-1]
+
+    def largest_gap(plans):
+        return max(p["usable_height_sp"] - p["page_height_sp"] for p in plans[:3])
+
+    assert largest_gap(balanced) < largest_gap(original) - 65536
+    assert set(rare["helps"]) <= set(original[1]["help_ids"])
+    assert set(rare["helps"]).isdisjoint(balanced[1]["help_ids"])
+    assert set(rare["helps"]) <= set(balanced[2]["help_ids"])
+    assert sum(len(v["tokens"]) for g in balanced[2]["groups"] for v in g) > len(last["tokens"])
+    assert all(p["page_height_sp"] <= p["usable_height_sp"] for p in balanced)
+    log = compiler.compile("reader", final_tex(document, balanced), passes=2)
+    result = verify_pdf(compiler.directory / "reader.pdf", balanced, document, log)
+    assert result["verse_count"] == 3 and result["pdf_marker_destinations"] == "verified"
 
 
 @pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])

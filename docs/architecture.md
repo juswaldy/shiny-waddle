@@ -206,18 +206,45 @@ scripture. CLI `--lexicon-only` / `--no-lexicon-only` override the saved mode.
 `ReaderDocument` version 2 contains resolved config, ordered verses/tokens, referenced
 helps, review rows, chapter registry, source lock, and warnings. The source lock
 contains actual artifact hashes and upstream revisions. `page-plan.json` contains
-verse blocks, first/last references, folios, measured heights in TeX scaled points,
+verse blocks/fragments, first/last references, folios, measured heights in TeX scaled points,
 and unique help IDs per page. Each candidate's complete page height includes its
 actual running head and separator spacing, measured using the same box assembly
 as final output. Fit is checked against TeX's usable text height; there is no fixed
 header allowance. Final TeX uses exactly those boxes, blocks, and page breaks.
-Verse blocks are pagination units. `layout.verse_layout` selects continuous
+Continuous mode can split ordinary verses at legal word boundaries, recording
+`token_start`, `token_end` (exclusive), and `continued` on fragments. References
+can span successive pages; validation reconstructs every source verse's exact
+ordered tokens and checks each page's marker destinations. Continuous chapter
+openings can split once TeX measures at least two actual text lines beside the
+badge; `chapter_lines` records that measurement for the last paragraph on a page
+(zero for a paragraph without a chapter opening). Separate-verse blocks remain
+indivisible. `layout.verse_layout` selects continuous
 justified RTL paragraphs with inline verse numbers, or separately started,
 right-aligned verse paragraphs with a number gutter. Chapter boxes reserve the
 first two lines in continuous mode and the first two verses in verse-per-line mode.
 Measurements and the final PDF use the same selected construction. Saved projects
 and immutable build snapshots retain the choice; omitted settings default to
 continuous through project validation.
+
+A continuous one-line chapter opening is legal only when its chapter or the
+selected passage ends. Prefix lookahead runs before validating the whole-group
+fallback, since the following verse can supply the second actual line. If no
+prefix can do so, the planner moves the opening intact to the next page or
+reports overflow. The same chapter-break rule applies during rebalancing.
+Final page assembly stretches space above the apparatus separator so the notes
+end at the bottom margin on every reader page; natural measured heights and page
+budgets still include the same minimum separator clearance.
+
+After greedy pagination, continuous mode revisits non-final chapter-ending pages
+with more than 1.25 lines of unused height. It measures at most 40 legal cuts in
+the preceding page's last three verses, minimizing the largest unused height
+across the two pages, then total unused height, then moved token count. If that
+leaves a large gap, a three-page fallback considers the preceding two boundaries:
+at most eight feasible cuts per boundary and 64 middle-page combinations, measured
+in batches of 32. A move must improve the largest gap by at least 1 pt. Each
+candidate uses its actual folio, merges contiguous source fragments, recomputes
+page-local helps, and retains the two-line chapter-box minimum. Page count, fonts,
+and leading remain fixed; verse-per-line and final reader pages are unchanged.
 
 `layout.paper` defaults to `reader` (140 × 216 mm). Existing named profiles retain
 their dimensions. Selecting `custom` requires validated `paper_width_mm` and

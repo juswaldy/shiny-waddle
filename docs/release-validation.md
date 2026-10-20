@@ -231,3 +231,139 @@ excluded. The extracted wheel built the John example successfully at
 `build/greek-wheel-smoke-proof/`, including the font/license/source-notice bundle.
 `doctor` verifies the NT crosswalk as well as text and lexicon checksums before
 reporting Greek readiness, and hashes shared LXX artifacts only once per check.
+
+## Compact spacing and verse continuations — 2026-10-19
+
+Helps now follow scripture directly, with 3 pt on either side of the separator
+and unused space below the apparatus. Note leading is 1.15 times the note size;
+entry and chapter-group gaps are smaller, with tall glyph boxes kept apart.
+Continuous pages can include a word-level prefix of the next verse, with source
+token offsets retained and only those words' helps printed on that page.
+Chapter openings, maqaf chains, and adjacent ketiv/qere pairs stay together.
+PDF validation reconstructs exact source token order across continuations.
+
+The default Proverbs proof at `build/reader-20261019-141021-935373/` advances the
+first page's end from 2:8 to 2:9. Its first-page apparatus shrinks from 104.7 pt to
+85.8 pt despite including another verse. Both reader pages were rasterized and
+inspected, including the sparse final page's text-to-help spacing.
+
+The existing Genesis engineering project's final proof at
+`build/spacing-genesis-final/` retains 139 verses and 193 helps over 12 reader
+pages, with nine verse continuations. First pages, a chapter transition, and the
+final page were visually inspected. The saved Greek engineering proof at
+`build/spacing-greek-final/` retains 63 verses and 87 helps over eight reader
+pages, plus the lexicon and credits. Inspection covered dense notes, continued
+verses, and the chapter 1/2 boundary. Both proofs pass same-page marker links,
+source-token coverage, embedded fonts, and overflow/missing-glyph checks. Their
+existing editorial decisions remain engineering-proof inputs.
+
+`make check` passes **297 tests and 8 subtests**, with 17 opt-in browser checks
+skipped. New regressions cover Hebrew and Greek verse continuations, same-line
+verse starts, compact apparatus placement on every page, exact source-token
+coverage, and intact maqaf/K/Q boundaries. `make demo` and `make pdf` pass.
+
+## Full-Genesis spacing refinement — 2026-10-19
+
+Continuous chapter openings can now break after two actual text lines beside
+the chapter box. Their continuation does not repeat the box. Paragraphs that
+continue onto another page justify their last line; chapter and passage endings
+keep their natural alignment. The scripture-to-apparatus rule gap is now 9 pt,
+matching the header's scripture gap, with 3 pt below the apparatus rule.
+
+Rebuilt the saved full-Genesis edition at
+`build/genesis-spacing-refined/`: SBL Hebrew 14.5 pt / 19 pt leading, 8.5 pt helps,
+preserved accents, and the saved word colors and book-frequency policy. The
+reader JSON is identical to the original 84-page build. All 1,533 verses and
+2,187 helps remain across 84 reader pages plus credits, with verified source
+tokens, page-local note links, embedded fonts, and no overflow or missing glyphs.
+
+The full-book PDF audit reduces mean unused space on non-final pages from
+13.83 pt to 8.96 pt. The largest gap falls from 72.90 pt to 47.93 pt, and gaps
+over 30 pt fall from seven pages to three. On pages 6, 20, and 77, measuring all
+legal prefixes confirms that the next chapter's two-line opening and its helps
+still cannot fit. Their available/minimum-required extra heights are respectively
+47.93/54.77 pt, 36.06/42.00 pt, and 40.31/42.00 pt. Final-page unused space falls
+from 292.29 pt to 133.56 pt. No continued page ends in a short last line.
+
+Rasterized and visually inspected the chapter 16/17 and 42/43 splits, their
+continuations, dense helps, the remaining chapter-boundary gaps, and the final
+page. The apparatus rule's measured ink gap is 9.15–10.69 PDF points, compared
+with 3.17–4.71 before. Audit details remain in
+`build/genesis-spacing-audit/comparison.json` and `remaining-gaps.json`.
+
+`make check` passes **299 tests and 8 subtests**, with 17 opt-in browser tests
+skipped. New PDF checks cover both languages' long chapter openings, a single
+chapter box across continuations, full last-line width, and the lower rule's
+actual glyph clearance. `make demo` and `make pdf` pass.
+
+## Chapter-end whitespace balancing — 2026-10-19
+
+The supplied `bottom-extra-space.pdf` shows Genesis folios 6, 72, and 77. All
+three end a chapter where its successor's opening and helps cannot fit. The
+planner now remeasures the preceding break, or the preceding two breaks if
+needed, to reduce the largest gap without adding pages or changing type size,
+leading, or chapter-box clearance. Source fragments and their page-local helps
+move together.
+
+Against `build/genesis-spacing-refined/`, the rebuilt proof at
+`build/genesis-balanced/` reduces those three gaps from 47.93 / 29.00 / 40.31 pt
+to 19.01 / 11.42 / 21.31 pt. Across non-final pages the maximum falls from
+47.93 to 21.31 pt and the mean from 8.96 to 7.72 pt. The three-page adjustment
+at folios 4–6 also reduces folio 4's gap from 4.32 to 2.81 pt; folio 5 changes
+from 12.13 to 12.31 pt. No large gap is transferred to its neighbor. The final
+page remains outside this balancing pass.
+
+The normal full-book CLI build preserves the exact reader JSON: all 1,533 verses
+and 2,187 helps across 84 reader pages plus credits. Its page plan and TeX are
+identical to the inspected proof. PDF checks verify source coverage, same-page
+note destinations, embedded fonts, and no overflow or missing glyphs; the final
+comparison is in `build/bottom-space-review/final-validation.json`.
+
+Rasterized review covers the three reported pages, both preceding breaks at
+folios 4–6, the other adjusted endings at 9–10 and 19–20, and the default
+Proverbs chapter transition with dense helps. The
+PDF audit finds no short continuing last lines, and the apparatus rule's ink
+clearance remains 9.15–10.69 PDF points. Measurements and review images remain
+under `build/bottom-space-review/`.
+
+`make check` passes **302 tests and 8 subtests**, with 17 opt-in browser tests
+skipped. Hebrew and Greek PDF regressions require both preceding boundaries to
+move, preserve the exact input document and final page, reassign a help from the
+middle page to the chapter-ending page, and verify all marker destinations.
+The fragment-join unit check retains source offsets and rejects noncontiguous
+fragments. `make demo` and `make pdf` pass.
+
+## Two-line opening fallbacks and bottom-aligned notes — 2026-10-19
+
+Continuous whole-group fallbacks now enforce two actual lines beside a chapter
+box whenever its chapter continues. Prefix lookahead runs first, since adding
+part of the next verse can supply that second line. If no such prefix fits with
+its helps, the opening moves intact to the next page or reports overflow.
+Padding remains valid at chapter and selected-passage ends. Rebalancing uses the
+same chapter-break rule.
+
+Notes and their separator now end at the bottom margin on every reader page.
+Extra height stretches above the separator, with a minimum 9 pt scripture gap
+and 3 pt below the rule. Type sizes, scripture leading, note spacing, and natural
+page budgets remain unchanged.
+
+The preserved full-Genesis reader and plan were recompiled at
+`build/genesis-bottom-aligned/`. Every existing break satisfies the new guard;
+remeasuring folios 1, 4, 5, 6, 72, 77, and 84 gives identical natural metrics.
+All 1,533 verses and 2,187 helps remain across 84 reader pages plus credits, with
+verified source coverage, page-local note destinations, embedded fonts, and no
+overflow or missing glyphs. The audit of all 84 pages places final note ink
+within 0.1 PDF point of the 10 mm bottom margin. Details and rasterized proofs
+are under `build/opening-bottom-review/`.
+
+Visual review covers the reported Genesis pages and final page, the default
+Proverbs ending, and both Hebrew and Greek examples of a moved chapter opening
+and a fitting prefix that supplies its second real line. Actual TeX/PDF tests
+also cover overflow and valid padded chapter/passage endings; the deliberately
+small synthetic fixtures retain compact synthetic credits. `make demo` and
+`make pdf` pass.
+
+`make check` passes **306 tests and 8 subtests**, with 17 opt-in browser tests
+skipped. The opening-overflow regression checks that the error identifies the
+opening itself, while the bottom-alignment regressions inspect actual Hebrew
+and Greek glyph positions on every page, including the sparse last page.
