@@ -921,8 +921,15 @@ def verify_compilation(path: Path, log: str):
     pdf = PdfReader(path)
     if not pdf.pages:
         raise ReaderError("The TeX file did not produce any PDF pages")
-    for page in pdf.pages:
-        for font in page["/Resources"].get("/Font", {}).values():
+    pending_resources = [page["/Resources"] for page in pdf.pages]
+    visited_resources = set()
+    while pending_resources:
+        resources = pending_resources.pop().get_object()
+        if id(resources) in visited_resources:
+            continue
+        visited_resources.add(id(resources))
+        fonts = resources.get("/Font")
+        for font in (fonts.get_object().values() if fonts else ()):
             font = font.get_object()
             descendants = font.get("/DescendantFonts", [font])
             for descendant in descendants:
@@ -931,6 +938,12 @@ def verify_compilation(path: Path, log: str):
                     key in descriptor.get_object() for key in ("/FontFile", "/FontFile2", "/FontFile3")
                 ):
                     raise ReaderError("A PDF font is not embedded")
+        for category in ("/XObject", "/Pattern"):
+            objects = resources.get(category)
+            for item in (objects.get_object().values() if objects else ()):
+                nested_resources = item.get_object().get("/Resources")
+                if nested_resources is not None:
+                    pending_resources.append(nested_resources)
     return {"total_pages": len(pdf.pages), "fonts_embedded": True}
 
 
