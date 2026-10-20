@@ -929,7 +929,7 @@ def verify_compilation(path: Path, log: str):
             continue
         visited_resources.add(id(resources))
         fonts = resources.get("/Font")
-        for font in (fonts.get_object().values() if fonts else ()):
+        for font in fonts.get_object().values() if fonts else ():
             font = font.get_object()
             descendants = font.get("/DescendantFonts", [font])
             for descendant in descendants:
@@ -940,7 +940,7 @@ def verify_compilation(path: Path, log: str):
                     raise ReaderError("A PDF font is not embedded")
         for category in ("/XObject", "/Pattern"):
             objects = resources.get(category)
-            for item in (objects.get_object().values() if objects else ()):
+            for item in objects.get_object().values() if objects else ():
                 nested_resources = item.get_object().get("/Resources")
                 if nested_resources is not None:
                     pending_resources.append(nested_resources)

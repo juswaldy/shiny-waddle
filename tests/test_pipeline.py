@@ -70,6 +70,35 @@ def test_reader_data_rejects_broken_references_and_tex_in_numeric_fields(source_
             load_reader_data(data)
 
 
+def test_reader_data_rejects_duplicate_labels_even_with_matching_help_records(source_state):
+    data = json.loads(json.dumps(build_document(source_state, ProjectConfig()).json()))
+    first, second = [help for help in data["helps"].values() if help["chapter"] == 1][:2]
+    data["registry"]["1"][second["id"]] = second["label"] = first["label"]
+    for row in data["review"]:
+        if row["help_id"] == second["id"]:
+            row["label"] = first["label"]
+    with pytest.raises(ReaderError, match="Help labels must be unique within each chapter"):
+        load_reader_data(data)
+
+
+def test_reader_data_rejects_duplicate_registry_labels_outside_the_passage(source_state):
+    data = json.loads(json.dumps(build_document(source_state, ProjectConfig()).json()))
+    # A chapter registry includes slots not referenced by the current passage.
+    label = next(iter(data["registry"]["1"].values()))
+    data["registry"]["1"]["Prov.1:outside-passage"] = label
+    with pytest.raises(ReaderError, match="Help labels must be unique within each chapter"):
+        load_reader_data(data)
+
+
+def test_reader_data_allows_label_reuse_across_chapters_and_repeated_help_anchors(source_state):
+    config = ProjectConfig(selection="all", gloss_selection="first-entry")
+    data = json.loads(json.dumps(build_document(source_state, config).json()))
+    assert set(data["registry"]["1"].values()) & set(data["registry"]["2"].values())
+    anchors = [help_id for verse in data["verses"] for token in verse["tokens"] for help_id in token["helps"]]
+    assert len(anchors) > len(set(anchors))  # Multiple tokens may refer to one semantic help.
+    assert load_reader_data(data).json() == data
+
+
 def test_cli_source_to_data_and_invalid_transform_input(source_state, tmp_path, monkeypatch):
     output = tmp_path / "data"
     assert main(["--state", str(source_state), "build", "--emit", "data", "--output", str(output)]) == 0
