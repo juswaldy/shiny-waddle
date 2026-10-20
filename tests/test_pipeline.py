@@ -1,0 +1,147 @@
+import copy
+import json
+import zipfile
+
+import pytest
+from fastapi.testclient import TestClient
+
+from bible_reader.__main__ import main as entrypoint
+from bible_reader.cli import main
+from bible_reader.data_files import load_reader_data
+from bible_reader.editorial import build_document
+from bible_reader.jobs import run_worker
+from bible_reader.models import ProjectConfig, ReaderError
+from bible_reader.service import build, build_from_data, compile_tex
+from bible_reader.tex import verify_pdf
+from bible_reader.web.app import create_app
+
+
+def test_data_export_needs_no_tex_and_preserves_complete_snapshot(source_state, tmp_path, monkeypatch):
+    def no_compiler(*args, **kwargs):
+        pytest.fail("Data export must not initialize TeX")
+
+    monkeypatch.setattr("bible_reader.service.Compiler", no_compiler)
+    config = ProjectConfig(lexicon_appendix=True)
+    original = json.loads(json.dumps(build_document(source_state, config).json()))
+    result = build(source_state, config, tmp_path / "data", emit="data")
+    saved = json.loads((tmp_path / "data/reader.v2.json").read_text())
+    assert saved == original
+    assert load_reader_data(saved).json() == saved
+    assert result["unresolved_helps"] == 0
+    assert "reader.tex" not in result["artifacts"] and "reader.pdf" not in result["artifacts"]
+    with zipfile.ZipFile(tmp_path / "data/reader-bundle.zip") as bundle:
+        assert json.loads(bundle.read("reader.v2.json")) == original
+    with pytest.raises(ReaderError, match="not empty"):
+        build(source_state, config, tmp_path / "data", emit="data")
+
+
+def test_unresolved_data_can_be_saved_but_cannot_render(source_state, consonant_review, tmp_path):
+    config = ProjectConfig(selection="all", passage="1:1")
+    result = build(source_state, config, tmp_path / "data", emit="data")
+    assert result["unresolved_helps"] > 0
+    saved = json.loads((tmp_path / "data/reader.v2.json").read_text())
+    with pytest.raises(ReaderError, match="unresolved selected helps"):
+        build_from_data(tmp_path / "offline", saved, tmp_path / "tex")
+
+
+def test_reader_data_rejects_broken_references_and_tex_in_numeric_fields(source_state):
+    original = json.loads(json.dumps(build_document(source_state, ProjectConfig()).json()))
+    malformed = []
+    data = copy.deepcopy(original)
+    data["schema_version"] = 1
+    malformed.append(data)
+    data = copy.deepcopy(original)
+    next(iter(data["helps"].values()))["label"] = r"\input{outside}"
+    malformed.append(data)
+    data = copy.deepcopy(original)
+    data["verses"][0]["tokens"][0]["helps"] = ["missing-help"]
+    malformed.append(data)
+    data = copy.deepcopy(original)
+    data["review"] = []
+    malformed.append(data)
+    data = copy.deepcopy(original)
+    data["verses"][0]["chapter"] = "1"
+    malformed.append(data)
+    data = copy.deepcopy(original)
+    data["sources"]["notices"] = {"bad": {"filename": "../reader.tex", "sha256": "0" * 64}}
+    malformed.append(data)
+    for data in malformed:
+        with pytest.raises(ReaderError, match="Invalid reader data file"):
+            load_reader_data(data)
+
+
+def test_cli_source_to_data_and_invalid_transform_input(source_state, tmp_path, monkeypatch):
+    output = tmp_path / "data"
+    assert main(["--state", str(source_state), "build", "--emit", "data", "--output", str(output)]) == 0
+    assert (output / "reader.v2.json").is_file()
+    bad = tmp_path / "bad.json"
+    bad.write_text('{"schema_version": 1}')
+    monkeypatch.setattr(
+        "sys.argv",
+        ["bible-reader", "transform", "data-to-tex", "--input", str(bad), "--output", str(tmp_path / "tex")],
+    )
+    with pytest.raises(SystemExit) as error:
+        entrypoint()
+    assert error.value.code == 1
+    assert not (tmp_path / "tex").exists()
+
+
+def test_api_data_export_download_and_upload_snapshots(source_state):
+    app = create_app(source_state, start_worker=False)
+    with TestClient(app) as client:
+        client.headers["X-Reader-Token"] = app.state.csrf_token
+        project = client.post("/api/projects", json={}).json()
+        base = f"/api/projects/{project['id']}"
+        job = client.post(base + "/data")
+        assert job.status_code == 202
+        run_worker(source_state, once=True)
+        job = client.get(f"/api/jobs/{job.json()['id']}").json()
+        assert job["status"] == "succeeded"
+        download = client.get(f"/api/jobs/{job['id']}/artifacts/reader.v2.json?download=true")
+        assert "attachment" in download.headers["content-disposition"]
+        data = download.json()
+        upload = client.post(base + "/transforms/data-to-tex", json={"data": data})
+        assert upload.status_code == 202
+        uploaded = upload.json()
+        path = source_state / "inputs" / uploaded["config"]["input_file"]
+        assert json.loads(path.read_text()) == data
+        assert "data" not in uploaded["config"]  # Polling never returns a full uploaded file.
+        client.post(f"/api/jobs/{uploaded['id']}/cancel")
+        tex = r"\documentclass{article}\begin{document}Hello\end{document}"
+        upload = client.post(base + "/transforms/tex-to-pdf", json={"tex": tex})
+        assert upload.status_code == 202
+        uploaded = upload.json()
+        assert (source_state / "inputs" / uploaded["config"]["input_file"]).read_text() == tex
+        assert client.get(base).json() == project
+        assert client.post(base + "/transforms/data-to-tex", json={"data": {}}).status_code == 400
+        assert client.post(base + "/transforms/tex-to-pdf", json={"tex": ""}).status_code == 400
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("language", ["hebrew", "greek"])
+def test_saved_data_to_tex_to_pdf_is_offline_and_preserves_reader(
+    source_state, request, tmp_path, tex_available, language
+):
+    state = request.getfixturevalue("greek_state") if language == "greek" else source_state
+    config = (
+        ProjectConfig(book="John", passage="1:1-3", selection="all", gloss_selection="first-entry")
+        if language == "greek"
+        else ProjectConfig()
+    )
+    build(state, config, tmp_path / "data", emit="data")
+    value = json.loads((tmp_path / "data/reader.v2.json").read_text())
+    offline = tmp_path / "no-installed-sources"
+    tex_result = build_from_data(offline, value, tmp_path / "tex")
+    assert "reader.tex" in tex_result["artifacts"] and "reader.pdf" not in tex_result["artifacts"]
+    assert json.loads((tmp_path / "tex/reader.v2.json").read_text()) == value
+    text = (tmp_path / "tex/reader.tex").read_text()
+    result = compile_tex(text, tmp_path / "pdf")
+    assert result["fonts_embedded"]
+    assert "page_membership" not in result  # Standalone TeX does not claim a reader-specific check.
+    assert (tmp_path / "pdf/reader.tex").read_text() == text
+    plans = json.loads((tmp_path / "tex/page-plan.json").read_text())
+    checked = verify_pdf(
+        tmp_path / "pdf/reader.pdf", plans, load_reader_data(value), (tmp_path / "pdf/reader.log").read_text()
+    )
+    assert checked["pdf_marker_destinations"] == "verified"
+    assert not offline.exists()

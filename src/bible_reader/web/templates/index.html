@@ -61,6 +61,7 @@
       </form>
       <button id="build" class="primary full">Build reader PDF <span>↗</span></button>
       <p class="hint">Text and lexical notes are measured together. Your PDF includes source credits.</p>
+      <button id="show-pipeline" class="text-button">Run individual steps &amp; save files →</button>
       <div class="sidebar-bottom"><span class="section-label">SOURCE EDITION</span><p>OSHB · SBLGNT · Rahlfs LXX<br>STEP Bible short glosses</p><button class="text-button" id="show-sources">Manage sources →</button></div>
     </aside>
     <main>
@@ -96,8 +97,33 @@
         <div id="review-list" aria-live="polite"></div><div class="pagination"><button id="previous" class="secondary">← Previous</button><span id="row-count"></span><button id="next" class="secondary">Next →</button></div>
       </section>
       <section id="preview-panel" class="panel" hidden>
+        <h2>Source → data → TeX → PDF</h2>
+        <div class="pipeline-steps">
+          <section class="pipeline-step">
+            <h3>1. Source → data</h3>
+            <p>Use the source, passage, settings, and saved lexical helps selected in the sidebar.</p>
+            <button id="make-data" class="secondary">Make data file</button>
+            <p class="hint">Saves reader JSON with source metadata. No TeX installation needed.</p>
+          </section>
+          <section class="pipeline-step">
+            <h3>2. Data → TeX</h3>
+            <label for="pipeline-data">Upload reader data (.json)</label>
+            <input id="pipeline-data" type="file" accept=".json,application/json">
+            <button id="make-tex" class="secondary">Make TeX file</button>
+            <p class="hint">Uses the settings in the data file. XeLaTeX measures pagination; selected helps must be resolved.</p>
+          </section>
+          <section class="pipeline-step">
+            <h3>3. TeX → PDF</h3>
+            <label for="pipeline-tex">Upload TeX (.tex)</label>
+            <input id="pipeline-tex" type="file" accept=".tex,text/plain,application/x-tex">
+            <label for="pipeline-font">Hebrew font used by this TeX</label>
+            <select id="pipeline-font"><option>Ezra SIL</option><option>SBL Hebrew</option></select>
+            <button id="make-pdf" class="secondary">Make PDF from TeX</button>
+            <p class="hint">Compiles a standalone UTF-8 TeX file. Ezra SIL and Gentium Plus are supplied; SBL Hebrew must be installed separately.</p>
+          </section>
+        </div>
         <div id="build-status" class="info-card">Build a reader to preview the actual PDF here.</div>
-        <div class="export-row"><a id="download-pdf" class="primary" hidden>Download PDF ↓</a><a id="download-bundle" class="secondary" hidden>Export source bundle</a><button id="cancel-build" class="secondary" hidden>Cancel build</button></div>
+        <div class="export-row"><a id="download-data" class="secondary" hidden>Save data file ↓</a><a id="download-tex" class="secondary" hidden>Save TeX file ↓</a><a id="download-pdf" class="primary" hidden>Download PDF ↓</a><a id="download-bundle" class="secondary" hidden>Export source bundle</a><button id="cancel-build" class="secondary" hidden>Cancel build</button></div>
         <iframe id="pdf-preview" title="Generated reader PDF" hidden></iframe>
         <div id="build-history"></div>
       </section>

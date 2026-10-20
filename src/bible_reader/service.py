@@ -11,14 +11,92 @@ from collections import Counter
 from importlib.resources import files
 from pathlib import Path
 
+from .data_files import load_reader_data, validate_tex
 from .editorial import build_document, require_resolved
 from .models import ProjectConfig, ReaderError, digest
 from .sources import book_artifact, catalog, read_verified
-from .tex import Compiler, engine_path, final_tex, font_path, paginate, preamble, verify_pdf
+from .tex import (
+    Compiler,
+    engine_path,
+    final_tex,
+    font_path,
+    paginate,
+    preamble,
+    verify_compilation,
+    verify_pdf,
+)
 
 
 def write_json(path: Path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+
+def prepare_output(output: Path) -> Path:
+    output = output.resolve()
+    if output.exists() and (not output.is_dir() or any(output.iterdir())):
+        raise ReaderError("Output directory is not empty. Choose a new build directory.")
+    output.mkdir(parents=True, exist_ok=True)
+    return output
+
+
+def bundle_artifacts(output: Path, artifacts: list[str]):
+    with zipfile.ZipFile(output / "reader-bundle.zip", "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+        for name in artifacts:
+            entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = 0o644 << 16
+            bundle.writestr(entry, (output / name).read_bytes())
+    artifacts.append("reader-bundle.zip")
+
+
+def build_from_data(
+    state: Path, value: dict, output: Path, progress=lambda _: None, cancelled=lambda: False, *, emit="tex"
+):
+    document = load_reader_data(value)
+    return build(
+        state,
+        ProjectConfig.model_validate(document.config),
+        output,
+        progress,
+        cancelled,
+        emit=emit,
+        document=document,
+    )
+
+
+def compile_tex(
+    text: str, output: Path, progress=lambda _: None, cancelled=lambda: False, *, font="Ezra SIL"
+):
+    text = validate_tex(text)
+    output = prepare_output(output)
+    progress("Compiling uploaded TeX")
+    compiler = Compiler(output, font, cancelled, greek=True)
+    log = compiler.compile("reader", text, passes=2)
+    checks = verify_compilation(output / "reader.pdf", log)
+    artifacts = ["reader.tex", "reader.pdf", "reader.log", "reader-greek.ttf", "GentiumPlus-LICENSE.txt"]
+    (output / "GentiumPlus-LICENSE.txt").write_bytes(
+        files("bible_reader").joinpath("resources/GentiumPlus-LICENSE.txt").read_bytes()
+    )
+    if font == "Ezra SIL":
+        (output / "Ezra-LICENSE.txt").write_bytes(
+            files("bible_reader").joinpath("resources/Ezra-LICENSE.txt").read_bytes()
+        )
+        artifacts += ["reader-hebrew.ttf", "Ezra-LICENSE.txt"]
+    manifest = {
+        "schema_version": 1,
+        "stage": "tex-to-pdf",
+        "checks": checks,
+        "engine": compiler.environment,
+        "engine_sha256": hashlib.sha256(Path(compiler.engine).read_bytes()).hexdigest(),
+        "font_sha256": compiler.font_hash,
+        "greek_font_sha256": compiler.greek_font_hash,
+        "artifacts": {name: hashlib.sha256((output / name).read_bytes()).hexdigest() for name in artifacts},
+    }
+    write_json(output / "manifest.json", manifest)
+    artifacts.append("manifest.json")
+    bundle_artifacts(output, artifacts)
+    progress("Ready")
+    return {**checks, "stage": "tex-to-pdf", "artifacts": artifacts, "output": str(output)}
 
 
 def doctor(state: Path):
@@ -123,19 +201,70 @@ def build(
     cancelled=lambda: False,
     *,
     emit="pdf",
+    document=None,
 ):
-    output = output.resolve()
-    if output.exists() and any(output.iterdir()):
-        raise ReaderError("Output directory is not empty. Choose a new build directory.")
-    output.mkdir(parents=True, exist_ok=True)
-    progress("Aligning source text and lexical helps")
-    document = build_document(state, config)
+    if emit not in {"data", "tex", "pdf"}:
+        raise ReaderError("Choose data, tex, or pdf output")
+    output = prepare_output(output)
+    if document is None:
+        progress("Aligning source text and lexical helps")
+        document = build_document(state, config)
+    else:
+        progress("Loading saved reader data")
+    # Embed exact source notices so subsequent transforms need no raw downloads.
+    for asset in document.sources.get("notices", {}).values():
+        name = asset["filename"]
+        if Path(name).name != name or name in {"reader.tex", "reader.pdf", "manifest.json"}:
+            raise ReaderError("Invalid source notice filename")
+        content = document.source_notices.get(name)
+        if content is None:
+            content = read_verified(state / "raw/greek" / name, asset["sha256"]).decode("utf-8")
+        if hashlib.sha256(content.encode("utf-8")).hexdigest() != asset["sha256"]:
+            raise ReaderError(f"Source notice checksum mismatch: {name}")
+        document.source_notices[name] = content
     write_json(output / "config.resolved.json", config.model_dump())
     write_json(output / "reader.v2.json", document.json())
     write_json(output / "alignment-report.json", document.review)
     write_json(output / "sources.lock.json", document.sources)
     write_json(output / "note-registry.json", document.registry)
+    if emit == "data":
+        checks = {
+            "stage": "source-to-data",
+            "verse_count": len(document.verses),
+            "help_count": len(document.helps),
+            "unresolved_helps": sum(r["selected"] and r["status"] != "resolved" for r in document.review),
+        }
+        artifacts = [
+            "config.resolved.json",
+            "reader.v2.json",
+            "alignment-report.json",
+            "sources.lock.json",
+            "note-registry.json",
+        ]
+        write_json(
+            output / "manifest.json",
+            {
+                "schema_version": 1,
+                "stage": "source-to-data",
+                "config_hash": digest(config.model_dump()),
+                "checks": checks,
+                "artifacts": {
+                    name: hashlib.sha256((output / name).read_bytes()).hexdigest() for name in artifacts
+                },
+            },
+        )
+        artifacts.append("manifest.json")
+        bundle_artifacts(output, artifacts)
+        progress("Ready")
+        return {
+            **checks,
+            "artifacts": artifacts,
+            "output": str(output),
+            "config_hash": digest(config.model_dump()),
+        }
     require_resolved(document)
+    if any(help["status"] != "resolved" for help in document.helps.values()):
+        raise ReaderError("Review unresolved selected helps before building")
     greek = document.sources.get("language") == "grc"
     compiler = Compiler(output, "Ezra SIL" if greek else config.layout.hebrew_font, cancelled, greek=greek)
     plans = [] if config.lexicon_only else paginate(document, compiler, progress)
@@ -185,8 +314,7 @@ def build(
         # Include the exact source notices in addition to the printed credits.
         for asset in document.sources["notices"].values():
             name = asset["filename"]
-            notice = state / "raw/greek" / name
-            (output / name).write_bytes(read_verified(notice, asset["sha256"]))
+            (output / name).write_text(document.source_notices[name], encoding="utf-8")
             artifacts.append(name)
     if config.lexicon_appendix or config.lexicon_only:
         write_json(output / "lexicon-appendix.json", document.lexicon_appendix)
@@ -241,12 +369,6 @@ def build(
     }
     write_json(output / "manifest.json", manifest)
     artifacts.append("manifest.json")
-    with zipfile.ZipFile(output / "reader-bundle.zip", "w", compression=zipfile.ZIP_DEFLATED) as bundle:
-        for name in artifacts:
-            entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-            entry.compress_type = zipfile.ZIP_DEFLATED
-            entry.external_attr = 0o644 << 16
-            bundle.writestr(entry, (output / name).read_bytes())
-    artifacts.append("reader-bundle.zip")
+    bundle_artifacts(output, artifacts)
     progress("Ready")
     return {**checks, "artifacts": artifacts, "output": str(output), "config_hash": manifest["config_hash"]}

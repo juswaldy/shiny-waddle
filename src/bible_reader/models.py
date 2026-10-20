@@ -192,6 +192,7 @@ class ReaderDocument:
     schema_version: int = 2
     warnings: list[str] = field(default_factory=list)
     lexicon_appendix: list[dict] = field(default_factory=list)
+    source_notices: dict[str, str] = field(default_factory=dict)
 
     def json(self):
         return asdict(self)

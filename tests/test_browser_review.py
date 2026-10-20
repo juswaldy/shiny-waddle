@@ -12,6 +12,7 @@ import pytest
 import uvicorn
 from playwright.sync_api import expect, sync_playwright
 
+from bible_reader.jobs import run_worker
 from bible_reader.models import ProjectConfig
 from bible_reader.web.app import create_app
 
@@ -70,6 +71,61 @@ def expect_review_choice(row, field, value):
         expect(group.locator(f"input[value='{value}']")).to_be_checked()
     else:
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
+
+
+def test_pipeline_download_upload_and_standalone_pdf_in_browser(
+    review_server, source_state, tmp_path, tex_available, monkeypatch
+):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, _, _ = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page(viewport={"width": 1440, "height": 1100})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(url)
+        expect(page.locator(".help-row").first).to_be_visible()
+        page.locator("#selection").select_option("reference")
+        page.locator("#show-pipeline").click()
+        expect(page.locator("#pipeline-data")).to_be_visible()
+
+        def run_stage(button, suffix):
+            with page.expect_response(
+                lambda response: response.url.endswith(suffix) and response.request.method == "POST"
+            ) as response:
+                page.locator(button).click()
+            assert response.value.status == 202
+            run_worker(source_state, once=True)
+
+        run_stage("#make-data", "/data")
+        expect(page.locator("#download-data")).to_be_visible(timeout=15000)
+        expect(page.locator("#download-tex")).to_be_hidden()
+        expect(page.locator("#pdf-preview")).to_be_hidden()
+        with page.expect_download() as download:
+            page.locator("#download-data").click()
+        saved = tmp_path / "reader.v2.json"
+        download.value.save_as(saved)
+        assert json.loads(saved.read_text())["config"]["selection"] == "reference"
+        page.locator("#pipeline-data").set_input_files(saved)
+        run_stage("#make-tex", "/transforms/data-to-tex")
+        expect(page.locator("#download-tex")).to_be_visible(timeout=15000)
+        expect(page.locator("#download-pdf")).to_be_hidden()
+        with page.expect_download() as download:
+            page.locator("#download-tex").click()
+        tex = tmp_path / "reader.tex"
+        download.value.save_as(tex)
+        page.locator("#pipeline-tex").set_input_files(tex)
+        run_stage("#make-pdf", "/transforms/tex-to-pdf")
+        expect(page.locator("#download-pdf")).to_be_visible(timeout=15000)
+        expect(page.locator("#pdf-preview")).to_be_visible()
+        expect(page.locator("#build-status")).to_contain_text("PDF ready from uploaded TeX")
+        expect(page.locator("#build-history .history-row")).to_have_count(3)
+        response = page.request.get(url + page.locator("#download-pdf").get_attribute("href"))
+        assert response.body().startswith(b"%PDF")
+        page.wait_for_timeout(2000)  # Let Chromium's native PDF viewer paint the proof.
+        page.screenshot(path=str(tmp_path / "pipeline-browser.png"), full_page=True)
+        assert errors == []
+        browser.close()
 
 
 @pytest.mark.parametrize("review_server", ["greek"], indirect=True)

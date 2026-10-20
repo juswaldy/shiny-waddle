@@ -26,6 +26,31 @@ Open **http://127.0.0.1:8765**. Choose a passage, save settings, review the lexi
 helps, and build. The preview displays the actual PDF. Download the PDF or an
 inspectable source bundle. Other books can be installed in the Sources tab.
 
+Choose **Run individual steps & save files** below the PDF build button to use
+the pipeline a stage at a time:
+
+1. Select a source/book and passage in the sidebar, review its helps, then choose
+   **Make data file**. **Save data file** downloads `reader.v2.json`, with ordered
+   source tokens, lexical helps, settings, provenance, and source notices.
+2. Upload that JSON under **Data → TeX** and choose **Make TeX file**, then
+   **Save TeX file**. This uses the uploaded file's settings and needs no installed
+   source downloads. XeLaTeX is required to measure pagination.
+3. Upload `reader.tex` under **TeX → PDF** and choose **Make PDF from TeX**.
+   Choose the Hebrew font used to generate the file; Ezra SIL is the default.
+   Download or preview the resulting PDF.
+
+The full **Build reader PDF** action also offers separate data and TeX downloads.
+Each stage retains its own files in build history. Data export needs no TeX and
+can retain unresolved helps for inspection; resolving or omitting selected gaps
+is required before generating TeX. Uploaded files are UTF-8 and limited to 64 MB.
+Reader data is a complete reader snapshot, distinct from a project settings file
+or a book-help file. Uploading it does not replace the open project's settings.
+Standalone TeX must contain its own document and use installed packages/fonts;
+the service supplies `reader-hebrew.ttf` and `reader-greek.ttf`. Use **Export source
+bundle** to save the fonts, licenses, and build records for external compilation.
+Standalone TeX compilation checks overflow, missing glyphs, and font embedding;
+full reader builds also verify verse coverage and page-local lexical markers.
+
 If XeLaTeX is already installed, `uv sync --locked` is enough for Python setup.
 Set `READER_XELATEX` to its executable if needed; run `bible-reader doctor` to check
 fonts, TeX packages, and source hashes. Ezra SIL is bundled under its font license.
@@ -48,6 +73,9 @@ for edition identities, Rahlfs access requirements, alternate witnesses, and lex
 .venv/bin/bible-reader inspect --project reader.json --report build/review.json
 .venv/bin/bible-reader build --project reader.json --output build/my-edition
 .venv/bin/bible-reader build --project reader.json --emit tex --output build/my-tex
+.venv/bin/bible-reader build --project reader.json --emit data --output build/my-data
+.venv/bin/bible-reader transform data-to-tex --input build/my-data/reader.v2.json --output build/from-data
+.venv/bin/bible-reader transform tex-to-pdf --input build/from-data/reader.tex --output build/from-tex
 .venv/bin/bible-reader sources import --all
 .venv/bin/bible-reader --state /path/to/workspace serve --port 8766
 ```

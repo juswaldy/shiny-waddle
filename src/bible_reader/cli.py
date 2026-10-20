@@ -12,8 +12,9 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .book_helps import load_book_helps, read_book_helps, save_book_helps
+from .data_files import MAX_PIPELINE_BYTES
 from .models import ProjectConfig, ReaderError
-from .service import build, doctor, inspect_project, write_json
+from .service import build, build_from_data, compile_tex, doctor, inspect_project, write_json
 from .sources import catalog, import_sources
 
 
@@ -60,7 +61,7 @@ def main(argv=None):
         cmd.add_argument("--passage")
         if name == "build":
             cmd.add_argument("--output", type=Path)
-            cmd.add_argument("--emit", choices=["pdf", "tex"], default="pdf")
+            cmd.add_argument("--emit", choices=["data", "pdf", "tex"], default="pdf")
             cmd.add_argument(
                 "--lexicon-appendix",
                 action=argparse.BooleanOptionalAction,
@@ -75,6 +76,11 @@ def main(argv=None):
             )
         else:
             cmd.add_argument("--report", type=Path)
+    transform = commands.add_parser("transform", help="Run one transform from a saved data or TeX file")
+    transform.add_argument("stage", choices=["data-to-tex", "tex-to-pdf"])
+    transform.add_argument("--input", type=Path, required=True)
+    transform.add_argument("--output", type=Path, required=True)
+    transform.add_argument("--hebrew-font", choices=["Ezra SIL", "SBL Hebrew"], default="Ezra SIL")
     serve = commands.add_parser("serve", help="Open the local browser application")
     serve.add_argument("--host", choices=["127.0.0.1", "localhost"], default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
@@ -158,6 +164,15 @@ def main(argv=None):
                     write_json(args.report, result)
                     print(f"Wrote {args.report}")
                     return 0
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        elif args.command == "transform":
+            if args.input.stat().st_size > MAX_PIPELINE_BYTES:
+                raise ReaderError("Pipeline files must be at most 64 MB")
+            text = args.input.read_text(encoding="utf-8")
+            if args.stage == "data-to-tex":
+                result = build_from_data(state, json.loads(text), args.output, print)
+            else:
+                result = compile_tex(text, args.output, print, font=args.hebrew_font)
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.command == "serve":
             import uvicorn
