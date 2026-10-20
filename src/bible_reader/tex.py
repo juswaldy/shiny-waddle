@@ -326,8 +326,8 @@ def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
 \newbox\PageBox
 \newcommand{{\ReaderPage}}[3]{{%
   \Header{{#1}}{{#2}}{{#3}}%
-  \copy\BodyBox\vskip9pt\hrule height0.35pt\vskip3pt
-  \copy\NotesBox\vfil\kern0pt
+  \copy\BodyBox\vfil\vskip9pt\hrule height0.35pt\vskip3pt
+  \copy\NotesBox\kern0pt
 }}
 \newwrite\Metrics
 \newcount\ChapterLines
@@ -441,6 +441,15 @@ def continues_chapter(groups: list, document: ReaderDocument) -> bool:
                 index + 1 < len(document.verses) and document.verses[index + 1]["chapter"] == last["chapter"]
             )
     raise ReaderError("Page fragment has an unknown source reference")
+
+
+def chapter_break_allowed(groups: list, document: ReaderDocument, measurement: PageMeasurement) -> bool:
+    """Padding can clear a short badge, but cannot supply a second text line."""
+    return (
+        document.config["layout"].get("verse_layout", "continuous") != "continuous"
+        or measurement.chapter_lines != 1
+        or not continues_chapter(groups, document)
+    )
 
 
 def contents(groups: list, document: ReaderDocument, prefix: str):
@@ -625,12 +634,12 @@ def balance_three_pages(document: ReaderDocument, compiler: Compiler, plans: lis
     first_metrics = measure_candidates(compiler, first_groups, document, first["folio"])
     last_metrics = measure_candidates(compiler, last_groups, document, last["folio"])
 
-    def options(metrics):
+    def options(metrics, groups):
         legal = [
             index
             for index, metric in enumerate(metrics)
             if metric.fits
-            and metric.chapter_lines != 1
+            and chapter_break_allowed(groups[index], document, metric)
             and metric.usable_height_sp - metric.page_height_sp <= ceiling
         ]
         # Keep representative cuts across the feasible range, at most eight.
@@ -638,7 +647,11 @@ def balance_three_pages(document: ReaderDocument, compiler: Compiler, plans: lis
             return [legal[round(i * (len(legal) - 1) / 7)] for i in range(8)]
         return legal
 
-    pairs = [(left, right) for left in options(first_metrics) for right in options(last_metrics)]
+    pairs = [
+        (left, right)
+        for left in options(first_metrics, first_groups)
+        for right in options(last_metrics, last_groups)
+    ]
     if not pairs:
         return plans
     middle_groups = [merge_fragments(first_cuts[left][1] + last_cuts[right][0]) for left, right in pairs]
@@ -650,7 +663,7 @@ def balance_three_pages(document: ReaderDocument, compiler: Compiler, plans: lis
     chosen = None
     for index, (left, right) in enumerate(pairs):
         metric = middle_metrics[index]
-        if not metric.fits or metric.chapter_lines == 1:
+        if not metric.fits or not chapter_break_allowed(middle_groups[index], document, metric):
             continue
         candidate_gaps = [
             value.usable_height_sp - value.page_height_sp
@@ -701,7 +714,12 @@ def rebalance_pages(document: ReaderDocument, compiler: Compiler, plans: list, p
         best_score = (max(previous_gap, current_gap), previous_gap + current_gap, 0)
         chosen = None
         for candidate, (first, second) in enumerate(zip(left_metrics, right_metrics, strict=True)):
-            if not first.fits or not second.fits or first.chapter_lines == 1 or second.chapter_lines == 1:
+            if (
+                not first.fits
+                or not second.fits
+                or not chapter_break_allowed(left[candidate], document, first)
+                or not chapter_break_allowed(right[candidate], document, second)
+            ):
                 continue
             gaps = (
                 first.usable_height_sp - first.page_height_sp,
@@ -754,6 +772,7 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
         consumed = max(fitting) + 1 if fitting else 0
         groups = remaining[:consumed]
         measurement = metrics[consumed - 1] if consumed else None
+        after = remaining[consumed:]
         # In continuous mode the next verse may start on the current last line.
         # Measure its word prefixes with exactly the helps those words require.
         # An opening can continue after two actual lines beside its badge.
@@ -762,22 +781,35 @@ def paginate(document: ReaderDocument, compiler: Compiler, progress=lambda _: No
             partials = [groups + [head] for head, _ in splits]
             partial_metrics = measure_candidates(compiler, partials, document, folio) if partials else []
             partial_fitting = [
-                i for i, metric in enumerate(partial_metrics) if metric.fits and metric.chapter_lines != 1
+                i
+                for i, metric in enumerate(partial_metrics)
+                if metric.fits and chapter_break_allowed(partials[i], document, metric)
             ]
             if partial_fitting:
                 index = max(partial_fitting)
                 groups = partials[index]
                 measurement = partial_metrics[index]
-                remaining = [splits[index][1]] + remaining[consumed + 1 :]
-            else:
-                remaining = remaining[consumed:]
-        else:
-            remaining = remaining[consumed:]
+                after = [splits[index][1]] + remaining[consumed + 1 :]
+        # Keep prefix lookahead above: a prefix can provide the second real line.
+        # If it cannot, move a one-line opening intact to the next page.
+        if measurement is not None and not chapter_break_allowed(groups, document, measurement):
+            consumed = next(
+                (
+                    i + 1
+                    for i in reversed(fitting)
+                    if chapter_break_allowed(remaining[: i + 1], document, metrics[i])
+                ),
+                0,
+            )
+            groups = remaining[:consumed]
+            measurement = metrics[consumed - 1] if consumed else None
+            after = remaining[consumed:]
         if measurement is None:
             raise ReaderError(
                 f"Layout overflow at {remaining[0][0]['reference']}: a verse/opening and its notes cannot fit. Increase page size or shorten reviewed glosses."
             )
         plans.append(page_plan(groups, document, measurement, len(plans) + 1, folio))
+        remaining = after
     return rebalance_pages(document, compiler, plans, progress)
 
 

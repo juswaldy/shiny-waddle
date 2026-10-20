@@ -226,6 +226,15 @@ Measurements and the final PDF use the same selected construction. Saved project
 and immutable build snapshots retain the choice; omitted settings default to
 continuous through project validation.
 
+A continuous one-line chapter opening is legal only when its chapter or the
+selected passage ends. Prefix lookahead runs before validating the whole-group
+fallback, since the following verse can supply the second actual line. If no
+prefix can do so, the planner moves the opening intact to the next page or
+reports overflow. The same chapter-break rule applies during rebalancing.
+Final page assembly stretches space above the apparatus separator so the notes
+end at the bottom margin on every reader page; natural measured heights and page
+budgets still include the same minimum separator clearance.
+
 After greedy pagination, continuous mode revisits non-final chapter-ending pages
 with more than 1.25 lines of unused height. It measures at most 40 legal cuts in
 the preceding page's last three verses, minimizing the largest unused height

@@ -218,6 +218,9 @@ Preserve source token offsets for each fragment and repeat its reference in the
 next page's running head; do not repeat its inline verse number. Assign helps
 from the actual words on each page. Keep a chapter box with at least two actual
 text lines before continuing its chapter onto another page.
+Try a fitting prefix of the following verse before rejecting a one-line opening.
+If none supplies a second actual line, backtrack the whole opening or report
+overflow. Padding remains valid when that chapter or the selected passage ends.
 When the next chapter cannot fit and leaves a large chapter-end gap, remeasure
 the preceding page breaks to distribute text more evenly. Keep the page count,
 type sizes, leading, and chapter-box minimum; move each word's helps with it.
@@ -231,10 +234,11 @@ centered geometrically, in Hebrew on odd printed folios and English on even prin
 folios. Hebrew titles use 18 pt. English titles use true small capitals with taller
 title initials, scaled to match the full height of the same book's Hebrew title.
 The alternation follows `layout.first_folio`, rather than the export's page
-index. Use a page-local, full-width apparatus separator, with a 9 pt scripture gap
-above it matching the header rule's gap, and a compact 3 pt gap below it.
-Helps follow scripture directly, including on sparse final
-pages; leave unused space below the apparatus. Keep note leading, entry gaps,
+index. Use a page-local, full-width apparatus separator, with a minimum 9 pt
+scripture gap above it matching the header rule's gap, and a compact 3 pt gap below
+it. Anchor the helps and their separator to the bottom margin on every reader
+page, including sparse final pages; leave unused height above the separator.
+Keep note leading, entry gaps,
 and chapter-group spacing compact without colliding pointed glyphs. Do not
 stretch Hebrew baselines to fill the page.
 

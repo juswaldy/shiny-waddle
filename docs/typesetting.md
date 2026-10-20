@@ -72,6 +72,10 @@ numbers, as in `bereshit002.jpg`. Numbers stay with the first word of their vers
 Chapter openings start a new paragraph; its first two lines share an inset beside
 a double chapter box, then the text returns to full width. Chapter openings may
 continue onto another page once at least two actual text lines accompany the box.
+Padding beside a short opening does not count as a text line. The planner tries
+a prefix of the following verse first; if it cannot supply a fitting second
+line, the whole-group fallback moves the opening to the next page or reports
+overflow. Padded one-line openings remain valid at chapter or passage ends.
 Continuous verses may split at word boundaries
 to fill the current page, including available space on its last line. Each fragment
 retains its source reference and token offsets in the page plan; continuation text
@@ -91,10 +95,10 @@ bounded remeasurement of the preceding page break. If needed, it also adjusts
 the break before that, choosing the smallest worst gap across the affected pages.
 This retains the page count, type sizes, leading, and chapter-box clearance;
 helps move with their source words. The final page may still be sparse.
-The apparatus follows
-scripture directly, with 9 pt above the separator and 3 pt below it. The 9 pt
-scripture gap matches the header rule's gap. Any unusable remainder stays
-below the helps. Run-in notes use 1.15-times-size leading (with at least 0.5 pt
+The apparatus ends at the bottom margin on every reader page, including the last.
+Its separator moves with it, retaining 3 pt above the notes. A minimum 9 pt
+scripture gap matches the header rule's gap; any unused height adds space above
+the separator. Run-in notes use 1.15-times-size leading (with at least 0.5 pt
 between tall line boxes), 0.45 em entry gaps, and a 3 pt chapter-group gap.
 
 General labels come from the full relevant chapter registry. The reference map

@@ -332,3 +332,38 @@ move, preserve the exact input document and final page, reassign a help from the
 middle page to the chapter-ending page, and verify all marker destinations.
 The fragment-join unit check retains source offsets and rejects noncontiguous
 fragments. `make demo` and `make pdf` pass.
+
+## Two-line opening fallbacks and bottom-aligned notes — 2026-10-19
+
+Continuous whole-group fallbacks now enforce two actual lines beside a chapter
+box whenever its chapter continues. Prefix lookahead runs first, since adding
+part of the next verse can supply that second line. If no such prefix fits with
+its helps, the opening moves intact to the next page or reports overflow.
+Padding remains valid at chapter and selected-passage ends. Rebalancing uses the
+same chapter-break rule.
+
+Notes and their separator now end at the bottom margin on every reader page.
+Extra height stretches above the separator, with a minimum 9 pt scripture gap
+and 3 pt below the rule. Type sizes, scripture leading, note spacing, and natural
+page budgets remain unchanged.
+
+The preserved full-Genesis reader and plan were recompiled at
+`build/genesis-bottom-aligned/`. Every existing break satisfies the new guard;
+remeasuring folios 1, 4, 5, 6, 72, 77, and 84 gives identical natural metrics.
+All 1,533 verses and 2,187 helps remain across 84 reader pages plus credits, with
+verified source coverage, page-local note destinations, embedded fonts, and no
+overflow or missing glyphs. The audit of all 84 pages places final note ink
+within 0.1 PDF point of the 10 mm bottom margin. Details and rasterized proofs
+are under `build/opening-bottom-review/`.
+
+Visual review covers the reported Genesis pages and final page, the default
+Proverbs ending, and both Hebrew and Greek examples of a moved chapter opening
+and a fitting prefix that supplies its second real line. Actual TeX/PDF tests
+also cover overflow and valid padded chapter/passage endings; the deliberately
+small synthetic fixtures retain compact synthetic credits. `make demo` and
+`make pdf` pass.
+
+`make check` passes **306 tests and 8 subtests**, with 17 opt-in browser tests
+skipped. The opening-overflow regression checks that the error identifies the
+opening itself, while the bottom-alignment regressions inspect actual Hebrew
+and Greek glyph positions on every page, including the sparse last page.
