@@ -101,6 +101,20 @@ class Store:
             )
         return self.job(identity)
 
+    def queue_file(self, kind: str, text: str, project_id: str, *, config=None):
+        """Keep immutable uploads out of frequently polled job metadata."""
+        inputs = self.state / "inputs"
+        inputs.mkdir(exist_ok=True)
+        filename = uuid.uuid4().hex
+        path = inputs / filename
+        with path.open("x", encoding="utf-8") as stream:
+            stream.write(text)
+        try:
+            return self.queue(kind, {**(config or {}), "input_file": filename}, project_id)
+        except Exception:
+            path.unlink()
+            raise
+
     def job(self, identity):
         with self.connection() as db:
             return self.decode(db.execute("SELECT * FROM jobs WHERE id=?", (identity,)).fetchone())

@@ -914,7 +914,41 @@ def final_tex(document: ReaderDocument, plans: list):
     return "\n".join(body)
 
 
+def verify_compilation(path: Path, log: str):
+    """Checks available for standalone TeX, without a reader document/page plan."""
+    if re.search(r"Overfull \\[hv]box", log):
+        raise ReaderError("The PDF has overflowing content; inspect reader.log and adjust the layout.")
+    pdf = PdfReader(path)
+    if not pdf.pages:
+        raise ReaderError("The TeX file did not produce any PDF pages")
+    pending_resources = [page["/Resources"] for page in pdf.pages]
+    visited_resources = set()
+    while pending_resources:
+        resources = pending_resources.pop().get_object()
+        if id(resources) in visited_resources:
+            continue
+        visited_resources.add(id(resources))
+        fonts = resources.get("/Font")
+        for font in fonts.get_object().values() if fonts else ():
+            font = font.get_object()
+            descendants = font.get("/DescendantFonts", [font])
+            for descendant in descendants:
+                descriptor = descendant.get_object().get("/FontDescriptor")
+                if descriptor is None or not any(
+                    key in descriptor.get_object() for key in ("/FontFile", "/FontFile2", "/FontFile3")
+                ):
+                    raise ReaderError("A PDF font is not embedded")
+        for category in ("/XObject", "/Pattern"):
+            objects = resources.get(category)
+            for item in objects.get_object().values() if objects else ():
+                nested_resources = item.get_object().get("/Resources")
+                if nested_resources is not None:
+                    pending_resources.append(nested_resources)
+    return {"total_pages": len(pdf.pages), "fonts_embedded": True}
+
+
 def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
+    verify_compilation(path, log)
     pdf = PdfReader(path)
     credits = pdf.named_destinations.get("reader-credits")
     credits_page = pdf.get_destination_page_number(credits) if credits else -1
@@ -945,8 +979,6 @@ def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
             for name in expected_entries
         ):
             raise ReaderError("A compiled lexicon entry falls outside the appendix")
-    if re.search(r"Overfull \\[hv]box", log):
-        raise ReaderError("The PDF has overflowing content; inspect reader.log and adjust the layout.")
     expected = [v["reference"] for v in document.verses]
     actual = []
     reconstructed = []
@@ -982,16 +1014,6 @@ def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
             destination = pdf.named_destinations.get(target)
             if destination is None or pdf.get_destination_page_number(destination) != page_index:
                 raise ReaderError("A compiled PDF lexical marker points to another page or a missing help")
-    for page in pdf.pages:
-        for font in page["/Resources"].get("/Font", {}).values():
-            font = font.get_object()
-            descendants = font.get("/DescendantFonts", [font])
-            for descendant in descendants:
-                descriptor = descendant.get_object().get("/FontDescriptor")
-                if descriptor is None or not any(
-                    key in descriptor.get_object() for key in ("/FontFile", "/FontFile2", "/FontFile3")
-                ):
-                    raise ReaderError("A PDF font is not embedded")
     return {
         "reader_pages": len(plans),
         "credits_pages": 1,

@@ -17,8 +17,9 @@ from pydantic import Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from ..book_helps import MAX_HELP_FILE_BYTES, BookHelps, load_book_helps, save_book_helps
+from ..data_files import load_reader_data, validate_tex
 from ..editorial import edit_decision, edit_decisions
-from ..models import Decision, ProjectConfig, ReaderError, StrictModel
+from ..models import Decision, ProjectConfig, ReaderError, StrictModel, canonical_json
 from ..service import doctor, inspect_project
 from ..sources import book_artifact, catalog
 from ..store import Store
@@ -53,6 +54,15 @@ class EditDecisionPage(StrictModel):
 class LoadBookHelps(StrictModel):
     revision: int = Field(ge=1)
     helps: BookHelps
+
+
+class UploadData(StrictModel):
+    data: dict
+
+
+class UploadTex(StrictModel):
+    tex: str
+    font: Literal["Ezra SIL", "SBL Hebrew"] = "Ezra SIL"
 
 
 def create_app(state: Path | None = None, *, start_worker=True):
@@ -233,6 +243,24 @@ def create_app(state: Path | None = None, *, start_worker=True):
     def queue_build(identity: str):
         project = store.project(identity)
         return store.queue("build", project["config"], identity, project["revision"])
+
+    @app.post("/api/projects/{identity}/data", status_code=202)
+    def queue_data(identity: str):
+        project = store.project(identity)
+        return store.queue("data", project["config"], identity, project["revision"])
+
+    @app.post("/api/projects/{identity}/transforms/data-to-tex", status_code=202)
+    def queue_data_to_tex(identity: str, value: UploadData):
+        store.project(identity)
+        document = load_reader_data(value.data)
+        return store.queue_file(
+            "data-to-tex", canonical_json(document.json()), identity, config=document.config
+        )
+
+    @app.post("/api/projects/{identity}/transforms/tex-to-pdf", status_code=202)
+    def queue_tex_to_pdf(identity: str, value: UploadTex):
+        store.project(identity)
+        return store.queue_file("tex-to-pdf", validate_tex(value.tex), identity, config={"font": value.font})
 
     @app.get("/api/jobs")
     def jobs():

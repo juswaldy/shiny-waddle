@@ -29,6 +29,7 @@ to `.reader/`. It holds:
 - `raw/`: checksum-verified source files and notices; rendering never downloads.
 - `canonical/`: rebuildable JSONL/lexicon exports from the import adapter.
 - `builds/<job-id>/`: immutable per-job outputs, logs, and review reports.
+- `inputs/`: immutable uploaded reader JSON and TeX snapshots used by transform jobs.
 - `worker.lock`: one worker per workspace, acquired with a kernel file lock.
 
 Stop the server before copying the entire workspace for backup. Restore into an

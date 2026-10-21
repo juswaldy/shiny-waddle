@@ -27,6 +27,7 @@ flowchart LR
 | `editorial.py` | Crosswalk candidates, decisions, frequency, stable chapter help labels |
 | `appendix.py` | Hebrew/Greek sort keys and the source-traceable union of selected passage helps |
 | `book_helps.py` | Versioned whole-book editorial help files and source compatibility checks |
+| `data_files.py` | Validation of portable reader data and standalone TeX inputs |
 | `word_classes.py` | Source-morphology display categories and preset word-color palette |
 | `tex.py` | Explicit language runs, TeX measurement, pagination, bounded compiler, PDF checks |
 | `service.py` | Shared inspect/build/doctor use cases and reproducibility bundles |
@@ -253,6 +254,31 @@ retain them. A shared dimension resolver supplies measurement, page budgets, and
 final PDF geometry, with 10 mm margins for reader/custom paper.
 
 ## Persistence and reproducibility
+
+`build --emit data` stops at the reader document and does not initialize TeX.
+The browser's stage controls share this service: `POST /api/projects/{id}/data`,
+`POST /api/projects/{id}/transforms/data-to-tex` (`data`), and
+`POST /api/projects/{id}/transforms/tex-to-pdf` (`tex`, optional `font`). Each queues
+an isolated, cancellable job. Uploaded UTF-8 files are retained under `inputs/`;
+job records contain their generated file IDs rather than the full uploads.
+
+Reader data retains logical Unicode, source IDs/readings, review rows, the chapter
+registry, source lock, layout settings, and any lexicon appendix. `source_notices`
+embeds exact Greek license/attribution files with checksums so resuming from a new
+snapshot needs no raw source installation. Older Greek snapshots without embedded
+notices need those pinned notices in the state directory. Source-to-data permits
+unresolved helps; rendering requires resolved selected helps. Upload validation
+checks the v2 schema, numeric types, references, help/registry consistency, and
+appendix membership without reconstructing or realigning source text.
+
+`transform data-to-tex` measures the saved reader and emits TeX and its source
+bundle. `transform tex-to-pdf` compiles standalone TeX twice with shell escape
+disabled, the existing restricted file access, timeout, and cancellation. It
+supplies the installed Hebrew font and bundled Greek font. Without the original
+reader and page plan it can check overflow, missing glyphs, and embedded fonts,
+but cannot verify verse coverage or page-local help destinations. Full reader
+builds retain those additional checks. Every successful stage exposes only its
+own artifact allowlist; existing output directories are never overwritten.
 
 SQLite stores projects/jobs only; raw sources remain the authority. Imports also
 write rebuildable canonical JSONL and lexical JSON. At current corpus sizes,

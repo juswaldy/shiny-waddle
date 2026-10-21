@@ -3,6 +3,7 @@ const $ = id => document.getElementById(id);
 const csrf = document.querySelector('meta[name="reader-token"]').content;
 let current, sourceInfo, reviewData, allJobs = [], page = 0, requestVersion = 0, noticeTimer, viewedJob;
 let pageSize = 40, reviewSaving = false, helpsResetting = false;
+let pipelineBusy = false;
 const reviewDrafts = new Map(), visibleEditors = new Map();
 let visibleRows = [], filteredRows = [];
 let contextRow, contextReference, contextPinned = false, contextHideTimer, suppressContextFocus = false;
@@ -530,30 +531,43 @@ function renderReview() {
 }
 function showBuild(job) {
   const result = job.result;
-  const stale = current && job.project_revision !== current.revision;
+  const stale = current && job.project_revision != null && job.project_revision !== current.revision;
   $("build-status").className = "info-card";
   const appendix = result.appendix_pages ? ` + ${result.appendix_pages} lexicon page${result.appendix_pages === 1 ? "" : "s"}` : "";
   const only = job.config.lexicon_only;
   const pages = only ? `${result.appendix_pages} lexicon page${result.appendix_pages === 1 ? "" : "s"}` : `${result.reader_pages} reader page${result.reader_pages === 1 ? "" : "s"}${appendix}`;
   const coverage = only ? `${result.appendix_entries} entries from ${result.verse_count} verses` : `${result.verse_count} verses · ${result.help_count} helps`;
-  $("build-status").textContent = `${pages} + source credits · ${coverage}${stale ? " · Earlier project revision — rebuild to include your latest edits." : " · Current saved edition"}`;
-  for (const [id, file] of [["download-pdf", "reader.pdf"], ["download-bundle", "reader-bundle.zip"]]) {
-    $(id).href = `/api/jobs/${job.id}/artifacts/${file}?download=true`; $(id).hidden = false;
+  if (job.kind === "data") {
+    $("build-status").textContent = `Data file ready · ${result.verse_count} verses · ${result.help_count} helps · ${result.unresolved_helps} selected helps need review${stale ? " · Earlier project revision" : " · Current saved edition"}`;
+  } else if (job.kind === "data-to-tex") {
+    $("build-status").textContent = `TeX file ready from uploaded data · ${result.verse_count} verses · ${result.help_count} helps`;
+  } else if (job.kind === "tex-to-pdf") {
+    $("build-status").textContent = `PDF ready from uploaded TeX · ${result.total_pages} pages · fonts embedded. Reader note placement and verse coverage require the original data build to verify.`;
+  } else {
+    $("build-status").textContent = `${pages} + source credits · ${coverage}${stale ? " · Earlier project revision — rebuild to include your latest edits." : " · Current saved edition"}`;
+  }
+  for (const [id, file] of [["download-data", "reader.v2.json"], ["download-tex", "reader.tex"], ["download-pdf", "reader.pdf"], ["download-bundle", "reader-bundle.zip"]]) {
+    $(id).hidden = !result.artifacts.includes(file);
+    if (!$(id).hidden) $(id).href = `/api/jobs/${job.id}/artifacts/${file}?download=true`;
+    else $(id).removeAttribute("href");
   }
   const url = `/api/jobs/${job.id}/artifacts/reader.pdf`;
-  if ($("pdf-preview").getAttribute("src") !== url) $("pdf-preview").src = url;
-  $("pdf-preview").hidden = false;
+  const hasPdf = result.artifacts.includes("reader.pdf");
+  if (hasPdf && $("pdf-preview").getAttribute("src") !== url) $("pdf-preview").src = url;
+  if (!hasPdf) $("pdf-preview").removeAttribute("src");
+  $("pdf-preview").hidden = !hasPdf;
 }
 function renderJobs() {
   if (!current) return;
-  const builds = allJobs.filter(j => j.kind === "build" && j.project_id === current.id);
+  const builds = allJobs.filter(j => ["build", "data", "data-to-tex", "tex-to-pdf"].includes(j.kind) && j.project_id === current.id);
   const active = builds.find(j => ["queued", "running"].includes(j.status));
   $("cancel-build").hidden = !active; $("build").disabled = Boolean(active);
+  for (const id of ["make-data", "make-tex", "make-pdf"]) $(id).disabled = pipelineBusy || Boolean(active);
   $("cancel-build").onclick = active ? guard(async () => { await api(`/jobs/${active.id}/cancel`, "POST"); notice("Cancellation requested"); }) : null;
   const latest = builds.find(j => j.id === viewedJob) || builds[0];
   if (latest?.status !== "succeeded") {
     $("pdf-preview").hidden = true; $("pdf-preview").removeAttribute("src");
-    $("download-pdf").hidden = true; $("download-bundle").hidden = true;
+    for (const id of ["download-data", "download-tex", "download-pdf", "download-bundle"]) $(id).hidden = true;
   }
   if (latest?.status === "succeeded") showBuild(latest);
   else if (latest) {
@@ -564,8 +578,9 @@ function renderJobs() {
     $("pdf-preview").hidden = true; $("download-pdf").hidden = true; $("download-bundle").hidden = true;
   }
   $("build-history").replaceChildren(...builds.slice(0, 8).map(job => {
-    const row = el("div", undefined, "history-row"); row.append(el("span", `${new Date(job.created).toLocaleString()} · ${job.status}`));
-    if (job.status === "succeeded") {const button = el("button", "View edition", "text-button"); button.onclick = () => {viewedJob = job.id; showBuild(job);}; row.append(button);} return row;
+    const label = {build: "Reader PDF", data: "Source → data", "data-to-tex": "Data → TeX", "tex-to-pdf": "TeX → PDF"}[job.kind];
+    const row = el("div", undefined, "history-row"); row.append(el("span", `${new Date(job.created).toLocaleString()} · ${label} · ${job.status}`));
+    if (job.status === "succeeded") {const button = el("button", "View files", "text-button"); button.onclick = () => {viewedJob = job.id; showBuild(job);}; row.append(button);} return row;
   }));
   const importJob = allJobs.find(j => j.kind === "import");
   if (importJob && ["running", "queued", "failed"].includes(importJob.status)) {
@@ -589,6 +604,7 @@ document.addEventListener("keydown", event => {if (event.key === "Escape" && !$(
 window.addEventListener("resize", positionVerseContext);
 document.addEventListener("scroll", positionVerseContext, true);
 $("show-sources").onclick = () => tab("sources");
+$("show-pipeline").onclick = () => tab("preview");
 $("project-picker").onchange = guard(() => loadProject($("project-picker").value));
 $("project-form").onsubmit = guard(async event => {event.preventDefault(); await saveConfig(formConfig()); notice("Edition settings saved");});
 $("selection").onchange = () => { $("frequency").disabled = $("selection").value !== "book-frequency"; };
@@ -608,6 +624,32 @@ document.querySelectorAll("[data-word-class]").forEach(row => {
 $("book").onchange = () => {updateLanguageFields(); if ($("book").value !== "Prov") {$("selection").value = "book-frequency"; $("passage").value = sourceInfo.books[$("book").value]?.default_passage || "1:1-10"; $("frequency").disabled = false;}};
 $("new-project").onclick = guard(async () => {requireSavedReview(); const config = structuredClone(current.config); config.name = "New reader edition"; const project = await api("/projects", "POST", config); await refreshProjects(project.id);});
 $("build").onclick = guard(async () => {requireSavedReview(); viewedJob = undefined; await saveConfig(formConfig()); const job = await api(`/projects/${current.id}/builds`, "POST"); allJobs.unshift(job); tab("preview"); renderJobs();});
+async function runPipeline(stage) {
+  pipelineBusy = true; renderJobs();
+  try {
+    let path, body;
+    if (stage === "data") {
+      requireSavedReview(); await saveConfig(formConfig());
+      path = `/projects/${current.id}/data`;
+    } else {
+      const file = $(stage === "data-to-tex" ? "pipeline-data" : "pipeline-tex").files[0];
+      if (!file) throw new Error(stage === "data-to-tex" ? "Choose a reader data JSON file first." : "Choose a TeX file first.");
+      if (file.size > 64_000_000) throw new Error("Pipeline files must be at most 64 MB.");
+      const text = await file.text();
+      if (stage === "data-to-tex") {
+        let data;
+        try {data = JSON.parse(text);} catch {throw new Error("Choose a valid reader data JSON file.");}
+        body = {data};
+      } else body = {tex: text, font: $("pipeline-font").value};
+      path = `/projects/${current.id}/transforms/${stage}`;
+    }
+    const job = await api(path, "POST", body);
+    allJobs.unshift(job); viewedJob = job.id; tab("preview");
+  } finally {pipelineBusy = false; renderJobs();}
+}
+$("make-data").onclick = guard(() => runPipeline("data"));
+$("make-tex").onclick = guard(() => runPipeline("data-to-tex"));
+$("make-pdf").onclick = guard(() => runPipeline("tex-to-pdf"));
 $("import-book").onchange = updateImportTerms;
 $("import-source").onclick = guard(async () => {const job = await api("/sources/import", "POST", {book: $("import-book").value}); allJobs.unshift(job); renderJobs(); notice("Source import queued");});
 $("check-environment").onclick = guard(async () => { $("environment").textContent = JSON.stringify(await api("/doctor"), null, 2); });

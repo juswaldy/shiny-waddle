@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import fcntl
+import json
 import time
 from pathlib import Path
 
 from .models import Cancelled, ProjectConfig
-from .service import build
+from .service import build, build_from_data, compile_tex
 from .sources import import_sources
 from .store import Store
 
@@ -40,6 +41,25 @@ def run_worker(state: Path, *, once=False, stopped=lambda: False):
                     raise Cancelled("Cancelled before starting")
                 if job["kind"] == "import":
                     result = import_sources(state, job["config"]["book"], progress, cancelled)
+                elif job["kind"] == "data":
+                    result = build(
+                        state,
+                        ProjectConfig.model_validate(job["config"]),
+                        state / "builds" / identity,
+                        progress,
+                        cancelled,
+                        emit="data",
+                    )
+                elif job["kind"] == "data-to-tex":
+                    value = json.loads(
+                        (state / "inputs" / job["config"]["input_file"]).read_text(encoding="utf-8")
+                    )
+                    result = build_from_data(state, value, state / "builds" / identity, progress, cancelled)
+                elif job["kind"] == "tex-to-pdf":
+                    text = (state / "inputs" / job["config"]["input_file"]).read_text(encoding="utf-8")
+                    result = compile_tex(
+                        text, state / "builds" / identity, progress, cancelled, font=job["config"]["font"]
+                    )
                 else:
                     config = ProjectConfig.model_validate(job["config"])
                     result = build(state, config, state / "builds" / identity, progress, cancelled)

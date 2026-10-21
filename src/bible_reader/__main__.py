@@ -9,7 +9,18 @@ from .render import render_document
 
 
 def main() -> int:
-    commands = {"doctor", "init", "sources", "inspect", "align", "build", "serve", "worker"}
+    commands = {
+        "doctor",
+        "init",
+        "sources",
+        "helps",
+        "inspect",
+        "align",
+        "build",
+        "transform",
+        "serve",
+        "worker",
+    }
     if (
         len(sys.argv) == 1
         or sys.argv[1] in commands
