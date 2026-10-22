@@ -112,6 +112,17 @@ include action, optional supported entry ID, optional editorial gloss, and reaso
 An exclusion is explicit and remains in the report. Missing source anchors or
 incompatible entry choices fail rather than silently discarding stale decisions.
 
+When no source candidates exist, a nonblank saved gloss creates an editorial
+proposal with effective `status` and `choice_method` set to `editorial`.
+`alignment_status` remains `unmatched`, candidates stay empty, and `entry_id`
+stays null. Its headword is the source word form with points/accents preserved,
+independent of the scripture display policy, and its source is
+explicitly labeled editorial. Such helps are eligible for reader/lexicon exports
+and portable book-help files; empty gaps still block rendering. Ambiguous source
+candidates still require a source-entry choice. A book-wide proposal without an
+entry applies only within the same source lemma, spelling key, and language,
+reporting other matching lexical components and excluded names as skipped.
+
 Names are excluded after alignment and editorial choices, before chapter help
 registration, in every selection mode. OSHB noun type `Np` identifies proper
 names; STEP's `N:` classification identifies names independently of language.

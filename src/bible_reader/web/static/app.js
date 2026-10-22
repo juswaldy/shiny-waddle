@@ -223,7 +223,7 @@ async function refreshReview({throwOnError = false} = {}) {
     const unresolved = (data.coverage.ambiguous || 0) + (data.coverage.unmatched || 0);
     const names = data.rows.filter(row => row.name_excluded).length;
     $("coverage").replaceChildren(...[[data.verse_count, "VERSES"], [data.help_count, "DISTINCT HELPS"], [unresolved, "TO REVIEW"], [names, "NAMES OMITTED"]].map(([value, label]) => {const node = el("div", undefined, "metric"); node.append(el("b", String(value)), el("span", label)); return node;}));
-    $("review-intro").textContent = unresolved ? `${unresolved} selected helps need a source-entry choice or explicit omission before export.` : "Every selected help resolves to a source entry. Review wording and meaning in context before publishing your edition.";
+    $("review-intro").textContent = unresolved ? `${unresolved} selected helps need review before export. Choose a source entry, write an editorial gloss where no entry is available, or omit the word.` : "Every selected help has a source entry or an editorial gloss. Review wording and meaning in context before publishing your edition.";
     $("review-intro").className = unresolved ? "info-card error" : "info-card";
     renderReview();
   } catch (error) {
@@ -310,9 +310,10 @@ function validateReviewEdits(rows) {
   for (const row of rows) {
     const edit = rowEdit(row);
     if (edit.gloss.length > 1200) throw new Error(`Gloss for ${row.anchor} must be at most 1200 characters.`);
-    if ((edit.included || edit.gloss.trim()) && !edit.entry_id) {
+    const editorialOnly = !row.candidates.length && Boolean(edit.gloss.trim());
+    if ((edit.included || edit.gloss.trim()) && !edit.entry_id && !editorialOnly) {
       visibleEditors.get(row.anchor)?.choice.focus();
-      throw new Error(`Choose a source entry for ${row.reference.replaceAll(".", " ")} (${row.anchor}), or omit the word and leave its gloss empty.`);
+      throw new Error(row.candidates.length ? `Choose a source entry for ${row.reference.replaceAll(".", " ")} (${row.anchor}), or omit the word and leave its gloss empty.` : `Write an editorial gloss for ${row.reference.replaceAll(".", " ")} (${row.anchor}), or omit the word.`);
     }
   }
 }
@@ -406,7 +407,7 @@ function createReviewEditor(row, grid) {
   const headword = el("span", "", "headword"); setScript(headword, row.language);
   sourceLine.append(headword, el("small", row.reading === "normal" ? row.lemma : `${row.lemma} · ${row.reading}`)); source.append(sourceLine);
   const choice = createReviewChoice(row, "source-entry", "Source entry",
-    [["", grid ? "No source entry selected" : "Choose a source entry…"], ...row.candidates.map(candidate => [candidate.id, `${candidate.gloss} · ${candidate.id}`])], grid);
+    [["", !row.candidates.length ? "No source entry available" : grid ? "No source entry selected" : "Choose a source entry…"], ...row.candidates.map(candidate => [candidate.id, `${candidate.gloss} · ${candidate.id}`])], grid);
   if (grid || row.candidates.length > 1 || !row.entry_id) source.append(choice.element);
   const details = el("details"); details.append(el("summary", "Source & selection"));
   details.append(el("div", `${row.reason} · ${row.method} · ${row.morphology} · ${row.book_frequency} occurrences in this book · anchor ${row.anchor}`, "source-detail")); source.append(details);
@@ -424,8 +425,9 @@ function createReviewEditor(row, grid) {
   else {const scopeLabel = el("label", "Apply to", "source-detail"); scopeLabel.append(scope.element); scopeBox.append(scopeLabel);}
   const scopeHint = el("p", undefined, "hint"); scopeHint.append(el("span", "Matches "));
   const key = el("bdi", row.consonants); setScript(key, row.language); scopeHint.append(key);
-  scopeHint.append(el("span", " across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged."));
-  if (grid) scope.element.title = `Matches \u2068${row.consonants}\u2069 across the book, including other passages and written/read forms. Replaces earlier edits. Occurrences without the chosen source candidate stay unchanged.`;
+  const scopeRule = row.candidates.length ? "Occurrences without the chosen source candidate stay unchanged." : "Editorial glosses apply only to matching words with the same unmatched source lemma.";
+  scopeHint.append(el("span", ` across the book, including other passages and written/read forms. Replaces earlier edits. ${scopeRule}`));
+  if (grid) scope.element.title = `Matches \u2068${row.consonants}\u2069 across the book, including other passages and written/read forms. Replaces earlier edits. ${scopeRule}`;
   else scopeBox.append(scopeHint);
   const actions = el(grid ? "td" : "div", undefined, "help-actions");
   actions.append(el("span", row.label === null ? "—" : String(row.label), "note-label"));
@@ -463,7 +465,7 @@ function createReviewEditor(row, grid) {
     if (values.some(value => value.includes("\t") || value.length > 1200) || targets.length !== values.length) {
       notice("Paste one column of glosses, at most 1200 characters each, into rows on the current page.", true); return;
     }
-    if (targets.some((target, offset) => values[offset].trim() && !rowEdit(target).entry_id)) {
+    if (targets.some((target, offset) => values[offset].trim() && !rowEdit(target).entry_id && target.candidates.length)) {
       notice("Choose a source entry for each destination row before pasting glosses.", true); return;
     }
     targets.forEach((target, offset) => setDraft(target, {...rowEdit(target), gloss: values[offset]}));
@@ -482,10 +484,11 @@ function createReviewEditor(row, grid) {
     headword.textContent = entry?.headword || "—";
     card.classList.toggle("dirty", reviewDrafts.has(row.anchor));
     const excludedName = nameExcluded(row, value);
+    const editorialOnly = !row.candidates.length && !entry && Boolean(value.gloss.trim());
     status.textContent = reviewDrafts.has(row.anchor) ? "unsaved" : excludedName ? "name omitted" : row.selected ? row.choice_method === "first-entry" ? "default" : row.status : "omitted";
-    status.classList.toggle("unresolved", value.included && !value.entry_id);
+    status.classList.toggle("unresolved", value.included && !value.entry_id && !editorialOnly);
     scopeHint.hidden = value.scope !== "book"; save.textContent = value.scope === "book" ? "Save all" : "Save help";
-    provenance.textContent = !entry ? "Choose a source entry" : value.gloss.trim() && value.gloss.trim() !== entry.gloss ? "Editorial wording · STEP source entry" : row.choice_method === "first-entry" && value.entry_id === row.entry_id ? "Default gloss · first STEP source entry" : "STEP source gloss";
+    provenance.textContent = !row.candidates.length ? editorialOnly ? "Editorial proposal · no source entry" : "No source entry available · write your own gloss" : !entry ? "Choose a source entry" : value.gloss.trim() && value.gloss.trim() !== entry.gloss ? "Editorial wording · STEP source entry" : row.choice_method === "first-entry" && value.entry_id === row.entry_id ? "Default gloss · first STEP source entry" : "STEP source gloss";
     resetSource.disabled = reviewSaving || !entry || value.gloss === entry.gloss;
     undo.disabled = reviewSaving || !reviewDrafts.has(row.anchor);
     save.disabled = reviewSaving;
@@ -502,7 +505,7 @@ function renderReview() {
   const query = $("search").value.toLowerCase();
   const editedOnly = $("edited-only").checked;
   filteredRows = reviewData.rows.filter(row => (editedOnly ? reviewDrafts.has(row.anchor) :
-    ($("show-all").checked || row.selected) && (!$("unresolved-only").checked || (row.selected && row.status !== "resolved")) && (!$("resolved-only").checked || row.status === "resolved")) &&
+    ($("show-all").checked || row.selected) && (!$("unresolved-only").checked || (row.selected && ["ambiguous", "unmatched"].includes(row.status))) && (!$("resolved-only").checked || ["resolved", "editorial"].includes(row.status))) &&
     `${row.surface} ${row.gloss} ${row.reference} ${row.lemma} ${row.entry_id || ""} ${rowEdit(row).gloss}`.toLowerCase().includes(query));
   page = Math.max(0, Math.min(page, Math.ceil(filteredRows.length / pageSize) - 1));
   visibleRows = filteredRows.slice(page * pageSize, (page + 1) * pageSize);

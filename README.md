@@ -178,8 +178,15 @@ section letters, and lexical headwords stay intact. The default remains `"hide"`
 The reference help selection applies to Proverbs 1:29–2:12. For other passages choose
 `all` or `book-frequency`; the latter counts occurrences in the entire selected
 source book. `known_entries` and per-anchor `decisions` support exclusions and
-reviewed glosses. Ambiguous or unmatched selected helps must be resolved or
-explicitly omitted before a build succeeds.
+reviewed glosses. Ambiguous selected helps need a source-entry choice or explicit
+omission before a build succeeds. Where **No source entry available** appears,
+type a gloss and choose **Save all**, **Save help**, or **Save page**. It is saved
+as an **Editorial proposal · no source entry** and can be used in reader and
+lexicon exports. Its source alignment remains unmatched, with no invented entry
+ID. The source word form supplies its headword, retaining its points and accents.
+Empty selected gaps still need a gloss or omission. Book-wide editorial proposals apply only to
+matching words with the same unmatched source lemma and language; other lemmas
+and names stay unchanged. These proposals also survive **Save/Load book helps**.
 
 **Gloss selection → Default gloss (first entry)** uses the first entry in
 each word’s source-entry list, including ambiguous and base-ID matches. The order

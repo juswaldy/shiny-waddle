@@ -93,7 +93,6 @@ def test_book_help_file_round_trip_includes_other_chapters_readings_and_segments
         ("missing:0", Decision(action="exclude"), "missing source anchor"),
         ("test-ketiv:0", Decision(entry_id="step:test-other"), "incompatible lexical decision"),
         ("test-segmented:1", Decision(entry_id="step:test-choice"), "incompatible lexical decision"),
-        ("test-unmatched:0", Decision(gloss="Editorial without a source"), "Choose a source entry"),
     ],
 )
 def test_save_checks_entire_book_even_when_chapters_and_readings_are_hidden(
@@ -112,6 +111,17 @@ def test_load_rejects_changed_source_identity(source_state, consonant_review, fi
     setattr(saved.sources, field, "different")
     with pytest.raises(ReaderError, match="different text or lexicon"):
         load_book_helps(source_state, config, saved)
+
+
+def test_unmatched_editorial_gloss_round_trips_outside_passage(source_state, consonant_review):
+    config = book_config()
+    config.decisions["test-unmatched:0"] = Decision(gloss="Synthetic unsourced proposal")
+    saved = BookHelps.model_validate_json(save_book_helps(source_state, config).model_dump_json())
+    restored = load_book_helps(source_state, ProjectConfig(passage="3:1", selection="all"), saved)
+    assert restored.decisions == config.decisions
+    row = next(r for r in build_document(source_state, restored).review if r["anchor"] == "test-unmatched:0")
+    assert row["gloss"] == "Synthetic unsourced proposal" and row["entry_id"] is None
+    assert row["status"] == "editorial" and row["alignment_status"] == "unmatched"
 
 
 def test_empty_file_clears_decisions_and_preserves_unresolved_choices(source_state, consonant_review):

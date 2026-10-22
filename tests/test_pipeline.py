@@ -10,7 +10,7 @@ from bible_reader.cli import main
 from bible_reader.data_files import load_reader_data
 from bible_reader.editorial import build_document
 from bible_reader.jobs import run_worker
-from bible_reader.models import ProjectConfig, ReaderError
+from bible_reader.models import Decision, ProjectConfig, ReaderError
 from bible_reader.service import build, build_from_data, compile_tex
 from bible_reader.tex import verify_pdf
 from bible_reader.web.app import create_app
@@ -42,6 +42,28 @@ def test_unresolved_data_can_be_saved_but_cannot_render(source_state, consonant_
     saved = json.loads((tmp_path / "data/reader.v2.json").read_text())
     with pytest.raises(ReaderError, match="unresolved selected helps"):
         build_from_data(tmp_path / "offline", saved, tmp_path / "tex")
+
+
+def test_manual_gloss_data_round_trip_and_reader_export(
+    source_state, consonant_review, tmp_path, tex_available
+):
+    config = ProjectConfig(selection="all", passage="3:1", lexicon_appendix=True)
+    config.decisions = {
+        row["anchor"]: Decision(gloss="Synthetic manual help: 50% & review")
+        if row["anchor"] == "test-unmatched:0"
+        else Decision(action="exclude")
+        for row in build_document(source_state, config).review
+    }
+    result = build(source_state, config, tmp_path / "data", emit="data")
+    assert result["unresolved_helps"] == 0
+    saved = json.loads((tmp_path / "data/reader.v2.json").read_text())
+    assert load_reader_data(saved).json() == saved
+    help = next(iter(saved["helps"].values()))
+    assert help["status"] == "editorial" and help["editorial"] and help["entry_id"] is None
+    assert saved["lexicon_appendix"][0]["gloss"] == help["gloss"]
+    result = build_from_data(tmp_path / "offline", saved, tmp_path / "pdf", emit="pdf")
+    assert "reader.pdf" in result["artifacts"]
+    assert r"50\% \& review" in (tmp_path / "pdf/reader.tex").read_text()
 
 
 def test_reader_data_rejects_broken_references_and_tex_in_numeric_fields(source_state):

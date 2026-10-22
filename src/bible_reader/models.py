@@ -46,6 +46,13 @@ class Decision(StrictModel):
     gloss: str | None = Field(default=None, min_length=1, max_length=1200)
     reason: str = Field(default="Reader selection", min_length=1, max_length=300)
 
+    @field_validator("gloss")
+    @classmethod
+    def nonblank_gloss(cls, value):
+        if value is not None and not value.strip():
+            raise ValueError("Gloss must not be blank")
+        return value
+
     @field_validator("gloss", "reason")
     @classmethod
     def text(cls, value):

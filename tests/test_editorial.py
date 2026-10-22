@@ -455,6 +455,39 @@ def test_bulk_omission_can_explicitly_exclude_unmatched_and_ambiguous_words(sour
     assert next(r for r in rows if r["anchor"] == "test-aramaic:0")["selected"]
 
 
+@pytest.mark.parametrize("scope", ["occurrence", "book"])
+def test_unmatched_gloss_is_an_explicit_editorial_help(source_state, unmatched_review, scope):
+    raw = [verse.json() for verse in unmatched_review]
+    config = ProjectConfig(passage="3:1-4:1", selection="all", lexicon_appendix=True)
+    decision = Decision(gloss="Synthetic editorial proposal", reason="Manual missing-source help")
+    changed, report = edit_decision(source_state, config, "test-unmatched:0", decision, scope)
+    expected = {"test-unmatched:0"}
+    if scope == "book":
+        expected.add("test-unmatched-repeat:0")
+        assert "test-unmatched-homograph:0" in {row["anchor"] for row in report["skipped"]}
+        assert "test-unmatched-name:0" in {row["anchor"] for row in report["skipped"]}
+    assert set(report["applied"]) == expected
+    assert set(changed.decisions) == expected
+    document = build_document(source_state, changed)
+    rows = {row["anchor"]: row for row in document.review}
+    for anchor in expected:
+        row = rows[anchor]
+        assert row["status"] == "editorial" and row["alignment_status"] == "unmatched"
+        assert row["entry_id"] is None and row["candidates"] == []
+        assert row["choice_method"] == "editorial" and row["gloss"] == decision.gloss
+        help = document.helps[row["help_id"]]
+        assert help["editorial"] and help["source"] == "Editorial proposal; source word form"
+        assert help["headword"] == row["source_surface"].replace("/", "")
+    assert any(entry["editorial"] and entry["entry_id"] is None for entry in document.lexicon_appendix)
+    changed.cantillation = "consonants-only"
+    assert build_document(source_state, changed).helps == document.helps
+    # Other gaps still block publication; a proposal never chooses their sources.
+    with pytest.raises(ReaderError, match="unresolved"):
+        require_resolved(document)
+    assert [verse.json() for verse in unmatched_review] == raw
+    assert not config.decisions
+
+
 @pytest.mark.parametrize(
     "anchor,decision,scope,message",
     [

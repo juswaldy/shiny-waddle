@@ -12,7 +12,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from .data_files import load_reader_data, validate_tex
-from .editorial import build_document, require_resolved
+from .editorial import READY_HELP_STATUSES, build_document, require_resolved
 from .models import ProjectConfig, ReaderError, digest
 from .sources import book_artifact, catalog, read_verified
 from .tex import (
@@ -232,7 +232,9 @@ def build(
             "stage": "source-to-data",
             "verse_count": len(document.verses),
             "help_count": len(document.helps),
-            "unresolved_helps": sum(r["selected"] and r["status"] != "resolved" for r in document.review),
+            "unresolved_helps": sum(
+                r["selected"] and r["status"] not in READY_HELP_STATUSES for r in document.review
+            ),
         }
         artifacts = [
             "config.resolved.json",
@@ -263,7 +265,7 @@ def build(
             "config_hash": digest(config.model_dump()),
         }
     require_resolved(document)
-    if any(help["status"] != "resolved" for help in document.helps.values()):
+    if any(help["status"] not in READY_HELP_STATUSES for help in document.helps.values()):
         raise ReaderError("Review unresolved selected helps before building")
     greek = document.sources.get("language") == "grc"
     compiler = Compiler(output, "Ezra SIL" if greek else config.layout.hebrew_font, cancelled, greek=greek)

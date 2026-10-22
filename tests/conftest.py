@@ -83,6 +83,25 @@ def consonant_review(source_state, monkeypatch):
 
 
 @pytest.fixture
+def unmatched_review(consonant_review):
+    """Synthetic missing-source repeats, homographs, names, and language boundaries."""
+    consonant_review.append(
+        Verse(
+            "Prov",
+            4,
+            1,
+            (
+                Token("test-unmatched-repeat", "שְמֹר", "9999"),
+                Token("test-unmatched-homograph", "שְמֹר", "9998"),
+                Token("test-unmatched-name", "שְמֹר", "9999", morph="HNp"),
+                Token("test-unmatched-aramaic", "שְמֹר", "9999", language="arc"),
+            ),
+        )
+    )
+    return consonant_review
+
+
+@pytest.fixture
 def name_review(source_state, monkeypatch):
     """Synthetic source classifications; no proposed biblical readings or lexical senses."""
     entries = {
