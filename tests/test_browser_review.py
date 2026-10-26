@@ -14,6 +14,7 @@ from playwright.sync_api import expect, sync_playwright
 
 from bible_reader.jobs import run_worker
 from bible_reader.models import ProjectConfig
+from bible_reader.store import Store
 from bible_reader.web.app import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -132,6 +133,66 @@ def test_manual_gloss_without_source_entry_saves_and_reloads(
             page.request.get(project_url).json()["config"]["decisions"]["test-unmatched:0"]["entry_id"]
             is None
         )
+        browser.close()
+
+
+def test_overflow_summary_links_logs_and_keeps_completed_pdf_files(
+    review_server, source_state, tmp_path, tex_available, monkeypatch
+):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, _, _ = review_server
+    source = tmp_path / "overflow.tex"
+    source.write_text(
+        r"\documentclass{article}\begin{document}"
+        r"\noindent\hbox to 0pt{Synthetic overflow}\par\end{document}"
+    )
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page(viewport={"width": 1440, "height": 1100})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(url)
+        page.locator("#show-pipeline").click()
+        page.locator("#pipeline-tex").set_input_files(source)
+        with page.expect_response(lambda response: response.url.endswith("/transforms/tex-to-pdf")) as queued:
+            page.locator("#make-pdf").click()
+        job = queued.value.json()
+        run_worker(source_state, once=True)
+        expect(page.locator("#build-status")).to_contain_text("Build completed with errors", timeout=15000)
+        expect(page.locator("#build-status")).to_contain_text("Overfull")
+        link = page.locator("#build-status").get_by_role("link", name="reader.log", exact=True)
+        expect(link).to_have_attribute("href", f"/api/jobs/{job['id']}/artifacts/reader.log")
+        response = page.request.get(url + link.get_attribute("href"))
+        assert response.ok and "Overfull" in response.text()
+        assert page.request.get(url + f"/api/jobs/{job['id']}").json()["status"] == "failed"
+        expect(page.locator("#download-pdf")).to_be_visible()
+        expect(page.locator("#download-bundle")).to_be_visible()
+        expect(page.locator("#pdf-preview")).to_be_visible()
+        page.reload()
+        page.get_by_role("button", name="PDF preview", exact=True).click()
+        expect(page.locator("#build-history").get_by_role("button", name="View files")).to_be_visible()
+        expect(page.locator("#build-status")).to_contain_text("Build completed with errors")
+        page.screenshot(path=str(tmp_path / "build-errors-browser.png"), full_page=True)
+        # Older failed jobs have no result manifest, but their log is still useful.
+        store = Store(source_state)
+        previous = store.queue("build", ProjectConfig().model_dump(), job["project_id"])
+        output = source_state / "builds" / previous["id"]
+        output.mkdir()
+        (output / "reader.log").write_text("Overfull \\hbox (11.89pt too wide)")
+        store.update_job(
+            previous["id"],
+            status="failed",
+            error="The PDF has overflowing content; inspect reader.log and adjust the layout.",
+        )
+        page.reload()
+        page.get_by_role("button", name="PDF preview", exact=True).click()
+        link = page.locator("#build-status").get_by_role("link", name="reader.log", exact=True)
+        expect(link).to_have_attribute("href", f"/api/jobs/{previous['id']}/artifacts/reader.log")
+        expect(page.locator("#download-pdf")).to_be_hidden()
+        page.locator("#build-history").get_by_role("button", name="View files").click()
+        expect(page.locator("#build-status")).to_contain_text("Build completed with errors")
+        expect(page.locator("#download-pdf")).to_be_visible()
+        assert not errors
         browser.close()
 
 

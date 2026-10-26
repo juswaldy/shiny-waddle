@@ -27,6 +27,35 @@ from bible_reader.word_classes import word_color
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.parametrize("language", ["hebrew", "greek"])
+@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
+def test_three_digit_chapter_badges_fit_in_both_languages_and_layouts(
+    source_state, request, tmp_path, tex_available, language, verse_layout
+):
+    greek = language == "greek"
+    state = request.getfixturevalue("greek_state") if greek else source_state
+    config = ProjectConfig(
+        book="John" if greek else "Prov",
+        passage="1:1-3" if greek else "2:1-3",
+        selection="all" if greek else "reference",
+        gloss_selection="first-entry",
+        layout={"verse_layout": verse_layout},
+    )
+    document = build_document(state, config)
+    # Synthetic chapter numbering exercises the badge without importing new text.
+    for verse in document.verses:
+        verse["chapter"] = 122
+        verse["reference"] = f"{config.book}.122.{verse['verse']}"
+    for help in document.helps.values():
+        help["chapter"] = 122
+    compiler = Compiler(tmp_path / "three-digits", "Ezra SIL", greek=greek)
+    plans = paginate(document, compiler)
+    log = compiler.compile("reader", final_tex(document, plans), passes=2)
+    assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 3
+    pdf = PdfReader(compiler.directory / "reader.pdf")
+    assert "122" in pdf.pages[0].extract_text()
+
+
 @pytest.mark.parametrize("paper,verse_layout", [("reader", "continuous"), ("reference", "verse-per-line")])
 def test_lexicon_appendix_is_four_columns_in_hebrew_order_before_credits(
     source_state, tmp_path, tex_available, paper, verse_layout

@@ -260,6 +260,31 @@ def test_validation_and_artifact_allowlist(client, source_state):
     assert client.get(base + "reader.pdf").status_code == 404
 
 
+@pytest.mark.parametrize("status", ["queued", "running", "failed", "interrupted", "cancelled"])
+def test_failed_build_logs_and_completed_diagnostic_artifacts(client, source_state, status):
+    store = client.app.state.store
+    job = store.queue("build", {})
+    path = source_state / "builds" / job["id"]
+    path.mkdir(parents=True)
+    (path / "reader.log").write_text("Overfull \\hbox (11.89pt too wide)")
+    (path / "reader.pdf").write_bytes(b"%PDF")
+    (path / "private.txt").write_text("private")
+    base = f"/api/jobs/{job['id']}/artifacts/"
+    store.update_job(job["id"], status=status)
+    response = client.get(base + "reader.log")
+    assert response.status_code == (200 if status in {"failed", "interrupted"} else 404)
+    if response.status_code == 200:
+        assert response.headers["content-type"].startswith("text/plain")
+        assert response.text.startswith("Overfull")
+    assert client.get(base + "reader.pdf").status_code == 404
+    store.update_job(job["id"], result={"artifacts": ["reader.pdf"], "errors": ["Overflow"]})
+    assert client.get(base + "reader.pdf").status_code == (200 if status == "failed" else 404)
+    assert client.get(base + "private.txt").status_code == 404
+    (path / "reader.log").unlink()
+    (path / "reader.log").symlink_to(source_state / "reader.sqlite3")
+    assert client.get(base + "reader.log").status_code == 404
+
+
 def test_custom_paper_settings_and_build_snapshot(client):
     project = client.post("/api/projects", json={}).json()
     assert project["config"]["layout"]["paper"] == "reader"

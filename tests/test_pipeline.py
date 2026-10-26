@@ -16,6 +16,50 @@ from bible_reader.tex import verify_pdf
 from bible_reader.web.app import create_app
 
 
+@pytest.mark.integration
+def test_reader_overflow_retains_pdf_bundle_and_all_validation_diagnostics(
+    source_state, tmp_path, tex_available, monkeypatch
+):
+    from bible_reader import service
+
+    render = service.final_tex
+
+    def overflowing_tex(document, plans):
+        return render(document, plans).replace(
+            r"\end{document}",
+            r"\noindent\hbox to 0pt{Synthetic layout overflow}\par\end{document}",
+        )
+
+    monkeypatch.setattr(service, "final_tex", overflowing_tex)
+    output = tmp_path / "overflow"
+    stages = []
+    result = build(source_state, ProjectConfig(), output, stages.append)
+    assert stages[-1] == "Completed with errors"
+    assert result["errors"] and "Overfull" in result["errors"][0]
+    # Log errors do not prevent the remaining independent PDF checks.
+    assert result["pdf_marker_destinations"] == "verified" and result["fonts_embedded"]
+    checks = json.loads((output / "layout-diagnostics.json").read_text())
+    assert checks["errors"] == result["errors"]
+    assert json.loads((output / "manifest.json").read_text())["checks"] == checks
+    with zipfile.ZipFile(output / "reader-bundle.zip") as bundle:
+        assert {"reader.pdf", "reader.tex", "reader.log", "layout-diagnostics.json"} <= set(bundle.namelist())
+
+
+@pytest.mark.integration
+def test_standalone_pdf_with_overflow_finishes_and_cli_reports_failure(tmp_path, tex_available, capsys):
+    text = (
+        r"\documentclass{article}\begin{document}"
+        r"\noindent\hbox to 0pt{Synthetic overflow}\par\end{document}"
+    )
+    source = tmp_path / "input.tex"
+    source.write_text(text)
+    output = tmp_path / "pdf"
+    assert main(["transform", "tex-to-pdf", "--input", str(source), "--output", str(output)]) == 1
+    assert '"errors"' in capsys.readouterr().out
+    assert (output / "reader-bundle.zip").is_file()
+    assert "overflowing content" in (output / "layout-diagnostics.json").read_text()
+
+
 def test_data_export_needs_no_tex_and_preserves_complete_snapshot(source_state, tmp_path, monkeypatch):
     def no_compiler(*args, **kwargs):
         pytest.fail("Data export must not initialize TeX")

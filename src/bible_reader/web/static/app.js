@@ -532,6 +532,29 @@ function renderReview() {
   $("row-count").textContent = filteredRows.length ? `Page ${page + 1} of ${Math.ceil(filteredRows.length / pageSize)} · ${page * pageSize + 1}–${Math.min((page + 1) * pageSize, filteredRows.length)} of ${filteredRows.length} word references` : "0 word references";
   updateReviewActions();
 }
+function buildMessage(node, message, job) {
+  node.replaceChildren(...message.split(/((?:reader|measure)(?:\.console)?\.log)/g).map(part => {
+    if (!/^(?:reader|measure)(?:\.console)?\.log$/.test(part)) return document.createTextNode(part);
+    const link = el("a", part);
+    link.href = `/api/jobs/${job.id}/artifacts/${part}`;
+    link.target = "_blank"; link.rel = "noopener";
+    return link;
+  }));
+}
+function buildErrors(job) {
+  const status = $("build-status");
+  status.className = "info-card error";
+  status.replaceChildren();
+  const errors = job.result?.errors || [];
+  if (errors.length) {
+    status.append(el("p", "Build completed with errors. Review the summary before using the PDF."));
+    const list = el("ul");
+    for (const message of errors) {
+      const item = el("li"); buildMessage(item, message, job); list.append(item);
+    }
+    status.append(list);
+  } else buildMessage(status, job.error || "Build failed", job);
+}
 function showBuild(job) {
   const result = job.result;
   const stale = current && job.project_revision != null && job.project_revision !== current.revision;
@@ -549,6 +572,7 @@ function showBuild(job) {
   } else {
     $("build-status").textContent = `${pages} + source credits · ${coverage}${stale ? " · Earlier project revision — rebuild to include your latest edits." : " · Current saved edition"}`;
   }
+  if (result.errors?.length) buildErrors(job);
   for (const [id, file] of [["download-data", "reader.v2.json"], ["download-tex", "reader.tex"], ["download-pdf", "reader.pdf"], ["download-bundle", "reader-bundle.zip"]]) {
     $(id).hidden = !result.artifacts.includes(file);
     if (!$(id).hidden) $(id).href = `/api/jobs/${job.id}/artifacts/${file}?download=true`;
@@ -568,14 +592,18 @@ function renderJobs() {
   for (const id of ["make-data", "make-tex", "make-pdf"]) $(id).disabled = pipelineBusy || Boolean(active);
   $("cancel-build").onclick = active ? guard(async () => { await api(`/jobs/${active.id}/cancel`, "POST"); notice("Cancellation requested"); }) : null;
   const latest = builds.find(j => j.id === viewedJob) || builds[0];
-  if (latest?.status !== "succeeded") {
+  const hasFiles = latest && ["succeeded", "failed"].includes(latest.status) && latest.result?.artifacts?.length;
+  if (!hasFiles) {
     $("pdf-preview").hidden = true; $("pdf-preview").removeAttribute("src");
     for (const id of ["download-data", "download-tex", "download-pdf", "download-bundle"]) $(id).hidden = true;
   }
-  if (latest?.status === "succeeded") showBuild(latest);
+  if (hasFiles) showBuild(latest);
   else if (latest) {
-    $("build-status").textContent = ["failed", "interrupted"].includes(latest.status) ? latest.error : `${latest.status === "cancelled" ? "Build cancelled" : latest.stage || "Build queued"}`;
-    $("build-status").className = ["failed", "interrupted"].includes(latest.status) ? "info-card error" : "info-card";
+    if (["failed", "interrupted"].includes(latest.status)) buildErrors(latest);
+    else {
+      $("build-status").textContent = latest.status === "cancelled" ? "Build cancelled" : latest.stage || "Build queued";
+      $("build-status").className = "info-card";
+    }
   } else {
     $("build-status").textContent = "Build a reader to preview the actual PDF here.";
     $("pdf-preview").hidden = true; $("download-pdf").hidden = true; $("download-bundle").hidden = true;
@@ -583,7 +611,7 @@ function renderJobs() {
   $("build-history").replaceChildren(...builds.slice(0, 8).map(job => {
     const label = {build: "Reader PDF", data: "Source → data", "data-to-tex": "Data → TeX", "tex-to-pdf": "TeX → PDF"}[job.kind];
     const row = el("div", undefined, "history-row"); row.append(el("span", `${new Date(job.created).toLocaleString()} · ${label} · ${job.status}`));
-    if (job.status === "succeeded") {const button = el("button", "View files", "text-button"); button.onclick = () => {viewedJob = job.id; showBuild(job);}; row.append(button);} return row;
+    if (["succeeded", "failed"].includes(job.status) && job.result?.artifacts?.length) {const button = el("button", "View files", "text-button"); button.onclick = () => {viewedJob = job.id; showBuild(job);}; row.append(button);} return row;
   }));
   const importJob = allJobs.find(j => j.kind === "import");
   if (importJob && ["running", "queued", "failed"].includes(importJob.status)) {

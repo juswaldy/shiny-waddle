@@ -163,7 +163,7 @@ class Compiler:
                     )
                 raise ReaderError(f"XeLaTeX failed; inspect {name}.console.log.\n{log[-1800:]}")
         log = (self.directory / f"{name}.log").read_text(errors="replace")
-        if "Missing character:" in log:
+        if name != "reader" and "Missing character:" in log:
             raise ReaderError("Selected fonts cannot render all characters. See the TeX log.")
         return log
 
@@ -185,7 +185,7 @@ def scripture_macros(layout: dict) -> str:
     \vtop{{\hsize=\dimexpr\linewidth-14mm\relax\linewidth=\hsize\vskip0pt
       \Verse{{}}{{#2}}\Verse{{#3}}{{#4}}}}%
     \hskip2mm\vtop{{\hsize=12mm\vskip0pt
-      \hbox{{\fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont #1}}}}}}}}}}
+      \hbox{{\ChapterBadge{{#1}}}}}}
   }}\par
 }}
 """
@@ -208,18 +208,15 @@ def scripture_macros(layout: dict) -> str:
 \newcommand{{\ChapterOpen}}[1]{{%
   \EndScriptureParagraph\vskip4pt\ChapterParagraphtrue\hangindent=-14mm\hangafter=-2\noindent
   \textenglish{{\makebox[0pt][l]{{\hspace{{2mm}}\smash{{\raisebox{{-2mm}}{{%
-    \fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont #1}}}}}}%
+    \ChapterBadge{{#1}}%
   }}}}}}}}%
 }}
 """
 
 
 def greek_scripture_macros(layout: dict) -> str:
-    badge = r"\newcommand{\ChapterBadge}[1]{\fboxsep=1pt\fbox{\fbox{\parbox[c][9mm][c]{9mm}{\centering\fontsize{25}{28}\selectfont #1}}}}"
     if layout.get("verse_layout", "continuous") == "verse-per-line":
-        return (
-            badge
-            + rf"""
+        return rf"""
 \newcommand{{\Scripture}}[1]{{#1}}
 \newcommand{{\Verse}}[2]{{%
   \noindent\hbox to\linewidth{{%
@@ -238,10 +235,7 @@ def greek_scripture_macros(layout: dict) -> str:
   }}\par
 }}
 """
-        )
-    return (
-        badge
-        + rf"""
+    return rf"""
 \newif\ifChapterParagraph
 \newcommand{{\EndScriptureParagraph}}{{%
   \par\global\ChapterLines=0
@@ -264,7 +258,6 @@ def greek_scripture_macros(layout: dict) -> str:
   \noindent\textenglish{{\makebox[0pt][r]{{\smash{{\raisebox{{-2mm}}{{\ChapterBadge{{#1}}}}}}\hspace{{2mm}}}}}}%
 }}
 """
-    )
 
 
 def document_language(document: ReaderDocument) -> str:
@@ -304,6 +297,14 @@ def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
 \setlength{{\parskip}}{{0pt}}
 \setlength{{\fboxrule}}{{0.35pt}}
 \hfuzz=0.2pt
+\newsavebox{{\ChapterNumberBox}}
+\newcommand{{\ChapterBadge}}[1]{{\begingroup
+  \sbox{{\ChapterNumberBox}}{{\textenglish{{\fontsize{{25}}{{28}}\selectfont #1}}}}%
+  \fboxsep=1pt\fbox{{\fbox{{\parbox[c][9mm][c]{{9mm}}{{\centering\fontsize{{25}}{{28}}\selectfont
+    \ifdim\wd\ChapterNumberBox>9mm
+      \resizebox{{9mm}}{{!}}{{\usebox{{\ChapterNumberBox}}}}%
+    \else\usebox{{\ChapterNumberBox}}\fi}}}}}}%
+\endgroup}}
 {macros}
 \newcommand{{\HelpMarker}}[2]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{7}}{{8}}\selectfont\hyperlink{{#1}}{{#2}}}}}}}}
 \newcommand{{\ReadingMark}}[1]{{\nobreak\textsuperscript{{\textenglish{{\fontsize{{6}}{{7}}\selectfont #1}}}}}}
@@ -914,10 +915,29 @@ def final_tex(document: ReaderDocument, plans: list):
     return "\n".join(body)
 
 
-def verify_compilation(path: Path, log: str):
+def compilation_errors(log: str) -> list[str]:
+    errors = []
+    overfull = re.findall(r"^Overfull \\[hv]box[^\n]*", log, re.MULTILINE)
+    if overfull:
+        errors.append(
+            "The PDF has overflowing content; inspect reader.log and adjust the layout.\n"
+            + "\n".join(overfull)
+        )
+    missing = list(dict.fromkeys(re.findall(r"^Missing character:[^\n]*", log, re.MULTILINE)))
+    if missing:
+        errors.append(
+            "Selected fonts cannot render all characters; inspect reader.log.\n" + "\n".join(missing)
+        )
+    return errors
+
+
+def verify_compilation(path: Path, log: str, *, errors: list[str] | None = None):
     """Checks available for standalone TeX, without a reader document/page plan."""
-    if re.search(r"Overfull \\[hv]box", log):
-        raise ReaderError("The PDF has overflowing content; inspect reader.log and adjust the layout.")
+    diagnostics = compilation_errors(log)
+    if errors is None and diagnostics:
+        raise ReaderError("\n".join(diagnostics))
+    if errors is not None:
+        errors.extend(diagnostics)
     pdf = PdfReader(path)
     if not pdf.pages:
         raise ReaderError("The TeX file did not produce any PDF pages")
@@ -947,8 +967,10 @@ def verify_compilation(path: Path, log: str):
     return {"total_pages": len(pdf.pages), "fonts_embedded": True}
 
 
-def verify_pdf(path: Path, plans: list, document: ReaderDocument, log: str):
-    verify_compilation(path, log)
+def verify_pdf(
+    path: Path, plans: list, document: ReaderDocument, log: str, *, errors: list[str] | None = None
+):
+    verify_compilation(path, log, errors=errors)
     pdf = PdfReader(path)
     credits = pdf.named_destinations.get("reader-credits")
     credits_page = pdf.get_destination_page_number(credits) if credits else -1

@@ -90,8 +90,11 @@ this release.
 - **Unresolved help:** filter Needs review, select a supported source candidate, or
   uncheck it and save the explicit omission. A gloss alone cannot invent a source.
 - **Revision conflict:** another tab saved a change; reload before applying your edit.
-- **Interrupted/failed job:** inspect its message and the workspace build directory;
-  correct the input and start a fresh build. Failed jobs do not expose export links.
+- **Interrupted/failed job:** follow the log link in its message or inspect the
+  workspace build directory. A PDF with validation errors still finishes its
+  diagnostic report, manifest, and bundle; its preview and downloads remain
+  available with the error summary. The job remains failed until a corrected
+  build passes validation. Earlier compilation failures expose only diagnostic logs.
 - **Blank embedded preview:** the browser must have a native PDF viewer enabled.
   The PDF download works independently. Browser acceptance uses full Chromium;
   Playwright's minimal headless shell cannot display embedded PDFs.

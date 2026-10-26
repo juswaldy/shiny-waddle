@@ -165,6 +165,8 @@ def main(argv=None):
                     print(f"Wrote {args.report}")
                     return 0
             print(json.dumps(result, ensure_ascii=False, indent=2))
+            if result.get("errors"):
+                return 1
         elif args.command == "transform":
             if args.input.stat().st_size > MAX_PIPELINE_BYTES:
                 raise ReaderError("Pipeline files must be at most 64 MB")
@@ -174,6 +176,8 @@ def main(argv=None):
             else:
                 result = compile_tex(text, args.output, print, font=args.hebrew_font)
             print(json.dumps(result, ensure_ascii=False, indent=2))
+            if result.get("errors"):
+                return 1
         elif args.command == "serve":
             import uvicorn
 
