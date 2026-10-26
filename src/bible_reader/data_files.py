@@ -45,7 +45,7 @@ class DataHelp(Record):
     headword: str
     gloss: str
     stem: str
-    status: Literal["resolved", "ambiguous", "unmatched"]
+    status: Literal["resolved", "editorial", "ambiguous", "unmatched"]
     editorial: bool
     source: str
     lemma: str
@@ -53,7 +53,7 @@ class DataHelp(Record):
 
 class DataReview(Record):
     selected: bool
-    status: Literal["resolved", "ambiguous", "unmatched"]
+    status: Literal["resolved", "editorial", "ambiguous", "unmatched"]
     reference: str
     surface: str
     help_id: str | None

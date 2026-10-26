@@ -14,6 +14,7 @@ from .sources import catalog, lemma_keys, load_book, load_lexicon, source_lock, 
 from .word_classes import word_class
 
 STEMS = {"q": "Qal", "N": "Nif", "p": "Piel", "P": "Pual", "h": "Hif", "H": "Hof", "t": "Hitp"}
+READY_HELP_STATUSES = {"resolved", "editorial"}
 CONSONANT_PUNCTUATION = {"consonants-only": "", "consonants": "־", "consonants-maqqef-sof-pasuq": "־׃"}
 DISPLAY_TRANSFORMATIONS = {
     "preserve": "Display policy preserve: source Hebrew points, accents, and punctuation retained.",
@@ -143,9 +144,16 @@ def edit_decisions(state: Path, config: ProjectConfig, edits: list[tuple[str, De
             decision.gloss
             and not decision.entry_id
             and not default_entry_id(origin_lemma, crosswalk, config.gloss_selection)
+            and origin_candidates
         ):
             raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
-        if scope == "book" and (decision.action == "include" or decision.gloss) and not decision.entry_id:
+        editorial_only = bool(decision.gloss and not decision.entry_id and not origin_candidates)
+        if (
+            scope == "book"
+            and (decision.action == "include" or decision.gloss)
+            and not decision.entry_id
+            and not editorial_only
+        ):
             raise ReaderError(f"Choose a source entry before applying a help to all occurrences: {anchor}")
         key = token_spelling_key(origin)
         if scope == "book" and not key:
@@ -154,6 +162,16 @@ def edit_decisions(state: Path, config: ProjectConfig, edits: list[tuple[str, De
         targets = anchors.items() if scope == "book" else [(anchor, anchors[anchor])]
         for target, (verse, token, lemma, morphology) in targets:
             if scope == "book" and (token.language != origin.language or token_spelling_key(token) != key):
+                continue
+            if editorial_only and lemma != origin_lemma:
+                skipped.append(
+                    {
+                        "anchor": target,
+                        "reference": verse.reference,
+                        "source_surface": token.surface,
+                        "reason": "Editorial gloss without a source entry applies only to the same unmatched source lemma",
+                    }
+                )
                 continue
             if decision.entry_id and decision.entry_id not in lexical_candidates(lemma, crosswalk):
                 skipped.append(
@@ -337,9 +355,23 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                     if decision and decision.gloss
                     else (entries[choice].gloss if choice else "")
                 )
-                if decision and decision.gloss and not choice:
+                if decision and decision.gloss and not choice and candidate_ids:
                     raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
-                semantic = digest([choice or lemma, stem, gloss])[:20]
+                editorial_only = bool(decision and decision.gloss and not choice)
+                headword = (
+                    entries[choice].headword
+                    if choice
+                    else token.surface.replace("/", "")
+                    if editorial_only
+                    else ""
+                )
+                if editorial_only:
+                    status, choice_method = "editorial", "editorial"
+                semantic = digest(
+                    [lemma, stem, gloss, headword, token.language]
+                    if editorial_only
+                    else [choice or lemma, stem, gloss]
+                )[:20]
                 explicit_label = reference.get(anchor, {}).get("label")
                 if decision and (
                     decision.gloss or (decision.entry_id and decision.entry_id != default_choice)
@@ -373,12 +405,14 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                         "chapter": verse.chapter,
                         "label": label,
                         "entry_id": choice,
-                        "headword": entries[choice].headword if choice else "",
+                        "headword": headword,
                         "gloss": gloss,
                         "stem": stem,
                         "status": status,
                         "editorial": bool(decision and decision.gloss),
-                        "source": "STEP TBESG Gloss; published Greek lexical crosswalk"
+                        "source": "Editorial proposal; source word form"
+                        if editorial_only
+                        else "STEP TBESG Gloss; published Greek lexical crosswalk"
                         if token.language == "grc"
                         else "STEP Gloss; OSHB verb-stem code",
                         "language": token.language,
@@ -426,6 +460,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                                 "exact": "",
                                 "first-entry": "; first listed source entry (project default)",
                                 "decision": "; saved source-entry decision",
+                                "editorial": "; editorial proposal without a source entry",
                                 "unresolved": "; review required",
                             }[choice_method],
                         }
@@ -475,7 +510,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
 
 
 def require_resolved(document: ReaderDocument):
-    problems = [r for r in document.review if r["selected"] and r["status"] != "resolved"]
+    problems = [r for r in document.review if r["selected"] and r["status"] not in READY_HELP_STATUSES]
     if problems:
         first = problems[0]
         raise ReaderError(

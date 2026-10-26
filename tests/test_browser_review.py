@@ -73,6 +73,68 @@ def expect_review_choice(row, field, value):
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
 
 
+@pytest.mark.parametrize("view", ["grid", "cards"])
+@pytest.mark.parametrize("batch", [False, True])
+def test_manual_gloss_without_source_entry_saves_and_reloads(
+    unmatched_review, review_server, monkeypatch, view, batch
+):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, csrf = review_server
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page(viewport={"width": 1440, "height": 1100})
+        project_url = url + f"/api/projects/{identity}"
+        project = page.request.get(project_url).json()
+        project["config"]["passage"] = "3:1-4:1"
+        assert page.request.put(
+            project_url,
+            headers={"X-Reader-Token": csrf},
+            data={"revision": project["revision"], "config": project["config"]},
+        ).ok
+        page.goto(url)
+        page.locator("#review-view").select_option(view)
+        page.locator("#unresolved-only").check()
+        row = page.locator("[data-anchor='test-unmatched:0']")
+        expect(row.locator(".gloss-provenance")).to_have_text(
+            "No source entry available · write your own gloss"
+        )
+        if view == "grid":
+            row.locator("textarea").evaluate(
+                "node => {const data = new DataTransfer(); data.setData('text/plain', "
+                "'Synthetic manual browser gloss\\n'); "
+                "node.dispatchEvent(new ClipboardEvent('paste', {clipboardData: data, bubbles: true, cancelable: true}));}"
+            )
+        else:
+            row.locator("textarea").fill("Synthetic manual browser gloss")
+        expect(row.locator("textarea")).to_have_value("Synthetic manual browser gloss")
+        expect(row.locator(".gloss-provenance")).to_have_text("Editorial proposal · no source entry")
+        endpoint = "/decisions/batch" if batch else "/decisions"
+        with page.expect_response(lambda response: response.url.endswith(endpoint)) as response:
+            if batch:
+                page.locator("#save-page").click()
+            else:
+                row.get_by_role("button", name="Save all", exact=True).click()
+        assert response.value.ok
+        saved = response.value.json()
+        assert set(saved["applied"]) == {"test-unmatched:0", "test-unmatched-repeat:0"}
+        expect(page.locator("#draft-count")).to_have_text("No unsaved edits")
+        expect(row).to_have_count(0)  # An explicit proposal leaves Needs review.
+        page.locator("#unresolved-only").uncheck()
+        page.locator("#resolved-only").check()
+        expect(row.locator("textarea")).to_have_value("Synthetic manual browser gloss")
+        expect(row.locator(".row-status")).to_have_text("editorial")
+        expect(row.locator(".row-status")).not_to_have_class("unresolved")
+        expect(row.get_by_role("button", name="Use source gloss for test-unmatched:0")).to_be_disabled()
+        page.reload()
+        expect(row.locator("textarea")).to_have_value("Synthetic manual browser gloss")
+        expect_review_choice(row, "Source entry", "")
+        assert (
+            page.request.get(project_url).json()["config"]["decisions"]["test-unmatched:0"]["entry_id"]
+            is None
+        )
+        browser.close()
+
+
 def test_pipeline_download_upload_and_standalone_pdf_in_browser(
     review_server, source_state, tmp_path, tex_available, monkeypatch
 ):
@@ -756,7 +818,7 @@ def test_grid_page_entry_drafts_shortcuts_atomic_saves_and_mobile(review_server,
         page.locator("#discard-page").click()
         page.locator("#search").fill("")
 
-        # Unmatched choices require explicit entry selection before any gloss paste or save.
+        # Ambiguous choices still require entry selection before gloss paste or save.
         page.locator("#unresolved-only").check()
         unresolved = page.locator(".help-row").first
         unresolved.locator("textarea").evaluate(

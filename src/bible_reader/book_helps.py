@@ -81,7 +81,7 @@ def validate_book_helps(state: Path, config: ProjectConfig):
         if decision.entry_id and decision.entry_id not in editorial.lexical_candidates(lemma, crosswalk):
             raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
         choice = decision.entry_id or editorial.default_entry_id(lemma, crosswalk, config.gloss_selection)
-        if decision.gloss and not choice:
+        if decision.gloss and not choice and editorial.lexical_candidates(lemma, crosswalk):
             raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
 
 

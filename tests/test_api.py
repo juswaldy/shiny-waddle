@@ -377,6 +377,31 @@ def test_single_decision_api_defaults_and_validation_do_not_save_partial_edits(c
     assert saved["applied"] == ["test-origin:0"] and not saved["skipped"]
 
 
+@pytest.mark.parametrize("batch", [False, True])
+def test_manual_unmatched_gloss_saves_without_entry_and_rejects_empty_inclusion(
+    client, consonant_review, batch
+):
+    project = client.post("/api/projects", json={"passage": "3:1", "selection": "all"}).json()
+    url = f"/api/projects/{project['id']}"
+    endpoint = url + "/decisions" + ("/batch" if batch else "")
+    for decision, status in [({}, 400), ({"gloss": "   "}, 422), ({"gloss": "Synthetic manual gloss"}, 200)]:
+        edit = {"anchor": "test-unmatched:0", "scope": "book", "decision": decision}
+        payload = {"revision": 1, **({"edits": [edit]} if batch else edit)}
+        response = client.post(endpoint, json=payload)
+        assert response.status_code == status
+        if status != 200:
+            assert client.get(url).json() == project
+    assert response.json()["project"]["revision"] == 2
+    saved = client.get(url).json()
+    assert saved["config"]["decisions"]["test-unmatched:0"]["entry_id"] is None
+    review = client.get(url + "/review").json()
+    row = next(r for r in review["rows"] if r["anchor"] == "test-unmatched:0")
+    assert row["status"] == "editorial" and row["alignment_status"] == "unmatched"
+    assert row["gloss"] == "Synthetic manual gloss"
+    assert review["coverage"]["editorial"] == 1
+    assert client.get(url + "/helps?revision=2").status_code == 200
+
+
 def test_review_page_is_one_revision_with_editorial_glosses_and_immutable_builds(client, consonant_review):
     project = client.post("/api/projects", json={"passage": "1:1", "selection": "all"}).json()
     url = f"/api/projects/{project['id']}"

@@ -94,6 +94,27 @@ def test_lxx_missing_lexical_links_stay_explicit_and_verse_zero_is_addressable(g
         editorial.build_document(greek_state, config)
 
 
+def test_lxx_missing_entry_accepts_manual_gloss_without_fabricating_a_lexical_link(greek_state):
+    config = ProjectConfig(book="LXXGen", passage="1:1-2", selection="all")
+    original = editorial.build_document(greek_state, config)
+    missing = next(r for r in original.review if r["surface"] == "ἀκατασκεύαστος")
+    changed, report = editorial.edit_decision(
+        greek_state, config, missing["anchor"], Decision(gloss="Synthetic Greek proposal"), "book"
+    )
+    assert missing["anchor"] in report["applied"]
+    restored = load_book_helps(greek_state, config, save_book_helps(greek_state, changed))
+    document = editorial.build_document(greek_state, restored)
+    row = next(r for r in document.review if r["anchor"] == missing["anchor"])
+    assert row["entry_id"] is None and not row["candidates"]
+    assert row["status"] == "editorial" and row["alignment_status"] == "unmatched"
+    help = document.helps[row["help_id"]]
+    assert help["headword"] == missing["surface"] and help["language"] == "grc"
+    assert help["gloss"] == "Synthetic Greek proposal" and "STEP" not in help["source"]
+    assert [t["source_surface"] for v in document.verses for t in v["tokens"]] == [
+        t["source_surface"] for v in original.verses for t in v["tokens"]
+    ]
+
+
 def test_nt_environment_requires_verified_crosswalk_as_well_as_text_and_lexicon(greek_state, monkeypatch):
     from types import SimpleNamespace
 
