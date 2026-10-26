@@ -148,7 +148,8 @@ source bundle. Unresolved selected helps still require review before building.
 for a preset palette, then open **Palette & class colors** to pick a custom color
 or **Auto (no color)** for each class. **Set all to no color** resets every class,
 including names, to Auto; you can then color individual classes. Use **Save settings**
-to keep the reset palette. Switching back to Auto keeps your overrides
+to keep the reset palette. **Set all to presets** restores every class's preset
+color, including names. Switching back to Auto keeps your overrides
 for later use. Scripture words use their source morphology; names also use the
 existing STEP name metadata. Attached prefixes and suffixes share the main word's
 color. Unknown or compound classes stay uncolored. Notes, markers, punctuation,
@@ -164,6 +165,10 @@ TOML uses `word_colors = "word-class"` under `[layout]` and per-class values und
 `adverb`, `pronoun`, `preposition`, `conjunction`, `particle`, `suffix`, `number`,
 and `name`. Omit an override to use its preset; custom colors are six-digit hex values.
 Omitted `word_colors` uses `"auto"`, including older projects.
+Saved reader data files include every class's explicit hex color or `"auto"` in
+`config.layout.word_color_overrides`, including colors inherited from presets.
+This pins the palette for offline data → TeX → PDF builds; project settings may
+still omit overrides to select presets.
 
 The **Cantillation** selector also offers **Consonants only**, **Consonants +
 maqqef**, and **Consonants + maqqef + sof pasuq**. All three hide Hebrew combining

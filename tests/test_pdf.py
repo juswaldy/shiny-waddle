@@ -56,6 +56,94 @@ def test_three_digit_chapter_badges_fit_in_both_languages_and_layouts(
     assert "122" in pdf.pages[0].extract_text()
 
 
+@pytest.mark.parametrize("language", ["hbo", "grc"])
+@pytest.mark.parametrize("opening", ["short", "two-lines", "long"])
+def test_separate_verses_reclaim_chapter_inset_after_two_lines(
+    request, tmp_path, tex_available, language, opening
+):
+    greek = language == "grc"
+    state = request.getfixturevalue("greek_state" if greek else "source_state")
+    config = ProjectConfig(
+        book="John" if greek else "Prov",
+        passage="1:1-3" if greek else "2:1-3",
+        selection="all",
+        gloss_selection="first-entry",
+        layout={"verse_layout": "verse-per-line"},
+    )
+    document = build_document(state, config)
+    # Repeating one attributed word isolates line positions and wrapping; these
+    # synthetic verses are typography fixtures, not proposed source readings.
+    word = max(
+        (t for v in document.verses for t in v["tokens"] if t["kind"] == "word"),
+        key=lambda t: sum(c.isalpha() for c in t["surface"]),
+    )
+    word = {**word, "helps": []}
+    opening_words = {"short": 1, "two-lines": 6 if greek else 9, "long": 24}[opening]
+    for verse, count in zip(document.verses, [opening_words, 24, 1], strict=True):
+        verse["tokens"] = [word] * count
+    compiler = Compiler(tmp_path / "opening-inset", "Ezra SIL", greek=greek)
+    plans = paginate(document, compiler)
+    assert len(plans) == 1
+    log = compiler.compile("reader", final_tex(document, plans), passes=2)
+    assert verify_pdf(compiler.directory / "reader.pdf", plans, document, log)["verse_count"] == 3
+    page = PdfReader(compiler.directory / "reader.pdf").pages[0]
+    runs, digits = [], {}
+    pt = 72 / 72.27
+
+    def collect(text, cm, tm, font, size):
+        if not text.strip():
+            return
+        x = cm[0] * tm[4] + cm[2] * tm[5] + cm[4]
+        y = round(cm[1] * tm[4] + cm[3] * tm[5] + cm[5], 1)
+        if size == pytest.approx(11 * pt, abs=0.01) and text.strip() in {"2", "3"}:
+            digits[text.strip()] = (x, y)
+        family = "GentiumPlus" if greek else "Ezra"
+        if (
+            family in font["/BaseFont"]
+            and size == pytest.approx(config.layout.body_pt * pt, abs=0.01)
+            and y < float(page.mediabox.top) - 60
+        ):
+            runs.append((x, y))
+
+    page.extract_text(visitor_text=collect)
+    baselines = sorted({y for _, y in runs}, reverse=True)
+    first_verse_lines = sum(y > digits["2"][1] for y in baselines)
+    if opening_words == 1:
+        assert first_verse_lines == 1
+    elif opening == "two-lines":
+        assert first_verse_lines == 2
+    else:
+        assert first_verse_lines > 2
+    rendered = pdfium.PdfDocument(compiler.directory / "reader.pdf")
+    text_page = rendered[0].get_textpage()
+    lines = [[] for _ in baselines]
+    for index in range(text_page.count_chars()):
+        if text_page.get_text_range(index, 1).isalpha() and pdfium.raw.FPDFText_GetFontSize(
+            text_page, index
+        ) == pytest.approx(config.layout.body_pt * pt, abs=0.01):
+            left, bottom, right, top = text_page.get_charbox(index)
+            center = (bottom + top) / 2
+            line = min(range(len(baselines)), key=lambda i: abs(baselines[i] - center))
+            if abs(baselines[line] - center) < config.layout.leading_pt / 2:
+                lines[line].append(left if greek else right)
+    edge = min if greek else max
+    positions = [edge(line) for line in lines]
+    normal = positions[-1]
+    inward = 1 if greek else -1
+    # Verse 1 sits directly beside the badge, without an empty number gutter.
+    assert inward * (positions[0] - normal) == pytest.approx(8 * 72 / 25.4, abs=0.2)
+    second_inset_mm = 14 if first_verse_lines == 1 else 8
+    assert inward * (positions[1] - normal) == pytest.approx(second_inset_mm * 72 / 25.4, abs=0.2)
+    # Every subsequent line, including wrapped verse 2, uses the normal margin.
+    assert all(x == pytest.approx(normal, abs=0.2) for x in positions[2:])
+    number_inset_mm = 14 if first_verse_lines == 1 else 0
+    assert inward * (digits["2"][0] - digits["3"][0]) == pytest.approx(number_inset_mm * 72 / 25.4, abs=0.2)
+    assert all(
+        a - b < config.layout.leading_pt * pt + 2 for a, b in zip(baselines, baselines[1:], strict=False)
+    )
+    rendered[0].render(scale=2).to_pil().save(compiler.directory / "proof.png")
+
+
 @pytest.mark.parametrize("paper,verse_layout", [("reader", "continuous"), ("reference", "verse-per-line")])
 def test_lexicon_appendix_is_four_columns_in_hebrew_order_before_credits(
     source_state, tmp_path, tex_available, paper, verse_layout

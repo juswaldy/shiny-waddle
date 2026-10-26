@@ -367,3 +367,51 @@ small synthetic fixtures retain compact synthetic credits. `make demo` and
 skipped. The opening-overflow regression checks that the error identifies the
 opening itself, while the bottom-alignment regressions inspect actual Hebrew
 and Greek glyph positions on every page, including the sparse last page.
+
+## Verse-per-line chapter spacing — 2026-10-25
+
+Hebrew and Greek verse-per-line openings now reserve the chapter inset for the
+first two actual text lines. Verse 1 omits the empty number gutter beside the
+badge; subsequent lines and verse numbers return to their normal margins below
+it, including lines within a wrapped verse. Pagination still keeps the first two
+verses together, and short single-verse openings retain two lines of clearance.
+Both languages use the same construction with mirrored directions and gutters.
+
+Six PDF regressions check actual glyph edges and verse-number positions for
+one-line, two-line, and longer opening verses, including a second verse that
+wraps past the badge. They also check consecutive baselines for added blank lines.
+Source coverage, page-local note destinations, embedded fonts, and TeX overflow
+checks pass for the full-source Proverbs 1:29–2:12, Genesis 1:1–8, and
+John 1:1–18 proofs under `build/chapter-spacing/final/`. The proofs retain their
+reader JSON, measured page plans, TeX, logs, PDFs, and rasterized reader pages.
+Visual review covers the mid-page Proverbs chapter transition, dense lexical
+notes, both reading directions, wrapped openings, and their following verses.
+Additional short single-word Hebrew/Greek fixtures were compiled and inspected
+under `build/chapter-spacing/single/` to check badge clearance at passage ends.
+
+`make check` passes **359 tests and 8 subtests**, with 23 opt-in browser tests
+skipped. The suite was run outside the sandbox after its API test client stalled
+under sandbox restrictions. `make demo` and `make pdf` pass.
+
+## Explicit exported word colors and preset reset — 2026-10-25
+
+Reader JSON now includes all eleven classes in
+`config.layout.word_color_overrides`: implicit presets become explicit hex
+values, while custom colors and `auto` choices are retained. Serialization
+copies the configuration, preserving the project's sparse overrides and the
+editor's distinction between presets and custom colors. Saved readers retain
+their palette even if application presets change later.
+
+**Set all to presets** restores every class, including names, and updates the
+pickers. Saving settings persists the reset; reloading retains preset selections.
+Browser checks exercise this alongside the existing no-color reset, mobile
+layout, unsaved color choices in downloaded data, and data → TeX → PDF uploads.
+Both targeted browser checks pass. The regenerated Psalm 123:1–4 reader data at
+`build/ps123-explicit-palette/reader.v2.json` includes every preset color, matches
+the saved project's rendering choices, and leaves the project unchanged.
+
+`make check` passes **363 tests and 8 subtests**, with 23 opt-in browser tests
+skipped; `make demo` passes. Four new export regressions cover enabled/disabled
+color modes, explicit overrides, bundled downloads, and palette stability after
+preset changes. The Hebrew and Greek offline pipeline checks also retain a
+custom noun color through data, TeX, and compiled PDF.

@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .word_classes import WordClass
+from .word_classes import WORD_CLASS_COLORS, WordClass
 
 
 class ReaderError(Exception):
@@ -202,4 +202,12 @@ class ReaderDocument:
     source_notices: dict[str, str] = field(default_factory=dict)
 
     def json(self):
-        return asdict(self)
+        data = asdict(self)
+        # A portable reader pins every palette value, including implicit presets.
+        # Projects keep sparse overrides so the editor can still identify presets.
+        layout = data["config"]["layout"]
+        layout["word_color_overrides"] = {
+            **{category: "#" + color for category, (_, color) in WORD_CLASS_COLORS.items()},
+            **layout.get("word_color_overrides", {}),
+        }
+        return data

@@ -14,6 +14,7 @@ from bible_reader.models import Decision, ProjectConfig, ReaderError
 from bible_reader.service import build, build_from_data, compile_tex
 from bible_reader.tex import verify_pdf
 from bible_reader.web.app import create_app
+from bible_reader.word_classes import WORD_CLASS_COLORS, word_color
 
 
 @pytest.mark.integration
@@ -77,6 +78,38 @@ def test_data_export_needs_no_tex_and_preserves_complete_snapshot(source_state, 
         assert json.loads(bundle.read("reader.v2.json")) == original
     with pytest.raises(ReaderError, match="not empty"):
         build(source_state, config, tmp_path / "data", emit="data")
+
+
+@pytest.mark.parametrize("mode", ["auto", "word-class"])
+@pytest.mark.parametrize("overrides", [{}, {"noun": "#123abc", "name": "auto"}])
+def test_data_export_pins_presets_and_preserves_color_overrides(
+    source_state, tmp_path, monkeypatch, mode, overrides
+):
+    config = ProjectConfig(layout={"word_colors": mode, "word_color_overrides": overrides})
+    document = build_document(source_state, config)
+    original = copy.deepcopy(document.config)
+    before = {category: word_color(category, document.config["layout"]) for category in WORD_CLASS_COLORS}
+    build(source_state, config, tmp_path / "palette", emit="data")
+    saved = json.loads((tmp_path / "palette/reader.v2.json").read_text())
+    palette = saved["config"]["layout"]["word_color_overrides"]
+    assert set(palette) == set(WORD_CLASS_COLORS)
+    assert palette["verb"] == "#A33432"
+    assert palette["noun"] == ("#123ABC" if overrides else "#245A81")
+    assert palette["name"] == ("auto" if overrides else "#9C3776")
+    assert saved["config"]["layout"]["word_colors"] == mode
+    assert config.model_dump() == document.config == original
+    assert document.json() == saved
+    assert document.config == original  # Serializing never changes the project palette.
+    with zipfile.ZipFile(tmp_path / "palette/reader-bundle.zip") as bundle:
+        assert json.loads(bundle.read("reader.v2.json")) == saved
+    # A later application palette must not change a saved reader's appearance.
+    monkeypatch.setitem(WORD_CLASS_COLORS, "verb", ("Verbs", "010203"))
+    monkeypatch.setitem(WORD_CLASS_COLORS, "noun", ("Nouns", "040506"))
+    restored = load_reader_data(saved)
+    assert restored.json() == saved
+    assert {
+        category: word_color(category, restored.config["layout"]) for category in WORD_CLASS_COLORS
+    } == before
 
 
 def test_unresolved_data_can_be_saved_but_cannot_render(source_state, consonant_review, tmp_path):
@@ -223,6 +256,8 @@ def test_saved_data_to_tex_to_pdf_is_offline_and_preserves_reader(
         if language == "greek"
         else ProjectConfig()
     )
+    config.layout.word_colors = "word-class"
+    config.layout.word_color_overrides = {"noun": "#123ABC", "name": "auto"}
     build(state, config, tmp_path / "data", emit="data")
     value = json.loads((tmp_path / "data/reader.v2.json").read_text())
     offline = tmp_path / "no-installed-sources"
@@ -230,6 +265,7 @@ def test_saved_data_to_tex_to_pdf_is_offline_and_preserves_reader(
     assert "reader.tex" in tex_result["artifacts"] and "reader.pdf" not in tex_result["artifacts"]
     assert json.loads((tmp_path / "tex/reader.v2.json").read_text()) == value
     text = (tmp_path / "tex/reader.tex").read_text()
+    assert r"\textcolor[HTML]{123ABC}" in text
     result = compile_tex(text, tmp_path / "pdf")
     assert result["fonts_embedded"]
     assert "page_membership" not in result  # Standalone TeX does not claim a reader-specific check.

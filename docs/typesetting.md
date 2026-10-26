@@ -89,7 +89,12 @@ marker and reserves at least two lines for the box. Candidate measurement window
 extend when more short verses fit, since several verses may share a line.
 In `verse-per-line` mode each verse starts its own right-aligned RTL paragraph
 with an LTR digit in a right-side gutter; longer verses wrap without repeating
-the number. The first two verses share the chapter-box inset, as in `mishle002.jpg`.
+the number. Greek mirrors this construction in LTR with a left-side gutter.
+The first two actual text lines share the chapter-box inset, as in `mishle002.jpg`;
+later lines return to the normal margin, including wrapped lines within a verse.
+Verse 1 sits directly beside the box without reserving an empty number gutter.
+The first two verses stay together during pagination. Short single-verse
+openings retain two lines of clearance for the badge.
 Both measurement and final rendering use the selected mode. In continuous mode,
 a chapter-ending page with more than 1.25 lines of unused height triggers a
 bounded remeasurement of the preceding page break. If needed, it also adjusts
