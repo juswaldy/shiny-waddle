@@ -4,10 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from bible_reader import editorial
+from bible_reader import editorial, tex
 from bible_reader.book_helps import load_book_helps, save_book_helps
 from bible_reader.greek import morphgnt_crosswalk, parse_morphgnt, parse_rahlfs, parse_tbesg
-from bible_reader.models import Decision, ProjectConfig, ReaderError
+from bible_reader.models import Decision, ProjectConfig, ReaderDocument, ReaderError
+from bible_reader.sources import catalog
 
 FIXTURES = Path(__file__).parent / "fixtures/greek"
 
@@ -140,6 +141,59 @@ def test_greek_fixtures_are_attributable_and_unchanged():
         assert hashlib.sha256((FIXTURES / name).read_bytes()).hexdigest() == expected
 
 
+def test_every_greek_book_has_a_greek_title_and_distinct_witness_labels():
+    books = catalog()["greek"]["books"]
+    for book in books.values():
+        assert any("\u0391" <= char <= "\u03a9" for char in book["greek"])
+    for codes in [
+        ("LXXJoshA", "LXXJoshB"),
+        ("LXXJudgA", "LXXJudgB"),
+        ("LXXTobBA", "LXXTobS"),
+        ("LXXDanOG", "LXXDanTh"),
+        ("LXXSusOG", "LXXSusTh"),
+        ("LXXBelOG", "LXXBelTh"),
+        ("LXXEzra", "LXXNeh"),
+    ]:
+        assert len({books[code]["greek"] for code in codes}) == len(codes)
+
+
+@pytest.mark.integration
+def test_greek_catalog_headers_have_matching_title_bounds(tmp_path, tex_available):
+    import pypdfium2 as pdfium
+
+    config = ProjectConfig(book="John", selection="all").model_dump()
+    body = [tex.preamble(config["layout"], language="grc")]
+    titles = []
+    for code, book in catalog()["greek"]["books"].items():
+        verse = {"reference": f"{code}.1.1", "chapter": 1, "verse": 1, "tokens": []}
+        document = ReaderDocument({**config, "book": code}, [verse], {}, [], {}, {"language": "grc"})
+        for folio in (1329, 1330):
+            boxes, page = tex.page_tex([[verse]], document, "p1", folio)
+            body.extend([boxes, page, r"\newpage"])
+        titles.extend([book["greek"], book["title"]])
+    body.append(r"\end{document}")
+    compiler = tex.Compiler(tmp_path, "Ezra SIL", greek=True)
+    log = compiler.compile("reader", "\n".join(body))
+    assert tex.verify_compilation(tmp_path / "reader.pdf", log)["fonts_embedded"]
+    pdf = pdfium.PdfDocument(tmp_path / "reader.pdf")
+    assert len(pdf) == len(titles)
+    original_bounds = None
+    for index, title in enumerate(titles):
+        page = pdf[index]
+        text = page.get_textpage()
+        content = text.get_text_range()
+        start = content.index(title)
+        boxes = [text.get_charbox(i) for i in range(start, start + len(title)) if content[i].strip()]
+        bounds = (min(box[1] for box in boxes), max(box[3] for box in boxes))
+        if index % 2:
+            assert bounds == pytest.approx(original_bounds, abs=0.2), title
+        else:
+            original_bounds = bounds
+        text.close()
+        page.close()
+    pdf.close()
+
+
 def test_morphgnt_retains_all_columns_punctuation_and_stable_positions():
     verses = parse_morphgnt((FIXTURES / "John.txt").read_bytes(), "John", 4)
     assert len(verses) == 18
@@ -206,9 +260,9 @@ def test_greek_lexicon_and_published_crosswalk_keep_candidates_and_gaps():
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("verse_layout", ["continuous", "verse-per-line"])
+@pytest.mark.parametrize("verse_layout,first_folio", [("continuous", 1), ("verse-per-line", 2)])
 def test_greek_pdf_has_embedded_fonts_same_page_notes_and_clear_chapter_inset(
-    greek_state, tmp_path, tex_available, verse_layout
+    greek_state, tmp_path, tex_available, verse_layout, first_folio
 ):
     import zipfile
 
@@ -221,7 +275,7 @@ def test_greek_pdf_has_embedded_fonts_same_page_notes_and_clear_chapter_inset(
         passage="1:1-18",
         selection="all",
         lexicon_appendix=True,
-        layout={"verse_layout": verse_layout},
+        layout={"verse_layout": verse_layout, "first_folio": first_folio},
     )
     document = editorial.build_document(greek_state, config)
     config.decisions = {
@@ -237,6 +291,25 @@ def test_greek_pdf_has_embedded_fonts_same_page_notes_and_clear_chapter_inset(
     assert result["reader_pages"] >= 2 and result["appendix_pages"] == 1
     pdf = PdfReader(output / "reader.pdf")
     assert "Ἐν" in pdf.pages[0].extract_text() and "λόγος" in pdf.pages[0].extract_text()
+    for index, page in enumerate(pdf.pages[: result["reader_pages"]]):
+        headings = []
+
+        def collect_heading(text, cm, tm, font, size, page=page, headings=headings):
+            baseline = cm[1] * tm[4] + cm[3] * tm[5] + cm[5]
+            if (
+                text.strip()
+                and baseline > float(page.mediabox.top) - 60
+                and size == pytest.approx(18 * 72 / 72.27, abs=0.01)
+            ):
+                headings.append((text.strip(), font["/BaseFont"]))
+
+        page.extract_text(visitor_text=collect_heading)
+        assert len(headings) == 1
+        title, font = headings[0]
+        if (first_folio + index) % 2:
+            assert title == "ΚΑΤΑ ΙΩΑΝΝΗΝ" and "GentiumPlus" in font
+        else:
+            assert title == "John" and "LMRomanCaps" in font
     if verse_layout == "continuous":
         runs = []
 
@@ -245,6 +318,7 @@ def test_greek_pdf_has_embedded_fonts_same_page_notes_and_clear_chapter_inset(
                 text.strip()
                 and "GentiumPlus" in font["/BaseFont"]
                 and size == pytest.approx(18 * 72 / 72.27, abs=0.01)
+                and cm[1] * tm[4] + cm[3] * tm[5] + cm[5] < float(pdf.pages[0].mediabox.top) - 60
             ):
                 runs.append(
                     (cm[0] * tm[4] + cm[2] * tm[5] + cm[4], round(cm[1] * tm[4] + cm[3] * tm[5] + cm[5], 1))

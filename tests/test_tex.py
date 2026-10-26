@@ -4,6 +4,7 @@ import pytest
 
 from bible_reader.editorial import build_document
 from bible_reader.models import ProjectConfig, ReaderDocument, ReaderError
+from bible_reader.sources import catalog
 from bible_reader.tex import blocks, contents, merge_fragments, page_tex, split_points, split_verse, word_tex
 
 
@@ -16,12 +17,22 @@ from bible_reader.tex import blocks, contents, merge_fragments, page_tex, split_
         ("Prov", 1330, r"\EnglishBookTitle{משלי}{Proverbs}"),
         ("1Sam", 2, r"\EnglishBookTitle{שמואל א}{1 Samuel}"),
         ("Song", 2, r"\EnglishBookTitle{שיר השירים}{Song of Songs}"),
+        ("John", 1, r"\GreekBookTitle{ΚΑΤΑ ΙΩΑΝΝΗΝ}"),
+        ("John", 2, r"\EnglishBookTitle{ΚΑΤΑ ΙΩΑΝΝΗΝ}{John}"),
+        ("1Thess", 1329, r"\GreekBookTitle{ΠΡΟΣ ΘΕΣΣΑΛΟΝΙΚΕΙΣ Α}"),
+        ("1Thess", 1330, r"\EnglishBookTitle{ΠΡΟΣ ΘΕΣΣΑΛΟΝΙΚΕΙΣ Α}{1 Thessalonians}"),
+        ("LXXGen", 1, r"\GreekBookTitle{ΓΕΝΕΣΙΣ}"),
+        ("LXXGen", 2, r"\EnglishBookTitle{ΓΕΝΕΣΙΣ}{Genesis}"),
+        ("LXXNeh", 1, r"\GreekBookTitle{ΕΣΔΡΑΣ Β (11–23)}"),
+        ("LXXDanOG", 1, r"\GreekBookTitle{ΔΑΝΙΗΛ (LXX)}"),
+        ("LXXDanTh", 1, r"\GreekBookTitle{ΔΑΝΙΗΛ (Th)}"),
     ],
 )
 def test_running_title_uses_printed_folio_language(book, folio, title):
     config = ProjectConfig(book=book, selection="all", passage="2:3").model_dump()
     verse = {"reference": f"{book}.2.3", "chapter": 2, "verse": 3, "tokens": []}
-    document = ReaderDocument(config, [verse], {}, [], {}, {})
+    language = catalog()["books"][book].get("language", "hbo")
+    document = ReaderDocument(config, [verse], {}, [], {}, {"language": language})
     _, page = page_tex([[verse]], document, "p1", folio)
     assert page == rf"\ReaderPage{{2:3}}{{{title}}}{{{folio}}}"
 

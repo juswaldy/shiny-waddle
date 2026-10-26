@@ -4,6 +4,7 @@
   "books": {
     "Matt": {
       "title": "Matthew",
+      "greek": "ΚΑΤΑ ΜΑΘΘΑΙΟΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -25,6 +26,7 @@
     },
     "Mark": {
       "title": "Mark",
+      "greek": "ΚΑΤΑ ΜΑΡΚΟΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -46,6 +48,7 @@
     },
     "Luke": {
       "title": "Luke",
+      "greek": "ΚΑΤΑ ΛΟΥΚΑΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -67,6 +70,7 @@
     },
     "John": {
       "title": "John",
+      "greek": "ΚΑΤΑ ΙΩΑΝΝΗΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -88,6 +92,7 @@
     },
     "Acts": {
       "title": "Acts",
+      "greek": "ΠΡΑΞΕΙΣ ΑΠΟΣΤΟΛΩΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -109,6 +114,7 @@
     },
     "Rom": {
       "title": "Romans",
+      "greek": "ΠΡΟΣ ΡΩΜΑΙΟΥΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -130,6 +136,7 @@
     },
     "1Cor": {
       "title": "1 Corinthians",
+      "greek": "ΠΡΟΣ ΚΟΡΙΝΘΙΟΥΣ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -151,6 +158,7 @@
     },
     "2Cor": {
       "title": "2 Corinthians",
+      "greek": "ΠΡΟΣ ΚΟΡΙΝΘΙΟΥΣ Β",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -172,6 +180,7 @@
     },
     "Gal": {
       "title": "Galatians",
+      "greek": "ΠΡΟΣ ΓΑΛΑΤΑΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -193,6 +202,7 @@
     },
     "Eph": {
       "title": "Ephesians",
+      "greek": "ΠΡΟΣ ΕΦΕΣΙΟΥΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -214,6 +224,7 @@
     },
     "Phil": {
       "title": "Philippians",
+      "greek": "ΠΡΟΣ ΦΙΛΙΠΠΗΣΙΟΥΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -235,6 +246,7 @@
     },
     "Col": {
       "title": "Colossians",
+      "greek": "ΠΡΟΣ ΚΟΛΟΣΣΑΕΙΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -256,6 +268,7 @@
     },
     "1Thess": {
       "title": "1 Thessalonians",
+      "greek": "ΠΡΟΣ ΘΕΣΣΑΛΟΝΙΚΕΙΣ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -277,6 +290,7 @@
     },
     "2Thess": {
       "title": "2 Thessalonians",
+      "greek": "ΠΡΟΣ ΘΕΣΣΑΛΟΝΙΚΕΙΣ Β",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -298,6 +312,7 @@
     },
     "1Tim": {
       "title": "1 Timothy",
+      "greek": "ΠΡΟΣ ΤΙΜΟΘΕΟΝ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -319,6 +334,7 @@
     },
     "2Tim": {
       "title": "2 Timothy",
+      "greek": "ΠΡΟΣ ΤΙΜΟΘΕΟΝ Β",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -340,6 +356,7 @@
     },
     "Titus": {
       "title": "Titus",
+      "greek": "ΠΡΟΣ ΤΙΤΟΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -361,6 +378,7 @@
     },
     "Phlm": {
       "title": "Philemon",
+      "greek": "ΠΡΟΣ ΦΙΛΗΜΟΝΑ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -382,6 +400,7 @@
     },
     "Heb": {
       "title": "Hebrews",
+      "greek": "ΠΡΟΣ ΕΒΡΑΙΟΥΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -403,6 +422,7 @@
     },
     "Jas": {
       "title": "James",
+      "greek": "ΙΑΚΩΒΟΥ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -424,6 +444,7 @@
     },
     "1Pet": {
       "title": "1 Peter",
+      "greek": "ΠΕΤΡΟΥ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -445,6 +466,7 @@
     },
     "2Pet": {
       "title": "2 Peter",
+      "greek": "ΠΕΤΡΟΥ Β",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -466,6 +488,7 @@
     },
     "1John": {
       "title": "1 John",
+      "greek": "ΙΩΑΝΝΟΥ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -487,6 +510,7 @@
     },
     "2John": {
       "title": "2 John",
+      "greek": "ΙΩΑΝΝΟΥ Β",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -508,6 +532,7 @@
     },
     "3John": {
       "title": "3 John",
+      "greek": "ΙΩΑΝΝΟΥ Γ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -529,6 +554,7 @@
     },
     "Jude": {
       "title": "Jude",
+      "greek": "ΙΟΥΔΑ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -550,6 +576,7 @@
     },
     "Rev": {
       "title": "Revelation",
+      "greek": "ΑΠΟΚΑΛΥΨΙΣ ΙΩΑΝΝΟΥ",
       "language": "grc",
       "direction": "ltr",
       "edition": "SBLGNT",
@@ -571,6 +598,7 @@
     },
     "LXXGen": {
       "title": "Genesis",
+      "greek": "ΓΕΝΕΣΙΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Gen",
@@ -594,6 +622,7 @@
     },
     "LXXExod": {
       "title": "Exodus",
+      "greek": "ΕΞΟΔΟΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Exod",
@@ -617,6 +646,7 @@
     },
     "LXXLev": {
       "title": "Leviticus",
+      "greek": "ΛΕΥΙΤΙΚΟΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Lev",
@@ -640,6 +670,7 @@
     },
     "LXXNum": {
       "title": "Numbers",
+      "greek": "ΑΡΙΘΜΟΙ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Num",
@@ -663,6 +694,7 @@
     },
     "LXXDeut": {
       "title": "Deuteronomy",
+      "greek": "ΔΕΥΤΕΡΟΝΟΜΙΟΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Deut",
@@ -686,6 +718,7 @@
     },
     "LXXJoshB": {
       "title": "Joshua B",
+      "greek": "ΙΗΣΟΥΣ ΝΑΥΗ (B)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / JoshB",
@@ -709,6 +742,7 @@
     },
     "LXXJudgB": {
       "title": "Judges B",
+      "greek": "ΚΡΙΤΑΙ (B)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / JudgB",
@@ -732,6 +766,7 @@
     },
     "LXXRuth": {
       "title": "Ruth",
+      "greek": "ΡΟΥΘ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Ruth",
@@ -755,6 +790,7 @@
     },
     "LXX1Sam": {
       "title": "1 Samuel (1 Kingdoms)",
+      "greek": "ΒΑΣΙΛΕΙΩΝ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 1Sam",
@@ -778,6 +814,7 @@
     },
     "LXX2Sam": {
       "title": "2 Samuel (2 Kingdoms)",
+      "greek": "ΒΑΣΙΛΕΙΩΝ Β",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 2Sam",
@@ -801,6 +838,7 @@
     },
     "LXX1Kgs": {
       "title": "1 Kings (3 Kingdoms)",
+      "greek": "ΒΑΣΙΛΕΙΩΝ Γ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 1Kgs",
@@ -824,6 +862,7 @@
     },
     "LXX2Kgs": {
       "title": "2 Kings (4 Kingdoms)",
+      "greek": "ΒΑΣΙΛΕΙΩΝ Δ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 2Kgs",
@@ -847,6 +886,7 @@
     },
     "LXX1Chr": {
       "title": "1 Chronicles",
+      "greek": "ΠΑΡΑΛΕΙΠΟΜΕΝΩΝ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 1Chr",
@@ -870,6 +910,7 @@
     },
     "LXX2Chr": {
       "title": "2 Chronicles",
+      "greek": "ΠΑΡΑΛΕΙΠΟΜΕΝΩΝ Β",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 2Chr",
@@ -893,6 +934,7 @@
     },
     "LXXEzra": {
       "title": "Ezra (Esdras B/II: 1-10)",
+      "greek": "ΕΣΔΡΑΣ Β (1–10)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Ezra",
@@ -916,6 +958,7 @@
     },
     "LXXNeh": {
       "title": "Nehemiah (Esdras B/II: 11-23)",
+      "greek": "ΕΣΔΡΑΣ Β (11–23)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Neh",
@@ -939,6 +982,7 @@
     },
     "LXXEsth": {
       "title": "Esther (with additions)",
+      "greek": "ΕΣΘΗΡ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Esth",
@@ -962,6 +1006,7 @@
     },
     "LXXJob": {
       "title": "Job",
+      "greek": "ΙΩΒ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Job",
@@ -985,6 +1030,7 @@
     },
     "LXXPs": {
       "title": "Psalms",
+      "greek": "ΨΑΛΜΟΙ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Ps",
@@ -1008,6 +1054,7 @@
     },
     "LXXProv": {
       "title": "Proverbs",
+      "greek": "ΠΑΡΟΙΜΙΑΙ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Prov",
@@ -1031,6 +1078,7 @@
     },
     "LXXQoh": {
       "title": "Ecclesiastes (Preacher)",
+      "greek": "ΕΚΚΛΗΣΙΑΣΤΗΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Qoh",
@@ -1054,6 +1102,7 @@
     },
     "LXXCant": {
       "title": "Canticle (Song of Solomon)",
+      "greek": "ΑΣΜΑ ΑΣΜΑΤΩΝ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Cant",
@@ -1077,6 +1126,7 @@
     },
     "LXXIsa": {
       "title": "Isaiah",
+      "greek": "ΗΣΑΪΑΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Isa",
@@ -1100,6 +1150,7 @@
     },
     "LXXJer": {
       "title": "Jeremiah",
+      "greek": "ΙΕΡΕΜΙΑΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Jer",
@@ -1123,6 +1174,7 @@
     },
     "LXXLam": {
       "title": "Lamentations (Threni)",
+      "greek": "ΘΡΗΝΟΙ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Lam",
@@ -1146,6 +1198,7 @@
     },
     "LXXEzek": {
       "title": "Ezekiel",
+      "greek": "ΙΕΖΕΚΙΗΛ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Ezek",
@@ -1169,6 +1222,7 @@
     },
     "LXXDanOG": {
       "title": "Daniel LXX",
+      "greek": "ΔΑΝΙΗΛ (LXX)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / DanOG",
@@ -1192,6 +1246,7 @@
     },
     "LXXHos": {
       "title": "Hosea",
+      "greek": "ΩΣΗΕ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Hos",
@@ -1215,6 +1270,7 @@
     },
     "LXXJoel": {
       "title": "Joel",
+      "greek": "ΙΩΗΛ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Joel",
@@ -1238,6 +1294,7 @@
     },
     "LXXAmos": {
       "title": "Amos",
+      "greek": "ΑΜΩΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Amos",
@@ -1261,6 +1318,7 @@
     },
     "LXXObad": {
       "title": "Obadiah",
+      "greek": "ΟΒΔΙΟΥ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Obad",
@@ -1284,6 +1342,7 @@
     },
     "LXXJonah": {
       "title": "Jonah",
+      "greek": "ΙΩΝΑΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Jonah",
@@ -1307,6 +1366,7 @@
     },
     "LXXMic": {
       "title": "Micah",
+      "greek": "ΜΙΧΑΙΑΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Mic",
@@ -1330,6 +1390,7 @@
     },
     "LXXNah": {
       "title": "Nahum",
+      "greek": "ΝΑΟΥΜ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Nah",
@@ -1353,6 +1414,7 @@
     },
     "LXXHab": {
       "title": "Habakkuk",
+      "greek": "ΑΜΒΑΚΟΥΜ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Hab",
@@ -1376,6 +1438,7 @@
     },
     "LXXZeph": {
       "title": "Zephaniah",
+      "greek": "ΣΟΦΟΝΙΑΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Zeph",
@@ -1399,6 +1462,7 @@
     },
     "LXXHag": {
       "title": "Haggai",
+      "greek": "ΑΓΓΑΙΟΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Hag",
@@ -1422,6 +1486,7 @@
     },
     "LXXZech": {
       "title": "Zechariah",
+      "greek": "ΖΑΧΑΡΙΑΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Zech",
@@ -1445,6 +1510,7 @@
     },
     "LXXMal": {
       "title": "Malachi",
+      "greek": "ΜΑΛΑΧΙΑΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Mal",
@@ -1468,6 +1534,7 @@
     },
     "LXX1Esdr": {
       "title": "Esdras A/I",
+      "greek": "ΕΣΔΡΑΣ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 1Esdr",
@@ -1491,6 +1558,7 @@
     },
     "LXXTobBA": {
       "title": "Tobit BA",
+      "greek": "ΤΩΒΙΤ (BA)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / TobBA",
@@ -1514,6 +1582,7 @@
     },
     "LXXJdt": {
       "title": "Judith",
+      "greek": "ΙΟΥΔΙΘ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Jdt",
@@ -1537,6 +1606,7 @@
     },
     "LXXPsSol": {
       "title": "Psalms of Solomon",
+      "greek": "ΨΑΛΜΟΙ ΣΟΛΟΜΩΝΤΟΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / PsSol",
@@ -1560,6 +1630,7 @@
     },
     "LXX1Mac": {
       "title": "I Maccabees",
+      "greek": "ΜΑΚΚΑΒΑΙΩΝ Α",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 1Mac",
@@ -1583,6 +1654,7 @@
     },
     "LXX2Mac": {
       "title": "II Maccabees",
+      "greek": "ΜΑΚΚΑΒΑΙΩΝ Β",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 2Mac",
@@ -1606,6 +1678,7 @@
     },
     "LXX3Mac": {
       "title": "III Maccabees",
+      "greek": "ΜΑΚΚΑΒΑΙΩΝ Γ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 3Mac",
@@ -1629,6 +1702,7 @@
     },
     "LXX4Mac": {
       "title": "IV Maccabees",
+      "greek": "ΜΑΚΚΑΒΑΙΩΝ Δ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / 4Mac",
@@ -1652,6 +1726,7 @@
     },
     "LXXWis": {
       "title": "Wisdom of Solomon",
+      "greek": "ΣΟΦΙΑ ΣΟΛΟΜΩΝΤΟΣ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Wis",
@@ -1675,6 +1750,7 @@
     },
     "LXXSir": {
       "title": "Wisdom of Sirach",
+      "greek": "ΣΟΦΙΑ ΣΕΙΡΑΧ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Sir",
@@ -1698,6 +1774,7 @@
     },
     "LXXEpJer": {
       "title": "Epistle of Jeremiah",
+      "greek": "ΕΠΙΣΤΟΛΗ ΙΕΡΕΜΙΟΥ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / EpJer",
@@ -1721,6 +1798,7 @@
     },
     "LXXBar": {
       "title": "Baruch",
+      "greek": "ΒΑΡΟΥΧ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Bar",
@@ -1744,6 +1822,7 @@
     },
     "LXXSusOG": {
       "title": "Susanna LXX",
+      "greek": "ΣΟΥΣΑΝΝΑ (LXX)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / SusOG",
@@ -1767,6 +1846,7 @@
     },
     "LXXBelOG": {
       "title": "Bel LXX",
+      "greek": "ΒΗΛ ΚΑΙ ΔΡΑΚΩΝ (LXX)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / BelOG",
@@ -1790,6 +1870,7 @@
     },
     "LXXOd": {
       "title": "Odes",
+      "greek": "ΩΔΑΙ",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / Od",
@@ -1813,6 +1894,7 @@
     },
     "LXXJoshA": {
       "title": "Joshua A",
+      "greek": "ΙΗΣΟΥΣ ΝΑΥΗ (A)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / JoshA",
@@ -1837,6 +1919,7 @@
     },
     "LXXJudgA": {
       "title": "Judges A",
+      "greek": "ΚΡΙΤΑΙ (A)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / JudgA",
@@ -1860,6 +1943,7 @@
     },
     "LXXTobS": {
       "title": "Tobit S",
+      "greek": "ΤΩΒΙΤ (S)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / TobS",
@@ -1883,6 +1967,7 @@
     },
     "LXXDanTh": {
       "title": "Daniel Th",
+      "greek": "ΔΑΝΙΗΛ (Th)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / DanTh",
@@ -1906,6 +1991,7 @@
     },
     "LXXSusTh": {
       "title": "Susanna Th",
+      "greek": "ΣΟΥΣΑΝΝΑ (Th)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / SusTh",
@@ -1929,6 +2015,7 @@
     },
     "LXXBelTh": {
       "title": "Bel Th",
+      "greek": "ΒΗΛ ΚΑΙ ΔΡΑΚΩΝ (Th)",
       "language": "grc",
       "direction": "ltr",
       "edition": "Rahlfs 1935 / BelTh",
