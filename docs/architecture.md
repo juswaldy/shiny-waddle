@@ -233,7 +233,9 @@ badge; `chapter_lines` records that measurement for the last paragraph on a page
 indivisible. `layout.verse_layout` selects continuous
 justified RTL paragraphs with inline verse numbers, or separately started,
 right-aligned verse paragraphs with a number gutter. Chapter boxes reserve the
-first two lines in continuous mode and the first two verses in verse-per-line mode.
+first two actual text lines in both modes. Verse-per-line mode counts lines across
+the opening paragraphs, restoring the normal text and number gutters below the
+badge while keeping the first two verses together for pagination.
 Measurements and the final PDF use the same selected construction. Saved projects
 and immutable build snapshots retain the choice; omitted settings default to
 continuous through project validation.

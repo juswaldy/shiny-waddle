@@ -168,27 +168,59 @@ class Compiler:
         return log
 
 
+def separate_verse_macros(layout: dict, *, greek=False) -> str:
+    # Count actual lines across the opening verses, so wrapped text and verse 2
+    # reclaim the badge's inset as soon as they pass it. The planner still keeps
+    # the first two verses together as a single indivisible page unit.
+    direction, font = ("LTR", "greek") if greek else ("RTL", "hebrew")
+    alignment = (
+        r"\leftskip=6mm\rightskip=0pt plus 1fil" if greek else r"\leftskip=0pt plus 1fil\rightskip=6mm"
+    )
+    opening_alignment = r"\rightskip=0pt plus \linewidth" if greek else r"\leftskip=0pt plus \linewidth"
+    side, number_side = ("r", "l") if greek else ("l", "r")
+    badge = r"\smash{\raisebox{-2mm}{\ChapterBadge{\ChapterNumber}}}"
+    number = rf"\makebox[4mm][{number_side}]{{\fontsize{{11}}{{{layout['leading_pt']}}}\selectfont #1}}"
+    badge = badge + r"\hspace{2mm}" if greek else r"\hspace{2mm}" + badge
+    number = number + r"\hspace{2mm}" if greek else r"\hspace{2mm}" + number
+    sign = "" if greek else "-"
+    return rf"""\newcount\ChapterInsetLines
+\newcount\VerseLines
+\newcommand{{\Scripture}}[1]{{#1}}
+\newcommand{{\Verse}}[2]{{%
+  \noindent\hbox to\linewidth{{\vtop{{\hsize=\linewidth
+  \set{direction}\{font}font\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
+  \parindent=0pt\parfillskip=0pt
+  {alignment}\hangindent=0pt
+  \ifnum\ChapterInsetLines>0
+    % Finite ragged glue favors full opening lines when their widths change;
+    % keep interword spaces fixed and let the final line end naturally.
+    {opening_alignment}\spaceskip=\fontdimen2\font\parfillskip=0pt plus 1fil
+    \hangafter=-\ChapterInsetLines
+    \if\relax\detokenize{{#1}}\relax\hangindent={sign}8mm
+    \else\hangindent={sign}14mm\fi
+  \fi
+  \noindent\strut
+  \if\relax\detokenize{{#1}}\relax
+    \textenglish{{\makebox[0pt][{side}]{{{badge}}}}}%
+  \else\textenglish{{\makebox[0pt][{side}]{{{number}}}}}\fi%
+  #2\par
+  \global\VerseLines=\prevgraf
+  }}}}\par
+  \ifnum\ChapterInsetLines>0\advance\ChapterInsetLines by -\VerseLines\fi
+  \vskip0.8pt
+}}
+\newcommand{{\ChapterOpen}}[4]{{\begingroup
+  \vskip4pt\ChapterInsetLines=2\def\ChapterNumber{{#1}}%
+  \Verse{{}}{{#2}}%
+  \if\relax\detokenize{{#3}}\relax\else\Verse{{#3}}{{#4}}\fi
+  \ifnum\ChapterInsetLines>0\vskip\dimexpr{layout["leading_pt"]}pt*\ChapterInsetLines\relax\fi
+\endgroup}}
+"""
+
+
 def scripture_macros(layout: dict) -> str:
     if layout.get("verse_layout", "continuous") == "verse-per-line":
-        return rf"""\newcommand{{\Scripture}}[1]{{#1}}
-\newcommand{{\Verse}}[2]{{%
-  \noindent\hbox to\linewidth{{%
-    \vtop{{\hsize=\dimexpr\linewidth-6mm\relax
-      \setRTL\hebrewfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
-      \parindent=0pt\leftskip=0pt plus 1fil\rightskip=0pt\parfillskip=0pt
-      \noindent\strut #2\par}}%
-    \hskip2mm\vtop{{\hsize=4mm\raggedleft\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont\strut #1\par}}%
-  }}\par\vskip0.8pt
-}}
-\newcommand{{\ChapterOpen}}[4]{{%
-  \vskip4pt\noindent\hbox to\linewidth{{%
-    \vtop{{\hsize=\dimexpr\linewidth-14mm\relax\linewidth=\hsize\vskip0pt
-      \Verse{{}}{{#2}}\Verse{{#3}}{{#4}}}}%
-    \hskip2mm\vtop{{\hsize=12mm\vskip0pt
-      \hbox{{\ChapterBadge{{#1}}}}}}
-  }}\par
-}}
-"""
+        return separate_verse_macros(layout)
     return rf"""\newif\ifChapterParagraph
 \newcommand{{\EndScriptureParagraph}}{{%
   \par\global\ChapterLines=0
@@ -216,25 +248,7 @@ def scripture_macros(layout: dict) -> str:
 
 def greek_scripture_macros(layout: dict) -> str:
     if layout.get("verse_layout", "continuous") == "verse-per-line":
-        return rf"""
-\newcommand{{\Scripture}}[1]{{#1}}
-\newcommand{{\Verse}}[2]{{%
-  \noindent\hbox to\linewidth{{%
-    \vtop{{\hsize=4mm\raggedright\fontsize{{11}}{{{layout["leading_pt"]}}}\selectfont\strut #1\par}}\hskip2mm
-    \vtop{{\hsize=\dimexpr\linewidth-6mm\relax
-      \setLTR\greekfont\fontsize{{{layout["body_pt"]}}}{{{layout["leading_pt"]}}}\selectfont
-      \parindent=0pt\leftskip=0pt\rightskip=0pt plus 1fil\parfillskip=0pt
-      \noindent\strut #2\par}}%
-  }}\par\vskip0.8pt
-}}
-\newcommand{{\ChapterOpen}}[4]{{%
-  \vskip4pt\noindent\hbox to\linewidth{{%
-    \vtop{{\hsize=12mm\vskip0pt\hbox{{\ChapterBadge{{#1}}}}}}\hskip2mm
-    \vtop{{\hsize=\dimexpr\linewidth-14mm\relax\linewidth=\hsize\vskip0pt
-      \Verse{{}}{{#2}}\Verse{{#3}}{{#4}}}}%
-  }}\par
-}}
-"""
+        return separate_verse_macros(layout, greek=True)
     return rf"""
 \newif\ifChapterParagraph
 \newcommand{{\EndScriptureParagraph}}{{%

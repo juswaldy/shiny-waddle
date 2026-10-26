@@ -367,3 +367,28 @@ small synthetic fixtures retain compact synthetic credits. `make demo` and
 skipped. The opening-overflow regression checks that the error identifies the
 opening itself, while the bottom-alignment regressions inspect actual Hebrew
 and Greek glyph positions on every page, including the sparse last page.
+
+## Verse-per-line chapter spacing — 2026-10-25
+
+Hebrew and Greek verse-per-line openings now reserve the chapter inset for the
+first two actual text lines. Verse 1 omits the empty number gutter beside the
+badge; subsequent lines and verse numbers return to their normal margins below
+it, including lines within a wrapped verse. Pagination still keeps the first two
+verses together, and short single-verse openings retain two lines of clearance.
+Both languages use the same construction with mirrored directions and gutters.
+
+Six PDF regressions check actual glyph edges and verse-number positions for
+one-line, two-line, and longer opening verses, including a second verse that
+wraps past the badge. They also check consecutive baselines for added blank lines.
+Source coverage, page-local note destinations, embedded fonts, and TeX overflow
+checks pass for the full-source Proverbs 1:29–2:12, Genesis 1:1–8, and
+John 1:1–18 proofs under `build/chapter-spacing/final/`. The proofs retain their
+reader JSON, measured page plans, TeX, logs, PDFs, and rasterized reader pages.
+Visual review covers the mid-page Proverbs chapter transition, dense lexical
+notes, both reading directions, wrapped openings, and their following verses.
+Additional short single-word Hebrew/Greek fixtures were compiled and inspected
+under `build/chapter-spacing/single/` to check badge clearance at passage ends.
+
+`make check` passes **359 tests and 8 subtests**, with 23 opt-in browser tests
+skipped. The suite was run outside the sandbox after its API test client stalled
+under sandbox restrictions. `make demo` and `make pdf` pass.

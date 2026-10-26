@@ -118,8 +118,10 @@ such as `104` must remain internally LTR and must not collide with Hebrew marks.
 **R06 — Chapter opening.** Introduce chapter 2 mid-page with a large Latin `2`
 inside two fine square outlines. In continuous mode reserve space on the right
 beside the first two lines of the chapter paragraph, then return to full width.
-In verse-per-line mode, inset the first two verse blocks beside the box; the
-third verse returns to full width. Measure the opening together with its text;
+In verse-per-line mode, inset the first two actual text lines beside the box;
+subsequent lines return to the normal verse margin, even within a wrapped verse.
+Omit the empty verse-number gutter beside verse 1 so its text sits close to the
+box. Mirror the construction for Greek. Measure the opening together with its text;
 the box is not an independent floating object. In continuous mode an opening may
 continue onto the next page after at least two actual text lines beside the box.
 In verse-per-line mode keep the first two verse blocks together. Reserve two lines even for
