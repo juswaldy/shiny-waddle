@@ -276,6 +276,7 @@ def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
         else ""
     )
     headword_command = "ReaderGreek" if language == "grc" else "texthebrew"
+    book_title_command = "GreekBookTitle" if language == "grc" else "HebrewBookTitle"
     macros = greek_scripture_macros(layout) if language == "grc" else scripture_macros(layout)
     # Parameters are validated numeric values; external content is always escaped separately.
     return rf"""\documentclass{{article}}
@@ -314,11 +315,12 @@ def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
   \raggedright\lineskip=0.5pt\tolerance=9999\emergencystretch=3em\noindent #1\par\endgroup}}
 \newsavebox{{\BookTitleBox}}
 \newcommand{{\HebrewBookTitle}}[1]{{\texthebrew{{\fontsize{{18}}{{20}}\selectfont #1}}}}
-% Match the English caps to the selected Hebrew font's full title height.
+\newcommand{{\GreekBookTitle}}[1]{{\ReaderGreek{{\fontsize{{18}}{{20}}\selectfont #1}}}}
+% Match the English caps to the original-language font's full title height.
 \newcommand{{\EnglishBookTitle}}[2]{{\begingroup
-  \sbox{{\BookTitleBox}}{{\HebrewBookTitle{{#1}}}}%
-  \raisebox{{-\dp\BookTitleBox}}{{\resizebox*{{!}}{{\dimexpr\ht\BookTitleBox+\dp\BookTitleBox\relax}}{{%
-    \textenglish{{\booktitlefont\fontsize{{18}}{{20}}\selectfont #2}}}}}}%
+  \sbox{{\BookTitleBox}}{{\{book_title_command}{{#1}}}}%
+  \raisebox{{-\dp\BookTitleBox}}{{\raisebox{{\depth}}{{\resizebox*{{!}}{{\dimexpr\ht\BookTitleBox+\dp\BookTitleBox\relax}}{{%
+    \textenglish{{\booktitlefont\fontsize{{18}}{{20}}\selectfont #2}}}}}}}}%
 \endgroup}}
 \newcommand{{\Header}}[3]{{\hbox to\linewidth{{\rlap{{\fontsize{{10}}{{12}}\selectfont #1}}\hfil
   #2\hfil\llap{{\fontsize{{10}}{{12}}\selectfont #3}}}}\vskip3pt\hrule height0.35pt\vskip9pt}}
@@ -518,15 +520,16 @@ def page_tex(groups: list, document: ReaderDocument, prefix: str, folio: int):
         passage += f"–{last[-2]}:{last[-1]}"
     book = catalog()["books"][document.config["book"]]
     if document_language(document) == "grc":
-        title = (
-            rf"\textenglish{{\booktitlefont\fontsize{{18}}{{20}}\selectfont {escape_latex(book['title'])}}}"
-        )
+        original_title = escape_latex(book["greek"])
+        title_command = "GreekBookTitle"
     else:
-        title = (
-            rf"\HebrewBookTitle{{{escape_latex(book['hebrew'])}}}"
-            if folio % 2
-            else rf"\EnglishBookTitle{{{escape_latex(book['hebrew'])}}}{{{escape_latex(book['title'])}}}"
-        )
+        original_title = escape_latex(book["hebrew"])
+        title_command = "HebrewBookTitle"
+    title = (
+        rf"\{title_command}{{{original_title}}}"
+        if folio % 2
+        else rf"\EnglishBookTitle{{{original_title}}}{{{escape_latex(book['title'])}}}"
+    )
     boxes = (
         "\\setbox\\BodyBox=\\vbox{\\hsize=\\linewidth\n" + scripture + "}\n"
         "\\setbox\\NotesBox=\\vbox{\\hsize=\\linewidth\n" + notes + "}\n"

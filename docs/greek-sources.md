@@ -103,6 +103,18 @@ source Unicode are preserved under every Hebrew accent/K/Q setting. Greek runs
 use explicit font/script/direction macros; atomic scripture words do not require
 Greek hyphenation patterns in a minimal TeX installation.
 
+Running titles alternate by printed folio: Greek on odd folios and English small
+caps on even folios, including builds starting with an even `layout.first_folio`.
+Greek titles use 18 pt Gentium Plus; English titles match their full height and
+baseline, as with Hebrew editions. The catalog's `greek` fields are editorial
+navigation labels, separate from imported scripture. NT labels follow the
+[SBLGNT XML book titles](https://github.com/Faithlife/SBLGNT/tree/master/data/sblgnt/xml).
+LXX labels use conventional Greek book names, checked against the
+[Apostoliki Diakonia index](https://apostoliki-diakonia.gr/bible/makkavaion-a/)
+and [SBL's Septuaginta contents](https://www.sbl-site.org/assets/pdfs/bibletexts/septuaginta/SEPTUAGINTA_SBL.pdf).
+Parenthesized witness labels and Esdras B chapter ranges retain the catalog's
+separate source identities; these labels do not transcribe edition headings.
+
 The optional four-column lexicon sorts Greek with a separate case/mark-insensitive
 key; final sigma collates with sigma. Display headwords retain source Unicode.
 Builds retain their TeX, source lock, review rows, page plan, embedded fonts, and
