@@ -642,6 +642,11 @@ $("selection").onchange = () => { $("frequency").disabled = $("selection").value
 $("paper").onchange = updatePaperFields;
 $("build-content").onchange = updateBuildOptions;
 $("word-colors").onchange = updateWordColorFields;
+$("word-colors-presets").onclick = () => {
+  document.querySelectorAll("[data-word-class]").forEach(row => {$("word-color-" + row.dataset.wordClass).value = "preset";});
+  updateWordColorFields();
+  notice("All word classes set to presets. Save settings to keep this palette.");
+};
 $("word-colors-clear").onclick = () => {
   document.querySelectorAll("[data-word-class]").forEach(row => {$("word-color-" + row.dataset.wordClass).value = "auto";});
   updateWordColorFields();

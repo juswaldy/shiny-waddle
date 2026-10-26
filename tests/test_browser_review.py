@@ -209,6 +209,11 @@ def test_pipeline_download_upload_and_standalone_pdf_in_browser(
         page.goto(url)
         expect(page.locator(".help-row").first).to_be_visible()
         page.locator("#selection").select_option("reference")
+        page.get_by_text("Page & reading settings", exact=True).click()
+        page.locator("#word-colors").select_option("word-class")
+        page.get_by_text("Palette & class colors", exact=True).click()
+        page.locator("#word-color-custom-noun").fill("#123abc")
+        page.locator("#word-color-name").select_option("auto")
         page.locator("#show-pipeline").click()
         expect(page.locator("#pipeline-data")).to_be_visible()
 
@@ -228,7 +233,14 @@ def test_pipeline_download_upload_and_standalone_pdf_in_browser(
             page.locator("#download-data").click()
         saved = tmp_path / "reader.v2.json"
         download.value.save_as(saved)
-        assert json.loads(saved.read_text())["config"]["selection"] == "reference"
+        data = json.loads(saved.read_text())
+        assert data["config"]["selection"] == "reference"
+        layout = data["config"]["layout"]
+        assert layout["word_colors"] == "word-class"
+        assert layout["word_color_overrides"]["noun"] == "#123ABC"
+        assert layout["word_color_overrides"]["name"] == "auto"
+        assert layout["word_color_overrides"]["verb"] == "#A33432"
+        assert len(layout["word_color_overrides"]) == page.locator("[data-word-class]").count()
         page.locator("#pipeline-data").set_input_files(saved)
         run_stage("#make-tex", "/transforms/data-to-tex")
         expect(page.locator("#download-tex")).to_be_visible(timeout=15000)
@@ -660,6 +672,28 @@ def test_word_colors_default_palette_customization_and_project_persistence(revie
         assert saved["config"]["layout"]["word_color_overrides"] == {
             category: "auto" for category in categories if category != "verb"
         }
+        page.locator("#word-color-custom-verb").fill("#ab1234")
+        page.get_by_role("button", name="Set all to presets", exact=True).click()
+        expect(page.locator("#word-colors")).to_have_value("word-class")
+        for category in categories:
+            row = page.locator(f"[data-word-class='{category}']")
+            expect(page.locator(f"#word-color-{category}")).to_have_value("preset")
+            expect(page.locator(f"#word-color-custom-{category}")).to_have_value(
+                row.get_attribute("data-preset-color").lower()
+            )
+            expect(page.locator(f"#word-color-custom-{category}")).to_be_enabled()
+        assert page.request.get(url + f"/api/projects/{identity}").json() == saved
+        with page.expect_response(lambda response: response.request.method == "PUT"):
+            page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        saved = page.request.get(url + f"/api/projects/{identity}").json()
+        assert saved["config"]["layout"]["word_color_overrides"] == {}
+        page.reload()
+        expect(page.locator(".help-row").first).to_be_visible()
+        page.get_by_text("Page & reading settings", exact=True).click()
+        page.get_by_text("Palette & class colors", exact=True).click()
+        for category in categories:
+            expect(page.locator(f"#word-color-{category}")).to_have_value("preset")
         page.get_by_role("button", name="Build reader PDF", exact=False).click()
         expect(page.locator("#preview-panel")).to_be_visible()
         job = page.request.get(url + "/api/jobs").json()[0]

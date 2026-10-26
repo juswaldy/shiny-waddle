@@ -392,3 +392,26 @@ under `build/chapter-spacing/single/` to check badge clearance at passage ends.
 `make check` passes **359 tests and 8 subtests**, with 23 opt-in browser tests
 skipped. The suite was run outside the sandbox after its API test client stalled
 under sandbox restrictions. `make demo` and `make pdf` pass.
+
+## Explicit exported word colors and preset reset — 2026-10-25
+
+Reader JSON now includes all eleven classes in
+`config.layout.word_color_overrides`: implicit presets become explicit hex
+values, while custom colors and `auto` choices are retained. Serialization
+copies the configuration, preserving the project's sparse overrides and the
+editor's distinction between presets and custom colors. Saved readers retain
+their palette even if application presets change later.
+
+**Set all to presets** restores every class, including names, and updates the
+pickers. Saving settings persists the reset; reloading retains preset selections.
+Browser checks exercise this alongside the existing no-color reset, mobile
+layout, unsaved color choices in downloaded data, and data → TeX → PDF uploads.
+Both targeted browser checks pass. The regenerated Psalm 123:1–4 reader data at
+`build/ps123-explicit-palette/reader.v2.json` includes every preset color, matches
+the saved project's rendering choices, and leaves the project unchanged.
+
+`make check` passes **363 tests and 8 subtests**, with 23 opt-in browser tests
+skipped; `make demo` passes. Four new export regressions cover enabled/disabled
+color modes, explicit overrides, bundled downloads, and palette stability after
+preset changes. The Hebrew and Greek offline pipeline checks also retain a
+custom noun color through data, TeX, and compiled PDF.
