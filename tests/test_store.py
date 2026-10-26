@@ -43,7 +43,8 @@ def test_newer_database_is_not_downgraded(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "outcome,status", [("ok", "succeeded"), ("error", "failed"), ("cancel", "cancelled")]
+    "outcome,status",
+    [("ok", "succeeded"), ("error", "failed"), ("diagnostics", "failed"), ("cancel", "cancelled")],
 )
 def test_worker_records_terminal_state(tmp_path, monkeypatch, outcome, status):
     store = Store(tmp_path)
@@ -55,6 +56,8 @@ def test_worker_records_terminal_state(tmp_path, monkeypatch, outcome, status):
             raise ReaderError("Actionable error")
         if outcome == "cancel":
             raise Cancelled("Cancelled")
+        if outcome == "diagnostics":
+            return {"artifacts": ["reader.pdf", "reader.log"], "errors": ["Overflow; inspect reader.log"]}
         return {"artifacts": []}
 
     monkeypatch.setattr(jobs, "build", fake_build)
@@ -62,3 +65,7 @@ def test_worker_records_terminal_state(tmp_path, monkeypatch, outcome, status):
     result = store.job(job["id"])
     assert result["status"] == status
     assert result["result"] == {"artifacts": []} if outcome == "ok" else result["error"]
+    if outcome == "diagnostics":
+        assert result["stage"] == "Completed with errors"
+        assert result["error"] == "Overflow; inspect reader.log"
+        assert result["result"]["artifacts"] == ["reader.pdf", "reader.log"]

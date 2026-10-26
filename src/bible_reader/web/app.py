@@ -278,7 +278,16 @@ def create_app(state: Path | None = None, *, start_worker=True):
     @app.get("/api/jobs/{identity}/artifacts/{name}")
     def artifact(identity: str, name: str, download: bool = False):
         job = store.job(identity)
-        if job["status"] != "succeeded" or name not in (job["result"] or {}).get("artifacts", []):
+        diagnostic = job["status"] in {"failed", "interrupted"} and name in {
+            "reader.log",
+            "reader.console.log",
+            "measure.log",
+            "measure.console.log",
+        }
+        exported = job["status"] in {"succeeded", "failed"} and name in (job["result"] or {}).get(
+            "artifacts", []
+        )
+        if not (diagnostic or exported):
             raise HTTPException(404, "Artifact not available")
         path = state / "builds" / job["id"] / name
         if path.resolve().parent != (state / "builds" / job["id"]).resolve() or not path.is_file():
@@ -286,7 +295,7 @@ def create_app(state: Path | None = None, *, start_worker=True):
         return FileResponse(
             path,
             filename=name if download else None,
-            media_type="application/pdf" if name.endswith(".pdf") else None,
+            media_type="application/pdf" if name.endswith(".pdf") else "text/plain" if diagnostic else None,
         )
 
     return app

@@ -93,3 +93,24 @@ def test_embedded_fonts_in_shared_and_cyclic_resources_are_accepted(tmp_path, ca
     path = tmp_path / "recursive.pdf"
     resource_pdf(path, embedded=True, category=category, cycle=True)
     assert verify_compilation(path, "") == {"total_pages": 1, "fonts_embedded": True}
+
+
+def test_compilation_errors_can_be_collected_without_skipping_font_checks(tmp_path):
+    path = tmp_path / "font.pdf"
+    resource_pdf(path, embedded=True)
+    log = (
+        "Overfull \\hbox (11.89253pt too wide) in paragraph at lines 70--70\n"
+        "Overfull \\vbox (2.0pt too high) detected at line 71\n"
+        "Missing character: There is no X in font Test!\n"
+    )
+    with pytest.raises(ReaderError, match="overflowing content"):
+        verify_compilation(path, log)
+    errors = []
+    checks = verify_compilation(path, log, errors=errors)
+    assert checks["fonts_embedded"]
+    assert len(errors) == 2
+    assert "reader.log" in errors[0] and "11.89253pt" in errors[0] and "2.0pt" in errors[0]
+    assert "Missing character" in errors[1]
+    resource_pdf(path, embedded=False)
+    with pytest.raises(ReaderError, match="not embedded"):
+        verify_compilation(path, log, errors=[])

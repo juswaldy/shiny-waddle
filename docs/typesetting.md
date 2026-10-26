@@ -151,6 +151,18 @@ unique output directories, captured logs, cancellation, and a 90-second timeout
 per invocation. It compiles final TeX twice. Measurement still requires TeX even
 with `--emit tex`. Oversized indivisible word/help or chapter-opening groups fail explicitly.
 
+Chapter badges keep their fixed double-box dimensions. The number uses 25 pt
+type when it fits; wider numbers, including three-digit Psalms, scale to the
+badge's 9 mm inner width in both languages and verse layouts.
+
+When final PDF validation finds overflow or missing glyphs, the build finishes
+the remaining PDF checks, diagnostic report, manifest, and source bundle. The
+browser shows an error summary with a direct `reader.log` link and retains the
+PDF preview and downloads. Such jobs remain failed; the CLI prints the errors
+and exits with status 1 after writing the artifacts. `layout-diagnostics.json`
+and the manifest retain the errors. Fatal compilation errors, cancellation, and
+unresolved source helps still stop the build.
+
 A successful PDF build checks:
 
 - Expected reader pages, any enabled lexicon pages, and a final source-credit page,

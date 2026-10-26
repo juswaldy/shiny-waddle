@@ -65,7 +65,14 @@ def run_worker(state: Path, *, once=False, stopped=lambda: False):
                     result = build(state, config, state / "builds" / identity, progress, cancelled)
                 if cancelled():
                     raise Cancelled("Cancelled")
-                store.update_job(identity, status="succeeded", stage="Ready", result=result)
+                errors = result.get("errors", [])
+                store.update_job(
+                    identity,
+                    status="failed" if errors else "succeeded",
+                    stage="Completed with errors" if errors else "Ready",
+                    error="\n\n".join(errors) if errors else None,
+                    result=result,
+                )
             except Cancelled as error:
                 store.update_job(identity, status="cancelled", error=str(error))
             except Exception as error:

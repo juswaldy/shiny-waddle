@@ -49,6 +49,21 @@ def bundle_artifacts(output: Path, artifacts: list[str]):
     artifacts.append("reader-bundle.zip")
 
 
+def check_pdf(output: Path, log: str, *, document=None, plans=None):
+    """Retain completed output and diagnostics even when PDF validation fails."""
+    errors = []
+    try:
+        checks = (
+            verify_compilation(output / "reader.pdf", log, errors=errors)
+            if document is None
+            else verify_pdf(output / "reader.pdf", plans, document, log, errors=errors)
+        )
+    except ReaderError as error:
+        errors.append(str(error))
+        checks = {"validation_completed": False}
+    return {**checks, "errors": errors}
+
+
 def build_from_data(
     state: Path, value: dict, output: Path, progress=lambda _: None, cancelled=lambda: False, *, emit="tex"
 ):
@@ -72,8 +87,16 @@ def compile_tex(
     progress("Compiling uploaded TeX")
     compiler = Compiler(output, font, cancelled, greek=True)
     log = compiler.compile("reader", text, passes=2)
-    checks = verify_compilation(output / "reader.pdf", log)
-    artifacts = ["reader.tex", "reader.pdf", "reader.log", "reader-greek.ttf", "GentiumPlus-LICENSE.txt"]
+    checks = check_pdf(output, log)
+    write_json(output / "layout-diagnostics.json", checks)
+    artifacts = [
+        "reader.tex",
+        "reader.pdf",
+        "reader.log",
+        "layout-diagnostics.json",
+        "reader-greek.ttf",
+        "GentiumPlus-LICENSE.txt",
+    ]
     (output / "GentiumPlus-LICENSE.txt").write_bytes(
         files("bible_reader").joinpath("resources/GentiumPlus-LICENSE.txt").read_bytes()
     )
@@ -95,7 +118,7 @@ def compile_tex(
     write_json(output / "manifest.json", manifest)
     artifacts.append("manifest.json")
     bundle_artifacts(output, artifacts)
-    progress("Ready")
+    progress("Completed with errors" if checks["errors"] else "Ready")
     return {**checks, "stage": "tex-to-pdf", "artifacts": artifacts, "output": str(output)}
 
 
@@ -283,7 +306,7 @@ def build(
     if emit == "pdf":
         progress("Compiling and checking the PDF")
         log = compiler.compile("reader", text, passes=2)
-        checks = verify_pdf(output / "reader.pdf", plans, document, log)
+        checks.update(check_pdf(output, log, document=document, plans=plans))
     elif config.lexicon_only:
         # A lexicon-only TeX export has no scripture measurements. Load its TeX
         # dependencies once so the source bundle still records their hashes.
@@ -372,5 +395,5 @@ def build(
     write_json(output / "manifest.json", manifest)
     artifacts.append("manifest.json")
     bundle_artifacts(output, artifacts)
-    progress("Ready")
+    progress("Completed with errors" if checks.get("errors") else "Ready")
     return {**checks, "artifacts": artifacts, "output": str(output), "config_hash": manifest["config_hash"]}
