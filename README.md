@@ -103,9 +103,9 @@ in either mode. Projects without this setting use continuous text.
 Check **Add lexicon appendix** above **Save settings** to add an alphabetically sorted,
 four-column lexicon after the reader pages and before **Sources and edition**.
 It uses the selected passage's footnote helps, including the same **Maximum
-occurrences in this book** cutoff in **Uncommon in this book** mode, known-word
-omissions, name exclusions, and saved inclusion/gloss edits. Counts still come
-from the whole book. It does not add words from outside the built passage.
+occurrences** cutoff in **Uncommon lexical items** mode, known-word
+omissions, name exclusions, and saved inclusion/gloss edits. Counts come from the
+whole book or corpus, as selected. It does not add words from outside the built passage.
 Identical entry/stem/gloss combinations appear once across chapters; different
 source entries, verb stems, or edited glosses remain separate.
 
@@ -136,7 +136,7 @@ in TOML or `"lexicon_only": true` in JSON. CLI overrides are:
 .venv/bin/bible-reader build --project reader.json --no-lexicon-only --output build/reader-again
 ```
 
-Both lexicon modes use the same passage, whole-book occurrence limit, and saved
+Both lexicon modes use the same passage, book/corpus occurrence limit, and saved
 help decisions. Lexicon-only builds skip scripture pagination and start at the
 saved first folio. They also support `--emit tex`.
 
@@ -181,8 +181,18 @@ section letters, and lexical headwords stay intact. The default remains `"hide"`
 (hide accents, retain vowel points); `"preserve"` retains source accents.
 
 The reference help selection applies to Proverbs 1:29–2:12. For other passages choose
-`all` or `book-frequency`; the latter counts occurrences in the entire selected
-source book. `known_entries` and per-anchor `decisions` support exclusions and
+`all` or `book-frequency`. For the latter, **Maximum occurrences** is an inclusive
+cutoff, and **Count occurrences** offers **In this book** (default) or **In the
+whole corpus**: Hebrew OT (OSHB), Greek NT (SBLGNT), or Greek OT (Rahlfs), matching
+the selected source. In JSON/TOML use `frequency_scope: "book"` or `"corpus"`
+alongside `frequency_max`. Corpus counts require every pinned book locally;
+import them explicitly with `bible-reader sources import --corpus oshb`,
+`--corpus sblgnt`, or `--corpus rahlfs`. Partial installations produce an error
+instead of incomplete counts. LXX counts use main books, replacing the selected
+book with its alternate witness when applicable; partial witnesses stay partial.
+Counts preserve language and extended lexical IDs, and exclude ketiv to avoid
+double-counting written/read forms. Exports retain corpus revision and hashes.
+`known_entries` and per-anchor `decisions` support exclusions and
 reviewed glosses. Ambiguous selected helps need a source-entry choice or explicit
 omission before a build succeeds. Where **No source entry available** appears,
 type a gloss and choose **Save all**, **Save help**, or **Save page**. It is saved

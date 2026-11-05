@@ -100,6 +100,7 @@ class ProjectConfig(StrictModel):
     lexicon_appendix: bool = False
     lexicon_only: bool = False
     frequency_max: int = Field(default=10, ge=1, le=100000)
+    frequency_scope: Literal["book", "corpus"] = "book"
     known_entries: list[str] = Field(default_factory=list, max_length=10000)
     cantillation: Literal[
         "preserve", "hide", "consonants-only", "consonants", "consonants-maqqef-sof-pasuq"

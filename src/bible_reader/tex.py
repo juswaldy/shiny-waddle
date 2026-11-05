@@ -848,7 +848,15 @@ def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
     ]
     subtitle = escape_latex(document.config["passage"])
     if document.config["selection"] == "book-frequency":
-        subtitle += r"\quad Maximum occurrences in the whole book: " + str(document.config["frequency_max"])
+        scope = "the whole book"
+        if document.config.get("frequency_scope", "book") == "corpus":
+            scope = "the whole corpus (" + document.sources["frequency_corpus"]["label"] + ")"
+        subtitle += (
+            r"\quad Maximum occurrences in "
+            + escape_latex(scope)
+            + ": "
+            + str(document.config["frequency_max"])
+        )
     body.append(r"{\fontsize{7}{9}\selectfont " + subtitle + r"\par}")
     body.extend(
         [

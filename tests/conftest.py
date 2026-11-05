@@ -174,3 +174,35 @@ def greek_state(tmp_path, monkeypatch):
     for module in [sources, editorial, service, tex]:
         monkeypatch.setattr(module, "catalog", lambda: info)
     return state
+
+
+@pytest.fixture
+def frequency_state(source_state, monkeypatch):
+    info = sources.catalog()
+    for code, words in {
+        "Prov": '<w id="a" lemma="1001">א</w><w id="b" lemma="1001 a">ב</w>',
+        "Gen": (
+            '<w id="c" lemma="1001">ג</w>'
+            '<w id="k" lemma="1001" type="x-ketiv">ד</w>'
+            '<note type="variant"><rdg type="x-qere"><w id="q" lemma="1001">ה</w></rdg></note>'
+            '<w id="arc" lemma="1001" morph="ANcmsa">ו</w>'
+        ),
+    }.items():
+        data = f'<verse osisID="{code}.1.1">{words}</verse>'.encode()
+        (source_state / "raw" / f"{code}.xml").write_bytes(data)
+        info["books"][code]["sha256"] = hashlib.sha256(data).hexdigest()
+    # A complete, explicitly synthetic two-book OSHB corpus. Other corpora remain
+    # cataloged but uninstalled to catch accidental cross-corpus requirements.
+    info["books"] = {
+        k: v for k, v in info["books"].items() if k in {"Prov", "Gen"} or v.get("language") == "grc"
+    }
+    monkeypatch.setattr("bible_reader.web.app.catalog", lambda: info)
+    entries = {
+        key: Entry(key, "א", "", "H:N", "Synthetic gloss", "") for key in ("step:test", "step:homograph")
+    }
+    monkeypatch.setattr(
+        editorial,
+        "load_lexicon",
+        lambda *_: (entries, {"H1001": ["step:test"], "H1001a": ["step:homograph"]}),
+    )
+    return source_state

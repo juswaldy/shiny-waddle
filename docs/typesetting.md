@@ -132,7 +132,7 @@ sorting uses a separate mark/punctuation-free key, with final letters folded to
 ordinary forms. Headwords retain their vowels and source Unicode.
 
 Entries are the deduplicated union of the built passage's footnote helps, using
-the same whole-book frequency cutoff, editorial inclusion/omission, known-word,
+the same book/corpus frequency cutoff, editorial inclusion/omission, known-word,
 name-exclusion, and gloss policies. Different source entries, verb stems, or
 glosses remain distinct. An empty selection prints a clear empty-appendix notice.
 `lexicon-appendix.json` retains links to the source-qualified entries and their

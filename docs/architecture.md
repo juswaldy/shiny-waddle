@@ -107,10 +107,27 @@ previous selector; refresh failures report that the reset was saved. All other
 settings, known-word exclusions, source records, and existing build snapshots remain intact.
 
 A review row records candidates, chosen entry, status, reason, source/display
-surface, morphology, reading, book frequency, selection, and help ID/label. Decisions
+surface, morphology, reading, book frequency, effective frequency and its scope,
+selection, and help ID/label. Decisions
 include action, optional supported entry ID, optional editorial gloss, and reason.
 An exclusion is explicit and remains in the report. Missing source anchors or
 incompatible entry choices fail rather than silently discarding stale decisions.
+
+The frequency help policy retains `selection: "book-frequency"` for compatibility.
+`frequency_scope` selects `book` (the default for existing projects) or `corpus`;
+`frequency_max` is an inclusive threshold. Corpus selection follows the source:
+Hebrew OT (all 39 OSHB books, retaining Hebrew/Aramaic language distinctions),
+Greek NT (27 SBLGNT books), or Greek OT (54 main Rahlfs book records, with the
+selected alternate witness replacing its main book). Partial alternate witnesses
+remain partial, with the existing source coverage warning; no missing text is supplied.
+Counts use each adapter's extended lexical component keys, independently of
+surface spelling, lexical choices, selected passage, or display/reading policy.
+Ketiv records are excluded to avoid counting written/read forms twice. Known
+entries, explicit decisions, and name exclusions still apply after the threshold.
+Corpus mode requires all its pinned inputs locally, verifies their checksums,
+and records book membership, source revision, counting/witness policy, and artifact
+hashes in `sources.frequency_corpus`. It never fetches sources or silently counts
+only installed books. In-memory count caching retains verification on every use.
 
 When no source candidates exist, a nonblank saved gloss creates an editorial
 proposal with effective `status` and `choice_method` set to `editorial`.

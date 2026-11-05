@@ -77,6 +77,7 @@ def test_appendix_uses_the_same_frequency_and_override_selection_as_notes(
             "test-origin:0": Decision(entry_id="step:test-alternate", gloss="Synthetic edited help"),
             "test-repeat:0": Decision(action="exclude"),
             "test-unmatched:0": Decision(action="exclude"),
+            "test-aramaic:0": Decision(action="exclude"),
         },
     )
     document = build_document(source_state, config)
