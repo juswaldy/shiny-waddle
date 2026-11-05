@@ -57,6 +57,7 @@ class DataReview(Record):
     reference: str
     surface: str
     help_id: str | None
+    help_modified: bool = False
 
 
 class NoticeAsset(Record):

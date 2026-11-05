@@ -150,6 +150,23 @@ lexicon plus source credits. This mode implicitly includes the lexicon even if
 empty, and PDF checks require the lexicon to begin on the first physical page.
 Folios start at the saved first folio. `--emit tex` supports both lexicon modes.
 
+## Citation page notes
+
+The final **Sources and edition** section includes a bottom-aligned notice when
+saved help decisions change the exported passage's entry choices, gloss wording,
+or inclusion. Unchanged choices and edits outside the exported passage do not
+trigger the notice. In **Citation page notes**, users can add multiline notes
+after it (`citation_notes_mode = "append"`, the default), or replace that notice
+with their notes (`"replace"`). Custom notes print even without help edits;
+source citations and revision information remain present in both modes.
+
+`citation_notes` allows up to 4,000 plain-text characters. TeX metacharacters are
+escaped once, line breaks are retained, and Hebrew/Aramaic and Greek text use
+explicit font/direction runs. Greek notes in a Hebrew edition include Gentium
+Plus and its license in the bundle. Long notes flow onto additional citation
+pages; PDF checks validate the start and end of the entire credits section and
+report its actual page count. The same resolved notes appear in `credits.txt`.
+
 ## Compiler and artifact checks
 
 The compiler uses an argument list, no shell escape, restricted TeX file access,
@@ -171,7 +188,7 @@ unresolved source helps still stop the build.
 
 A successful PDF build checks:
 
-- Expected reader pages, any enabled lexicon pages, and a final source-credit page,
+- Expected reader pages, any enabled lexicon pages, and a final source-credit section,
   without lost or duplicate verses.
 - Actual PDF link count against every lexical marker in the reader document.
 - Each marker's actual PDF destination resolves to a note on the same page.

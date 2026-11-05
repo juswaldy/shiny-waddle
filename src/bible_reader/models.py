@@ -99,6 +99,8 @@ class ProjectConfig(StrictModel):
     gloss_selection: Literal["reviewed", "first-entry"] = "reviewed"
     lexicon_appendix: bool = False
     lexicon_only: bool = False
+    citation_notes: str = Field(default="", max_length=4000)
+    citation_notes_mode: Literal["append", "replace"] = "append"
     frequency_max: int = Field(default=10, ge=1, le=100000)
     frequency_scope: Literal["book", "corpus"] = "book"
     known_entries: list[str] = Field(default_factory=list, max_length=10000)
@@ -113,6 +115,13 @@ class ProjectConfig(StrictModel):
     @classmethod
     def text(cls, value):
         return plain_text(value)
+
+    @field_validator("citation_notes")
+    @classmethod
+    def notes_text(cls, value):
+        value = value.replace("\r\n", "\n").replace("\r", "\n")
+        plain_text(value.replace("\n", ""))
+        return value
 
     @field_validator("passage")
     @classmethod

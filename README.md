@@ -140,6 +140,19 @@ Both lexicon modes use the same passage, book/corpus occurrence limit, and saved
 help decisions. Lexicon-only builds skip scripture pagination and start at the
 saved first folio. They also support `--emit tex`.
 
+Open **Citation page notes** to add plain-text notes at the bottom of **Sources
+and edition**. By default, an automatic notice appears when saved help edits
+change entry choices, wording, or inclusion in the exported passage. Unchanged
+choices and edits outside that passage do not trigger it.
+Choose **Add to automatic notice** to print your notes after it, or **Replace
+automatic notice** to use only your notes. Custom notes print even when helps
+are unchanged; source citations and revision information remain included.
+Notes support line breaks and up to 4,000 characters. Long notes can continue
+onto additional citation pages. Project files use top-level `citation_notes`
+(a string) and `citation_notes_mode` (`"append"`, the default, or `"replace"`).
+These settings are retained in saved projects, build snapshots, reader data,
+and exported credits.
+
 Lexicon builds include `lexicon-appendix.json` with source-entry IDs, editorial
 status, and the originating chapter help IDs, both beside the PDF and in the
 source bundle. Unresolved selected helps still require review before building.

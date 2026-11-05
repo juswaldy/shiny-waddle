@@ -25,6 +25,7 @@ flowchart LR
 | `sources.py` | Pinned acquisition, hash checks, OSIS/TSV adapters, canonical exports |
 | `greek.py` | MorphGNT/Rahlfs/TBESG parsing and explicit Open Scriptures lexical crosswalk |
 | `editorial.py` | Crosswalk candidates, decisions, frequency, stable chapter help labels |
+| `citations.py` | Passage-specific help-change disclosure and custom citation notes |
 | `appendix.py` | Hebrew/Greek sort keys and the source-traceable union of selected passage helps |
 | `book_helps.py` | Versioned whole-book editorial help files and source compatibility checks |
 | `data_files.py` | Validation of portable reader data and standalone TeX inputs |
@@ -112,6 +113,21 @@ selection, and help ID/label. Decisions
 include action, optional supported entry ID, optional editorial gloss, and reason.
 An exclusion is explicit and remains in the report. Missing source anchors or
 incompatible entry choices fail rather than silently discarding stale decisions.
+
+Review rows also record `help_modified`: whether a saved decision changes the
+effective entry, gloss, or inclusion from the same project policy without that
+decision. Omitted names and unchanged choices stay false. The citation page's
+automatic notice considers only the exported passage's review rows, including
+omissions. Older reader snapshots without this evidence conservatively disclose
+saved decisions in that passage.
+
+`citation_notes` defaults to an empty multiline plain-text string (up to 4,000
+characters). `citation_notes_mode` defaults to `append`, adding user notes after
+the automatic modification notice; `replace` substitutes only the user notes
+for that notice. User notes print regardless of help modifications. Source
+attributions, transformations, warnings, and revision information remain intact.
+The shared citation service supplies both the PDF footer and `credits.txt`.
+Project revisions, immutable jobs, and portable reader data retain the settings.
 
 The frequency help policy retains `selection: "book-frequency"` for compatibility.
 `frequency_scope` selects `book` (the default for existing projects) or `corpus`;

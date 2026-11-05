@@ -57,6 +57,11 @@
           <label for="cantillation">Cantillation</label><select id="cantillation"><option value="hide">Hide accents; retain vowel points</option><option value="preserve">Preserve source accents</option><option value="consonants-only">Consonants only</option><option value="consonants">Consonants + maqqef</option><option value="consonants-maqqef-sof-pasuq">Consonants + maqqef + sof pasuq</option></select>
           <p id="hebrew-accent-hint" class="hint">Consonant options remove Hebrew points and accents.</p>
         </details>
+        <details><summary>Citation page notes</summary>
+          <label for="citation-notes-mode">Modification notice</label><select id="citation-notes-mode"><option value="append">Add to automatic notice</option><option value="replace">Replace automatic notice</option></select>
+          <label for="citation-notes">Your citation page notes</label><textarea id="citation-notes" rows="5" maxlength="4000" aria-describedby="citation-notes-hint"></textarea>
+          <p id="citation-notes-hint" class="hint">Notes print at the bottom of Sources and edition, even if lexical helps are unchanged. The automatic notice appears when helps have been modified. Source citations are always included.</p>
+        </details>
         <label for="build-content">Build content</label><select id="build-content"><option value="reader">Reader</option><option value="lexicon">Lexicon only</option></select>
         <label class="check-label build-option"><input id="lexicon-appendix" type="checkbox" aria-describedby="lexicon-appendix-hint"> Add lexicon appendix</label>
         <p id="lexicon-appendix-hint" class="hint">Four columns, read left to right. Hebrew words and compact English glosses share a line. Uses the same maximum occurrences and edited helps as the reader notes. Lexicon only keeps source credits and skips scripture pages.</p>

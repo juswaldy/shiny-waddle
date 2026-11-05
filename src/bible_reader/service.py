@@ -11,6 +11,7 @@ from collections import Counter
 from importlib.resources import files
 from pathlib import Path
 
+from .citations import citation_needs_greek, citation_notes
 from .data_files import load_reader_data, validate_tex
 from .editorial import READY_HELP_STATUSES, build_document, require_resolved
 from .models import ProjectConfig, ReaderError, digest
@@ -291,7 +292,10 @@ def build(
     if any(help["status"] not in READY_HELP_STATUSES for help in document.helps.values()):
         raise ReaderError("Review unresolved selected helps before building")
     greek = document.sources.get("language") == "grc"
-    compiler = Compiler(output, "Ezra SIL" if greek else config.layout.hebrew_font, cancelled, greek=greek)
+    greek_font = greek or citation_needs_greek(document)
+    compiler = Compiler(
+        output, "Ezra SIL" if greek else config.layout.hebrew_font, cancelled, greek=greek_font
+    )
     plans = [] if config.lexicon_only else paginate(document, compiler, progress)
     write_json(output / "page-plan.json", plans)
     text = final_tex(document, plans)
@@ -312,11 +316,19 @@ def build(
         # dependencies once so the source bundle still records their hashes.
         compiler.compile(
             "measure",
-            preamble(config.layout.model_dump(), lexicon_appendix=True, language="grc" if greek else "hbo")
+            preamble(
+                config.layout.model_dump(),
+                lexicon_appendix=True,
+                language="grc" if greek else "hbo",
+                greek_notes=citation_needs_greek(document),
+            )
             + r"\end{document}",
         )
     notices = "\n\n".join(
-        document.sources["attributions"] + document.sources["transformations"] + document.warnings
+        document.sources["attributions"]
+        + document.sources["transformations"]
+        + document.warnings
+        + citation_notes(document)
     )
     (output / "credits.txt").write_text(notices + "\n", encoding="utf-8")
     write_json(output / "layout-diagnostics.json", checks)
@@ -331,11 +343,12 @@ def build(
         "credits.txt",
         "layout-diagnostics.json",
     ]
-    if greek:
+    if greek_font:
         (output / "GentiumPlus-LICENSE.txt").write_bytes(
             files("bible_reader").joinpath("resources/GentiumPlus-LICENSE.txt").read_bytes()
         )
         artifacts += ["reader-greek.ttf", "GentiumPlus-LICENSE.txt"]
+    if greek:
         # Include the exact source notices in addition to the printed credits.
         for asset in document.sources["notices"].values():
             name = asset["filename"]
@@ -356,7 +369,7 @@ def build(
         "Rebuild this edition offline with XeLaTeX, fontspec, xcolor, polyglossia, bidi, hyperref, geometry, multicol, and Latin Modern.\n"
         "Run twice from this directory: xelatex -no-shell-escape -halt-on-error reader.tex\n"
         + font_instructions
-        + ("\nGentium Plus is included under its accompanying SIL Open Font License." if greek else "")
+        + ("\nGentium Plus is included under its accompanying SIL Open Font License." if greek_font else "")
         + "\nSee manifest.json for engine, font, source and application fingerprints.\n",
         encoding="utf-8",
     )
@@ -387,7 +400,7 @@ def build(
         "tex_inputs": tex_inputs,
         "font": config.layout.greek_font if greek else config.layout.hebrew_font,
         "font_sha256": compiler.greek_font_hash if greek else compiler.font_hash,
-        "greek_font": config.layout.greek_font if greek else None,
+        "greek_font": config.layout.greek_font if greek_font else None,
         "greek_font_sha256": compiler.greek_font_hash,
         "checks": checks,
         "artifacts": {name: hashlib.sha256((output / name).read_bytes()).hexdigest() for name in artifacts},

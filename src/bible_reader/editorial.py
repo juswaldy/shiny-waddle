@@ -335,6 +335,12 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                 )
                 if choice in config.known_entries:
                     selected, reason = False, "Known-word list"
+                component_morphology = lexical_morphology(token, index)
+                fixed_name_reason = name_omission_reason(component_morphology, candidate_entries)
+                default_selected = selected and not (
+                    fixed_name_reason
+                    or name_omission_reason("", [entries[default_choice]] if default_choice else [])
+                )
                 if decision:
                     selected, reason = decision.action == "include", decision.reason
                     if decision.entry_id:
@@ -342,8 +348,6 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
                         choice = decision.entry_id
                         choice_method = "decision"
-                component_morphology = lexical_morphology(token, index)
-                fixed_name_reason = name_omission_reason(component_morphology, candidate_entries)
                 name_reason = fixed_name_reason or name_omission_reason(
                     "", [entries[choice]] if choice else []
                 )
@@ -358,6 +362,16 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                     decision.gloss
                     if decision and decision.gloss
                     else (entries[choice].gloss if choice else "")
+                )
+                help_modified = bool(decision) and (
+                    selected != default_selected
+                    or (
+                        selected
+                        and (
+                            choice != default_choice
+                            or gloss != (entries[default_choice].gloss if default_choice else "")
+                        )
+                    )
                 )
                 if decision and decision.gloss and not choice and candidate_ids:
                     raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
@@ -444,6 +458,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "status": status,
                             "alignment_status": alignment_status,
                             "choice_method": choice_method,
+                            "help_modified": help_modified,
                             "selected": selected,
                             "name_excluded": bool(name_reason),
                             "fixed_name_reason": fixed_name_reason,

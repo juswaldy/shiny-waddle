@@ -74,6 +74,41 @@ def expect_review_choice(row, field, value):
         expect(row.get_by_role("combobox", name=name, exact=True)).to_have_value(value)
 
 
+@pytest.mark.parametrize("mode", ["append", "replace"])
+def test_citation_notes_save_without_help_edits_and_persist_in_builds(review_server, monkeypatch, mode):
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(ROOT / ".tools/browsers"))
+    url, identity, _ = review_server
+    notes = "Prepared for the reading group: 50% & review.\nAdditional edition notes."
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel="chromium")
+        page = browser.new_page()
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(url)
+        expect(page.locator(".help-row").first).to_be_visible()
+        page.get_by_text("Citation page notes", exact=True).click()
+        field = page.get_by_label("Your citation page notes", exact=True)
+        notice_mode = page.get_by_label("Modification notice", exact=True)
+        expect(field).to_have_value("")
+        expect(notice_mode).to_have_value("append")
+        field.fill(notes)
+        notice_mode.select_option(mode)
+        page.get_by_role("button", name="Save settings", exact=True).click()
+        expect(page.locator("#notice")).to_have_text("Edition settings saved")
+        review = page.request.get(url + f"/api/projects/{identity}/review").json()
+        assert all(not row["help_modified"] for row in review["rows"])
+        page.reload()
+        expect(field).to_have_value(notes)
+        expect(notice_mode).to_have_value(mode)
+        page.get_by_role("button", name="Build reader PDF", exact=False).click()
+        expect(page.locator("#preview-panel")).to_be_visible()
+        job = page.request.get(url + "/api/jobs").json()[0]
+        assert job["config"]["citation_notes"] == notes
+        assert job["config"]["citation_notes_mode"] == mode
+        assert not job["config"]["decisions"] and not errors
+        browser.close()
+
+
 def test_frequency_scope_changes_selection_persists_and_labels_the_source_corpus(
     frequency_state, review_server, monkeypatch
 ):

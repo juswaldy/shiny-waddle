@@ -127,6 +127,7 @@ function fillForm() {
   $("build-content").value = c.lexicon_only ? "lexicon" : "reader";
   updateBuildOptions();
   const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max, "frequency-scope": c.frequency_scope ?? "book", "gloss-selection": c.gloss_selection ?? "reviewed",
+    "citation-notes": c.citation_notes ?? "", "citation-notes-mode": c.citation_notes_mode ?? "append",
     paper: c.layout.paper, "paper-width": c.layout.paper_width_mm ?? 140, "paper-height": c.layout.paper_height_mm ?? 216,
     "verse-layout": c.layout.verse_layout ?? "continuous", "word-colors": c.layout.word_colors ?? "auto", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
     "notes-pt": c.layout.notes_pt, folio: c.layout.first_folio, readings: c.readings, cantillation: c.cantillation};
@@ -192,6 +193,7 @@ function formConfig() {
   Object.assign(c, {name: $("project-name").value, book: $("book").value, passage: $("passage").value.trim(), selection: $("selection").value,
     lexicon_appendix: $("lexicon-appendix").checked,
     lexicon_only: $("build-content").value === "lexicon",
+    citation_notes: $("citation-notes").value, citation_notes_mode: $("citation-notes-mode").value,
     frequency_max: Number($("frequency").value), frequency_scope: $("frequency-scope").value, gloss_selection: $("gloss-selection").value, readings: $("readings").value, cantillation: $("cantillation").value});
   Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, word_colors: $("word-colors").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
     leading_pt: Number($("leading-pt").value), notes_pt: Number($("notes-pt").value), first_folio: Number($("folio").value)});
