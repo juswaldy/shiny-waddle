@@ -25,6 +25,7 @@ flowchart LR
 | `sources.py` | Pinned acquisition, hash checks, OSIS/TSV adapters, canonical exports |
 | `greek.py` | MorphGNT/Rahlfs/TBESG parsing and explicit Open Scriptures lexical crosswalk |
 | `editorial.py` | Crosswalk candidates, decisions, frequency, stable chapter help labels |
+| `citations.py` | Passage-specific help-change disclosure and custom citation notes |
 | `appendix.py` | Hebrew/Greek sort keys and the source-traceable union of selected passage helps |
 | `book_helps.py` | Versioned whole-book editorial help files and source compatibility checks |
 | `data_files.py` | Validation of portable reader data and standalone TeX inputs |
@@ -107,10 +108,44 @@ previous selector; refresh failures report that the reset was saved. All other
 settings, known-word exclusions, source records, and existing build snapshots remain intact.
 
 A review row records candidates, chosen entry, status, reason, source/display
-surface, morphology, reading, book frequency, selection, and help ID/label. Decisions
+surface, morphology, reading, book frequency, effective frequency and its scope,
+selection, and help ID/label. Decisions
 include action, optional supported entry ID, optional editorial gloss, and reason.
 An exclusion is explicit and remains in the report. Missing source anchors or
 incompatible entry choices fail rather than silently discarding stale decisions.
+
+Review rows also record `help_modified`: whether a saved decision changes the
+effective entry, gloss, or inclusion from the same project policy without that
+decision. Omitted names and unchanged choices stay false. The citation page's
+automatic notice considers only the exported passage's review rows, including
+omissions. Older reader snapshots without this evidence conservatively disclose
+saved decisions in that passage.
+
+`citation_notes` defaults to an empty multiline plain-text string (up to 4,000
+characters). `citation_notes_mode` defaults to `append`, adding user notes after
+the automatic modification notice; `replace` substitutes only the user notes
+for that notice. User notes print regardless of help modifications. Source
+attributions, transformations, warnings, and revision information remain intact.
+The shared citation service supplies both the PDF footer and `credits.txt`.
+Project revisions, immutable jobs, and portable reader data retain the settings.
+
+The frequency help policy retains `selection: "book-frequency"` for compatibility.
+`frequency_scope` selects `book` (the default for existing projects) or `corpus`;
+`frequency_max` is an inclusive threshold. Corpus selection follows the source:
+Hebrew OT (all 39 OSHB books, retaining Hebrew/Aramaic language distinctions),
+Greek NT (27 SBLGNT books), or Greek OT (54 main Rahlfs book records, with the
+selected alternate witness replacing its main book). Partial alternate witnesses
+remain partial, with the existing source coverage warning; no missing text is supplied.
+Counts use each adapter's extended lexical component keys, independently of
+surface spelling, lexical choices, selected passage, or display/reading policy.
+Ketiv records are excluded to avoid counting written/read forms twice. Known
+entries, explicit decisions, and name exclusions still apply after the threshold.
+Corpus mode requires all its pinned inputs locally, verifies their checksums,
+and records book membership, source revision, counting/witness policy, and artifact
+hashes in `sources.frequency_corpus`. It never fetches sources or silently counts
+only installed books. In-memory count caching groups books by artifact and scans
+shared Rahlfs files once to collect per-book counters. Every required artifact is
+verified again on each use, including when its counters are cached.
 
 When no source candidates exist, a nonblank saved gloss creates an editorial
 proposal with effective `status` and `choice_method` set to `editorial`.

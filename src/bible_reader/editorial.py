@@ -9,6 +9,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from .appendix import collect_lexicon
+from .frequency import corpus_frequencies, lemma_frequencies
 from .models import Decision, Entry, ProjectConfig, ReaderDocument, ReaderError, Token, digest, parse_passage
 from .sources import catalog, lemma_keys, load_book, load_lexicon, source_lock, token_keys
 from .word_classes import word_class
@@ -233,17 +234,15 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
         raise ReaderError("Passage endpoints do not exist in the selected source versification.")
     if config.selection == "reference" and not ((1, 29) <= start <= end <= (2, 12)):
         raise ReaderError(
-            "Reference selection covers Proverbs 1:29–2:12. Choose All or Book frequency for other passages."
+            "Reference selection covers Proverbs 1:29–2:12. "
+            "Choose All lexical items or Uncommon lexical items for other passages."
         )
     selected_chapters = set(range(start[0], end[0] + 1))
     reference = reference_map()["anchors"] if config.selection == "reference" else {}
-    counts = Counter(
-        key
-        for verse in book
-        for token in verse.tokens
-        if token.kind == "word" and token.reading != "ketiv"
-        for key in token_keys(token)
-    )
+    counts = lemma_frequencies(book)
+    frequency_counts, frequency_corpus = counts, None
+    if config.selection == "book-frequency" and config.frequency_scope == "corpus":
+        frequency_counts, frequency_corpus = corpus_frequencies(state, config.book, counts)
     word_counts = Counter(
         (token.language, token_spelling_key(token))
         for verse in book
@@ -295,6 +294,7 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                 "helps": [],
             }
             for index, lemma in enumerate(token_keys(token)):
+                frequency = frequency_counts[(token.language, lemma)]
                 anchor = f"{token.id}:{index}"
                 exact = lemma in crosswalk
                 candidate_ids = lexical_candidates(lemma, crosswalk)
@@ -305,12 +305,16 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                     seen_decisions.add(anchor)
                 selected = (
                     config.selection == "all"
-                    or (config.selection == "book-frequency" and counts[lemma] <= config.frequency_max)
+                    or (config.selection == "book-frequency" and frequency <= config.frequency_max)
                     or anchor in reference
                 )
                 reason = {
                     "all": "All lexical items",
-                    "book-frequency": f"Book frequency {counts[lemma]}",
+                    "book-frequency": (
+                        f"{frequency_corpus['label']} corpus frequency {frequency}"
+                        if frequency_corpus
+                        else f"Book frequency {frequency}"
+                    ),
                     "reference": "Reference-page selection",
                 }[config.selection]
                 alignment_status = (
@@ -331,6 +335,12 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                 )
                 if choice in config.known_entries:
                     selected, reason = False, "Known-word list"
+                component_morphology = lexical_morphology(token, index)
+                fixed_name_reason = name_omission_reason(component_morphology, candidate_entries)
+                default_selected = selected and not (
+                    fixed_name_reason
+                    or name_omission_reason("", [entries[default_choice]] if default_choice else [])
+                )
                 if decision:
                     selected, reason = decision.action == "include", decision.reason
                     if decision.entry_id:
@@ -338,8 +348,6 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             raise ReaderError(f"Stale or incompatible lexical decision: {anchor}")
                         choice = decision.entry_id
                         choice_method = "decision"
-                component_morphology = lexical_morphology(token, index)
-                fixed_name_reason = name_omission_reason(component_morphology, candidate_entries)
                 name_reason = fixed_name_reason or name_omission_reason(
                     "", [entries[choice]] if choice else []
                 )
@@ -354,6 +362,16 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                     decision.gloss
                     if decision and decision.gloss
                     else (entries[choice].gloss if choice else "")
+                )
+                help_modified = bool(decision) and (
+                    selected != default_selected
+                    or (
+                        selected
+                        and (
+                            choice != default_choice
+                            or gloss != (entries[default_choice].gloss if default_choice else "")
+                        )
+                    )
                 )
                 if decision and decision.gloss and not choice and candidate_ids:
                     raise ReaderError(f"Choose a source entry before editing its gloss: {anchor}")
@@ -440,13 +458,17 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
                             "status": status,
                             "alignment_status": alignment_status,
                             "choice_method": choice_method,
+                            "help_modified": help_modified,
                             "selected": selected,
                             "name_excluded": bool(name_reason),
                             "fixed_name_reason": fixed_name_reason,
                             "reason": reason,
                             "label": label,
                             "help_id": help_id if selected else None,
-                            "book_frequency": counts[lemma],
+                            "book_frequency": counts[(token.language, lemma)],
+                            "frequency": frequency,
+                            "frequency_scope": "corpus" if frequency_corpus else "book",
+                            "frequency_corpus": frequency_corpus["label"] if frequency_corpus else None,
                             "method": (
                                 (
                                     "published MorphGNT crosswalk"
@@ -495,13 +517,18 @@ def build_document(state: Path, config: ProjectConfig) -> ReaderDocument:
             "Default glosses use the first listed STEP source entry unless overridden. "
             "Candidate order is not a context-specific sense selection; all candidates remain in the review report."
         )
+    locked_sources = source_lock(
+        config.book, config.cantillation, DISPLAY_TRANSFORMATIONS[config.cantillation]
+    )
+    if frequency_corpus:
+        locked_sources["frequency_corpus"] = frequency_corpus
     return ReaderDocument(
         config.model_dump(),
         rendered,
         passage_helps,
         reviews,
         {str(k): v for k, v in registries.items()},
-        source_lock(config.book, config.cantillation, DISPLAY_TRANSFORMATIONS[config.cantillation]),
+        locked_sources,
         warnings=warnings,
         lexicon_appendix=collect_lexicon(passage_helps)
         if config.lexicon_appendix or config.lexicon_only

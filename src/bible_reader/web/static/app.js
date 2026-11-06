@@ -126,7 +126,8 @@ function fillForm() {
   $("lexicon-appendix").checked = c.lexicon_appendix;
   $("build-content").value = c.lexicon_only ? "lexicon" : "reader";
   updateBuildOptions();
-  const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max, "gloss-selection": c.gloss_selection ?? "reviewed",
+  const values = {"project-name": c.name, book: c.book, passage: c.passage, selection: c.selection, frequency: c.frequency_max, "frequency-scope": c.frequency_scope ?? "book", "gloss-selection": c.gloss_selection ?? "reviewed",
+    "citation-notes": c.citation_notes ?? "", "citation-notes-mode": c.citation_notes_mode ?? "append",
     paper: c.layout.paper, "paper-width": c.layout.paper_width_mm ?? 140, "paper-height": c.layout.paper_height_mm ?? 216,
     "verse-layout": c.layout.verse_layout ?? "continuous", "word-colors": c.layout.word_colors ?? "auto", "hebrew-font": c.layout.hebrew_font, "body-pt": c.layout.body_pt, "leading-pt": c.layout.leading_pt,
     "notes-pt": c.layout.notes_pt, folio: c.layout.first_folio, readings: c.readings, cantillation: c.cantillation};
@@ -138,7 +139,7 @@ function fillForm() {
   });
   updateWordColorFields();
   updatePaperFields();
-  $("frequency").disabled = c.selection !== "book-frequency";
+  updateFrequencyFields();
   $("edition-title").textContent = c.name;
   const selectedBook = sourceInfo.books[c.book];
   $("edition-subtitle").textContent = `${selectedBook?.title || c.book} ${c.passage} · ${selectedBook?.edition || "OSHB"} · ${selectedBook?.language === "grc" ? "Greek" : "Hebrew"} text with English lexical helps`;
@@ -150,6 +151,15 @@ function updatePaperFields() {
   const custom = $("paper").value === "custom";
   $("custom-paper").hidden = !custom;
   $("paper-width").disabled = $("paper-height").disabled = !custom;
+}
+function updateFrequencyFields() {
+  const source = sourceInfo.books[$("book").value]?.source || "oshb";
+  const label = {oshb: "Hebrew OT", sblgnt: "Greek NT", rahlfs: "Greek OT"}[source];
+  $("frequency-scope").querySelector('[value="corpus"]').textContent = `In the whole corpus (${label})`;
+  $("frequency").disabled = $("frequency-scope").disabled = $("selection").value !== "book-frequency";
+  $("frequency-scope-hint").textContent = $("frequency-scope").value === "corpus"
+    ? `Counts all ${label} books. Import the complete corpus before using this option.`
+    : "Counts the whole book, regardless of the selected passage.";
 }
 function updateBuildOptions() {
   const only = $("build-content").value === "lexicon";
@@ -183,7 +193,8 @@ function formConfig() {
   Object.assign(c, {name: $("project-name").value, book: $("book").value, passage: $("passage").value.trim(), selection: $("selection").value,
     lexicon_appendix: $("lexicon-appendix").checked,
     lexicon_only: $("build-content").value === "lexicon",
-    frequency_max: Number($("frequency").value), gloss_selection: $("gloss-selection").value, readings: $("readings").value, cantillation: $("cantillation").value});
+    citation_notes: $("citation-notes").value, citation_notes_mode: $("citation-notes-mode").value,
+    frequency_max: Number($("frequency").value), frequency_scope: $("frequency-scope").value, gloss_selection: $("gloss-selection").value, readings: $("readings").value, cantillation: $("cantillation").value});
   Object.assign(c.layout, {paper: $("paper").value, verse_layout: $("verse-layout").value, word_colors: $("word-colors").value, hebrew_font: $("hebrew-font").value, body_pt: Number($("body-pt").value),
     leading_pt: Number($("leading-pt").value), notes_pt: Number($("notes-pt").value), first_folio: Number($("folio").value)});
   c.layout.word_color_overrides = {};
@@ -410,7 +421,10 @@ function createReviewEditor(row, grid) {
     [["", !row.candidates.length ? "No source entry available" : grid ? "No source entry selected" : "Choose a source entry…"], ...row.candidates.map(candidate => [candidate.id, `${candidate.gloss} · ${candidate.id}`])], grid);
   if (grid || row.candidates.length > 1 || !row.entry_id) source.append(choice.element);
   const details = el("details"); details.append(el("summary", "Source & selection"));
-  details.append(el("div", `${row.reason} · ${row.method} · ${row.morphology} · ${row.book_frequency} occurrences in this book · anchor ${row.anchor}`, "source-detail")); source.append(details);
+  const frequencyDetail = row.frequency_scope === "corpus"
+    ? `${row.frequency} occurrences in ${row.frequency_corpus} · ${row.book_frequency} in this book`
+    : `${row.book_frequency} occurrences in this book`;
+  details.append(el("div", `${row.reason} · ${row.method} · ${row.morphology} · ${frequencyDetail} · anchor ${row.anchor}`, "source-detail")); source.append(details);
   const glossBox = el("div", undefined, "help-edit");
   const gloss = el("textarea"); gloss.maxLength = 1200; gloss.rows = 2; gloss.setAttribute("aria-label", `Gloss for ${row.anchor}`); glossBox.append(gloss);
   const tools = el("div", undefined, "gloss-tools");
@@ -638,7 +652,8 @@ $("show-sources").onclick = () => tab("sources");
 $("show-pipeline").onclick = () => tab("preview");
 $("project-picker").onchange = guard(() => loadProject($("project-picker").value));
 $("project-form").onsubmit = guard(async event => {event.preventDefault(); await saveConfig(formConfig()); notice("Edition settings saved");});
-$("selection").onchange = () => { $("frequency").disabled = $("selection").value !== "book-frequency"; };
+$("selection").onchange = updateFrequencyFields;
+$("frequency-scope").onchange = updateFrequencyFields;
 $("paper").onchange = updatePaperFields;
 $("build-content").onchange = updateBuildOptions;
 $("word-colors").onchange = updateWordColorFields;
@@ -657,7 +672,7 @@ document.querySelectorAll("[data-word-class]").forEach(row => {
   $("word-color-" + category).onchange = updateWordColorFields;
   $("word-color-custom-" + category).oninput = () => {$("word-color-" + category).value = "custom";};
 });
-$("book").onchange = () => {updateLanguageFields(); if ($("book").value !== "Prov") {$("selection").value = "book-frequency"; $("passage").value = sourceInfo.books[$("book").value]?.default_passage || "1:1-10"; $("frequency").disabled = false;}};
+$("book").onchange = () => {updateLanguageFields(); if ($("book").value !== "Prov") {$("selection").value = "book-frequency"; $("passage").value = sourceInfo.books[$("book").value]?.default_passage || "1:1-10";} updateFrequencyFields();};
 $("new-project").onclick = guard(async () => {requireSavedReview(); const config = structuredClone(current.config); config.name = "New reader edition"; const project = await api("/projects", "POST", config); await refreshProjects(project.id);});
 $("build").onclick = guard(async () => {requireSavedReview(); viewedJob = undefined; await saveConfig(formConfig()); const job = await api(`/projects/${current.id}/builds`, "POST"); allJobs.unshift(job); tab("preview"); renderJobs();});
 async function runPipeline(stage) {

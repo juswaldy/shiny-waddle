@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections import defaultdict
+from collections.abc import Iterator
 
 from .models import Entry, ReaderError, Token, Verse
 
@@ -45,6 +46,13 @@ def parse_morphgnt(data: bytes, book: str, source_book: int) -> list[Verse]:
 
 
 def parse_rahlfs(data: bytes, book: str, source_book: int, witness="main") -> list[Verse]:
+    verses = list(iter_rahlfs(data, {source_book: book}, witness))
+    if not verses:
+        raise ReaderError(f"No Rahlfs records found for {book}")
+    return verses
+
+
+def iter_rahlfs(data: bytes, books: dict[int, str], witness="main") -> Iterator[Verse]:
     """Read Wong's MyBible TSV without flattening its explicit witness identity.
 
     This artifact uses its own numeric MyBible versification (including verse
@@ -52,7 +60,6 @@ def parse_rahlfs(data: bytes, book: str, source_book: int, witness="main") -> li
     The first S field is a Wong LXX lexeme ID; subsequent traditional Strong's
     references are lexical links, while 70000+ NT index values remain raw data.
     """
-    verses = []
     seen = set()
     units = re.compile(
         r"(?P<word>(?P<surface>[^<>\s]+)<S>(?P<lexeme>\d+)</S><m>(?P<morph>lxx\.[^<>]+)</m>(?P<links>(?:<S>\d+</S>)*))"
@@ -62,12 +69,15 @@ def parse_rahlfs(data: bytes, book: str, source_book: int, witness="main") -> li
         columns = line.split("\t")
         if len(columns) != 4 or not all(part.isdigit() for part in columns[:3]):
             raise ReaderError(f"Malformed Rahlfs TSV row {number}")
-        if int(columns[0]) != source_book:
+        source_book = int(columns[0])
+        if source_book not in books:
             continue
+        book = books[source_book]
         chapter, verse = map(int, columns[1:3])
-        if (chapter, verse) in seen:
+        reference = (source_book, chapter, verse)
+        if reference in seen:
             raise ReaderError(f"Duplicate Rahlfs reference on row {number}")
-        seen.add((chapter, verse))
+        seen.add(reference)
         tokens = []
         cursor = 0
         for position, match in enumerate(units.finditer(columns[3]), 1):
@@ -109,10 +119,7 @@ def parse_rahlfs(data: bytes, book: str, source_book: int, witness="main") -> li
             raise ReaderError(f"Unsupported Rahlfs content on row {number}")
         if not tokens:
             raise ReaderError(f"Empty Rahlfs verse on row {number}")
-        verses.append(Verse(book, chapter, verse, tuple(tokens), (line,)))
-    if not verses:
-        raise ReaderError(f"No Rahlfs records found for {book}")
-    return verses
+        yield Verse(book, chapter, verse, tuple(tokens), (line,))
 
 
 def parse_tbesg(data: bytes) -> tuple[dict[str, Entry], dict[str, list[str]]]:

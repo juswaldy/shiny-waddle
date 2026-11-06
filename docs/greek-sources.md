@@ -88,7 +88,15 @@ supported choice or exclusion. The LXX example intentionally exposes such review
 work; it is not a pre-reviewed publication edition. TBESG Meaning and word-list
 definitions are excluded from canonical entries and export bundles.
 
-Frequency counts the selected source book/witness. Proper-name omission uses
+Frequency defaults to the selected source book/witness. Set `frequency_scope` to
+`corpus` for all 27 SBLGNT books (Greek NT), or the 54 main Rahlfs book records
+(Greek OT). A selected alternate LXX witness replaces its main book in that
+corpus; parallel witnesses are never summed. Partial Joshua A remains partial.
+The corpus revision, membership, witness/counting policy, and artifact hashes
+are recorded in the source lock. All required source artifacts must be installed
+and verified; use `sources import --corpus sblgnt` or `--corpus rahlfs` explicitly.
+NT and LXX lexical counts stay separate even when they share Strong's links.
+Proper-name omission uses
 source lexical classifications, not capital letters. Bulk spelling matches retain
 Greek accents and case; Hebrew consonant policies do not strip Greek accents.
 Saved help files bind text, lexicon, and NT crosswalk hashes as well as revisions.

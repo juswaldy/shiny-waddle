@@ -44,8 +44,14 @@ OSHB versification is authoritative; no silent mapping to another edition occurs
 
 Extended ID crosswalks preserve candidate sets. A base-ID fallback is a suggestion
 requiring review even if it returns only one candidate. Known-word/frequency rules
-have explicit reasons. Frequency counts the selected whole source book, not the
-requested passage, and avoids counting both ketiv and qere as two occurrences.
+have explicit reasons. Frequency counts either the selected whole source book
+(the default) or its complete source corpus, never just the requested passage.
+The Hebrew OT corpus includes all 39 pinned OSHB books, with Hebrew and Aramaic
+counts kept separate. Extended lexical IDs remain distinct; each lexical segment
+counts, and ketiv is excluded to avoid counting written/read forms twice.
+Corpus mode requires every book locally, verifies hashes, and records corpus
+membership/revision/hashes in the source lock. Import it explicitly with
+`bible-reader sources import --corpus oshb`.
 
 Name omission follows [OSHB noun type `Np`](https://hb.openscriptures.org/parsing/HebrewMorphologyCodes.html)
 and the pinned TBESH header's `N:` name classification (people, locations,

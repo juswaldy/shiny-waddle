@@ -15,6 +15,7 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
+from .citations import citation_needs_greek, citation_notes
 from .models import Cancelled, ReaderDocument, ReaderError, digest
 from .render import escape_latex
 from .sources import catalog
@@ -278,7 +279,7 @@ def document_language(document: ReaderDocument) -> str:
     return document.sources.get("language", "hbo")
 
 
-def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
+def preamble(layout: dict, *, lexicon_appendix=False, language="hbo", greek_notes=False) -> str:
     width, height, margin = paper_dimensions(layout)
     appendix_package = r"\usepackage{multicol}" if lexicon_appendix else ""
     # All scripture words are atomic boxes, so Greek hyphenation is unnecessary.
@@ -286,7 +287,7 @@ def preamble(layout: dict, *, lexicon_appendix=False, language="hbo") -> str:
     greek_setup = (
         r"\newfontfamily\greekfont[Script=Greek]{reader-greek.ttf}"
         r"\newcommand{\ReaderGreek}[1]{{\setLTR\greekfont #1}}"
-        if language == "grc"
+        if language == "grc" or greek_notes
         else ""
     )
     headword_command = "ReaderGreek" if language == "grc" else "texthebrew"
@@ -848,7 +849,15 @@ def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
     ]
     subtitle = escape_latex(document.config["passage"])
     if document.config["selection"] == "book-frequency":
-        subtitle += r"\quad Maximum occurrences in the whole book: " + str(document.config["frequency_max"])
+        scope = "the whole book"
+        if document.config.get("frequency_scope", "book") == "corpus":
+            scope = "the whole corpus (" + document.sources["frequency_corpus"]["label"] + ")"
+        subtitle += (
+            r"\quad Maximum occurrences in "
+            + escape_latex(scope)
+            + ": "
+            + str(document.config["frequency_max"])
+        )
     body.append(r"{\fontsize{7}{9}\selectfont " + subtitle + r"\par}")
     body.extend(
         [
@@ -893,12 +902,36 @@ def lexicon_tex(document: ReaderDocument, reader_pages: int) -> str:
     return "\n".join(body)
 
 
+def citation_text_tex(text: str) -> str:
+    """Keep user notes plain text with explicit script runs and line breaks."""
+    hebrew = r"[\u0590-\u05ff]+"
+    greek = r"[\u0370-\u03ff\u1f00-\u1fff][\u0300-\u036f\u0370-\u03ff\u1f00-\u1fff]*"
+    runs = re.compile(f"({hebrew}(?: +{hebrew})*|{greek}(?: +{greek})*)")
+    lines = []
+    for line in text.split("\n"):
+        parts = []
+        for part in runs.split(line):
+            if not part:
+                continue
+            escaped = escape_latex(part)
+            if "\u0590" <= part[0] <= "\u05ff":
+                escaped = r"\texthebrew{" + escaped + "}"
+            elif re.match(greek, part):
+                escaped = r"\ReaderGreek{" + escaped + "}"
+            parts.append(escaped)
+        lines.append("".join(parts) + r"\par" if line.strip() else r"\smallskip")
+    return "\n".join(lines)
+
+
 def final_tex(document: ReaderDocument, plans: list):
     only = document.config.get("lexicon_only", False)
     appendix_enabled = document.config.get("lexicon_appendix", False) or only
     body = [
         preamble(
-            document.config["layout"], lexicon_appendix=appendix_enabled, language=document_language(document)
+            document.config["layout"],
+            lexicon_appendix=appendix_enabled,
+            language=document_language(document),
+            greek_notes=citation_needs_greek(document),
         )
     ]
     reader_plans = [] if only else plans
@@ -928,6 +961,13 @@ def final_tex(document: ReaderDocument, plans: list):
         + escape_latex(document.sources["lexicon"].get("revision", document.sources.get("step_revision", "")))
         + r"\par"
     )
+    notes = citation_notes(document)
+    if notes:
+        body.append(r"\par\vfill\begingroup\setLTR\fontsize{9}{11}\selectfont")
+        body.append(r"\hypertarget{reader-citation-notes}{}")
+        body.append(("\n" + r"\medskip" + "\n").join(citation_text_tex(note) for note in notes))
+        body.append(r"\endgroup")
+    body.append(r"\hypertarget{reader-credits-end}{}")
     body.append(r"\end{document}")
     return "\n".join(body)
 
@@ -991,19 +1031,22 @@ def verify_pdf(
     pdf = PdfReader(path)
     credits = pdf.named_destinations.get("reader-credits")
     credits_page = pdf.get_destination_page_number(credits) if credits else -1
+    credits_end = pdf.named_destinations.get("reader-credits-end")
+    credits_last_page = pdf.get_destination_page_number(credits_end) if credits_end else -1
     only = document.config.get("lexicon_only", False)
     appendix_enabled = document.config.get("lexicon_appendix", False) or only
     if only and plans:
         raise ReaderError("A lexicon-only build cannot contain scripture page plans")
     appendix_pages = credits_page - len(plans) if appendix_enabled else 0
     if (
-        credits_page != len(pdf.pages) - 1
+        credits_page < len(plans)
+        or credits_last_page != len(pdf.pages) - 1
         or (appendix_enabled and appendix_pages < 1)
-        or (not appendix_enabled and len(pdf.pages) != len(plans) + 1)
+        or (not appendix_enabled and credits_page != len(plans))
     ):
         raise ReaderError(
             f"Unexpected PDF pagination: {len(pdf.pages)} pages, expected {len(plans)} reader pages, "
-            "the selected lexicon appendix, and one final credits page"
+            "the selected lexicon appendix, and final source credits"
         )
     expected_entries = {f"lexicon-entry-{entry['id']}" for entry in document.lexicon_appendix}
     actual_entries = {name for name in pdf.named_destinations if name.startswith("lexicon-entry-")}
@@ -1055,7 +1098,7 @@ def verify_pdf(
                 raise ReaderError("A compiled PDF lexical marker points to another page or a missing help")
     return {
         "reader_pages": len(plans),
-        "credits_pages": 1,
+        "credits_pages": len(pdf.pages) - credits_page,
         "appendix_pages": appendix_pages,
         "appendix_entries": len(document.lexicon_appendix),
         "lexicon_only": only,

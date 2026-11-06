@@ -50,7 +50,8 @@ brief sourced glosses, and optional morphology. Unknown joins are reported. The
 user can inspect the intermediate document and TeX before compiling a PDF.
 
 Implemented help policies include the explicit reference selection, all lexical
-items, book-frequency cutoff, known-word lists, and per-anchor reader overrides.
+items, a maximum-occurrences cutoff in this book or its whole corpus, known-word
+lists, and per-anchor reader overrides.
 Chapter-local shared labels are allocated before pagination. Repeat a help entry
 on each page that needs it, once per page.
 Frequency counts need a named corpus/revision and must not be confused with counts

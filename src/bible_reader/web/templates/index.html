@@ -21,8 +21,10 @@
         <label for="book">Book</label><select id="book"></select>
         <label for="passage">Chapter &amp; verses</label><input id="passage" placeholder="1:29–2:12" required>
         <p class="hint">Use the source’s chapter and verse numbering.</p>
-        <label for="selection">Lexical helps</label><select id="selection"><option value="reference">Proverbs sample selection</option><option value="book-frequency">Uncommon in this book</option><option value="all">All lexical items</option></select>
-        <label for="frequency">Maximum occurrences in this book</label><input id="frequency" type="number" min="1" max="100000">
+        <label for="selection">Lexical helps</label><select id="selection"><option value="reference">Proverbs sample selection</option><option value="book-frequency">Uncommon lexical items</option><option value="all">All lexical items</option></select>
+        <label for="frequency">Maximum occurrences</label><input id="frequency" type="number" min="1" max="100000">
+        <label for="frequency-scope">Count occurrences</label><select id="frequency-scope" aria-describedby="frequency-scope-hint"><option value="book">In this book</option><option value="corpus">In the whole corpus</option></select>
+        <p id="frequency-scope-hint" class="hint">Counts cover the whole book or corpus, regardless of the selected passage.</p>
         <label for="gloss-selection">Gloss selection</label><select id="gloss-selection" aria-describedby="gloss-selection-hint"><option value="reviewed">Review ambiguous entries</option><option value="first-entry">Default gloss (first entry)</option></select>
         <p id="gloss-selection-hint" class="hint">Default gloss uses the first entry in each word’s source list. Saved help edits take precedence.</p>
         <details><summary>Page &amp; reading settings</summary>
@@ -54,6 +56,11 @@
           <label for="readings">Written / read forms</label><select id="readings"><option value="both">Both, with K / Q labels</option><option value="qere">Read form (qere)</option><option value="ketiv">Written form (ketiv)</option></select>
           <label for="cantillation">Cantillation</label><select id="cantillation"><option value="hide">Hide accents; retain vowel points</option><option value="preserve">Preserve source accents</option><option value="consonants-only">Consonants only</option><option value="consonants">Consonants + maqqef</option><option value="consonants-maqqef-sof-pasuq">Consonants + maqqef + sof pasuq</option></select>
           <p id="hebrew-accent-hint" class="hint">Consonant options remove Hebrew points and accents.</p>
+        </details>
+        <details><summary>Citation page notes</summary>
+          <label for="citation-notes-mode">Modification notice</label><select id="citation-notes-mode"><option value="append">Add to automatic notice</option><option value="replace">Replace automatic notice</option></select>
+          <label for="citation-notes">Your citation page notes</label><textarea id="citation-notes" rows="5" maxlength="4000" aria-describedby="citation-notes-hint"></textarea>
+          <p id="citation-notes-hint" class="hint">Notes print at the bottom of Sources and edition, even if lexical helps are unchanged. The automatic notice appears when helps have been modified. Source citations are always included.</p>
         </details>
         <label for="build-content">Build content</label><select id="build-content"><option value="reader">Reader</option><option value="lexicon">Lexicon only</option></select>
         <label class="check-label build-option"><input id="lexicon-appendix" type="checkbox" aria-describedby="lexicon-appendix-hint"> Add lexicon appendix</label>

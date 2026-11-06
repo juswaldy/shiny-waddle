@@ -6,7 +6,7 @@ import pytest
 
 from bible_reader import editorial, tex
 from bible_reader.book_helps import load_book_helps, save_book_helps
-from bible_reader.greek import morphgnt_crosswalk, parse_morphgnt, parse_rahlfs, parse_tbesg
+from bible_reader.greek import iter_rahlfs, morphgnt_crosswalk, parse_morphgnt, parse_rahlfs, parse_tbesg
 from bible_reader.models import Decision, ProjectConfig, ReaderDocument, ReaderError
 from bible_reader.sources import catalog
 
@@ -243,6 +243,33 @@ def test_rahlfs_rejects_unknown_markup_and_duplicate_references():
     for data in [row + "<unknown/>", row + "\n" + row]:
         with pytest.raises(ReaderError):
             parse_rahlfs(data.encode(), "LXXGen", 10)
+
+
+def test_rahlfs_streams_books_in_source_order_with_distinct_reference_identities():
+    books = {10: "LXXGen", 240: "LXXProv", 340: "LXXDanOG", 800: "LXXOd"}
+    data = (FIXTURES / "LXX-main.csv").read_bytes()
+    verses = list(iter_rahlfs(data, books))
+    assert [(v.book, v.chapter, v.verse) for v in verses] == [
+        ("LXXGen", 1, 1),
+        ("LXXGen", 1, 2),
+        ("LXXGen", 10, 6),
+        ("LXXOd", 1, 0),
+        ("LXXProv", 1, 1),
+        ("LXXProv", 1, 2),
+        ("LXXProv", 3, 16),
+        ("LXXDanOG", 4, 12),
+        ("LXXDanOG", 4, 11),
+    ]
+    assert [v.annotations[0] for v in verses] == data.decode().splitlines()
+    assert all(
+        token.id.startswith(f"rahlfs:main:{number}:")
+        for number, code in books.items()
+        for verse in verses
+        if verse.book == code
+        for token in verse.tokens
+    )
+    with pytest.raises(ReaderError, match="Duplicate Rahlfs reference"):
+        list(iter_rahlfs(data + data.splitlines(keepends=True)[0], books))
 
 
 def test_greek_lexicon_and_published_crosswalk_keep_candidates_and_gaps():
