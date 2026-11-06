@@ -1,13 +1,16 @@
 """Source-scoped lexical frequencies over complete, verified local corpora."""
 
-from collections import Counter
-from functools import lru_cache
+from collections import Counter, OrderedDict
 from pathlib import Path
+from threading import Lock
 
 from . import sources
+from .greek import iter_rahlfs
 from .models import ReaderError, Verse
 
 CORPUS_LABELS = {"oshb": "Hebrew OT", "sblgnt": "Greek NT", "rahlfs": "Greek OT"}
+_COUNTS_CACHE: OrderedDict[tuple, dict[str, Counter]] = OrderedDict()
+_COUNTS_CACHE_LOCK = Lock()
 
 
 def corpus_for_book(book: str) -> dict:
@@ -46,20 +49,49 @@ def lemma_frequencies(verses: list[Verse]) -> Counter:
     )
 
 
-@lru_cache(maxsize=256)
-def _book_counts(state: Path, book: str, checksum: str) -> Counter:
-    # The caller verifies the artifact even on a cache hit. Cache only compact
-    # counts, scoped by state, source book/witness, and pinned artifact checksum.
-    return lemma_frequencies(sources.load_book(state, book))
+def _artifact_counts(
+    path: Path, checksum: str, source: str, witness: str | None, books: tuple[tuple[str, int | None], ...]
+) -> dict[str, Counter]:
+    # Verify even on cache hits; keep only compact counters, never source bytes
+    # or the parsed corpus. Parser/book/witness identities also scope the cache.
+    data = sources.read_verified(path, checksum)
+    key = (path.resolve(), checksum, source, witness, books)
+    with _COUNTS_CACHE_LOCK:
+        if key in _COUNTS_CACHE:
+            _COUNTS_CACHE.move_to_end(key)
+            return _COUNTS_CACHE[key]
+    counts: dict[str, Counter] = {}
+    if source == "rahlfs":
+        for verse in iter_rahlfs(data, {number: code for code, number in books}, witness):
+            counts.setdefault(verse.book, Counter()).update(lemma_frequencies([verse]))
+    else:
+        for code, number in books:
+            verses = (
+                sources.parse_morphgnt(data, code, number)
+                if source == "sblgnt"
+                else sources.parse_oshb(data, code)
+            )
+            counts[code] = lemma_frequencies(verses)
+    with _COUNTS_CACHE_LOCK:
+        _COUNTS_CACHE[key] = counts
+        _COUNTS_CACHE.move_to_end(key)
+        if len(_COUNTS_CACHE) > 256:
+            _COUNTS_CACHE.popitem(last=False)
+    return counts
 
 
 def corpus_frequencies(state: Path, book: str, book_counts: Counter) -> tuple[Counter, dict]:
     corpus = corpus_for_book(book)
+    info = sources.catalog()
     artifacts = {}
+    groups = {}
     missing = []
     for code in corpus["books"]:
         path, asset = sources.book_artifact(state, code)
         artifacts[code] = (path, asset)
+        selected = info["books"][code]
+        artifact = (path, asset["sha256"], selected.get("source", "oshb"), selected.get("witness"))
+        groups.setdefault(artifact, []).append(code)
         if not path.is_file():
             missing.append(code)
     if missing:
@@ -68,13 +100,29 @@ def corpus_frequencies(state: Path, book: str, book_counts: Counter) -> tuple[Co
             f"Run bible-reader sources import --corpus {corpus['id']}, or choose In this book."
         )
     counts = Counter()
-    verified = set()
-    for code, (path, asset) in artifacts.items():
-        artifact = (path, asset["sha256"])
-        if artifact not in verified:
-            sources.read_verified(path, asset["sha256"])
-            verified.add(artifact)
-        counts.update(book_counts if code == book else _book_counts(state, code, asset["sha256"]))
+    for (path, checksum, source, witness), codes in groups.items():
+        if codes == [book]:
+            sources.read_verified(path, checksum)
+            counts.update(book_counts)
+            continue
+        if source == "rahlfs":
+            # Cache all books in this artifact, so selecting another book or an
+            # alternate witness can reuse the same main-artifact counters.
+            books = tuple(
+                (code, item["source_book"])
+                for code, item in info["books"].items()
+                if item.get("source") == source
+                and item["witness"] == witness
+                and item["artifact"]["filename"] == path.name
+                and item["artifact"]["sha256"] == checksum
+            )
+        else:
+            books = tuple((code, info["books"][code].get("source_book")) for code in codes)
+        per_book = _artifact_counts(path, checksum, source, witness, books)
+        for code in codes:
+            if code != book and code not in per_book:
+                raise ReaderError(f"No Rahlfs records found for {code}")
+            counts.update(book_counts if code == book else per_book[code])
     return counts, {
         **corpus,
         "artifacts": {code: asset["sha256"] for code, (_, asset) in artifacts.items()},

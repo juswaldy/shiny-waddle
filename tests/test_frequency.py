@@ -110,16 +110,116 @@ def test_greek_corpus_counts_use_source_keys_not_spelling_or_other_corpora(
         codes[0] = code
     info["books"] = {k: v for k, v in info["books"].items() if k in codes or v.get("source") != source}
     monkeypatch.setattr(sources, "catalog", lambda: info)
-    tokens = (Token("a", "α", lemma, language="grc", lexical_keys=keys),)
     for other in codes:
         path, asset = sources.book_artifact(tmp_path, other)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b"synthetic verified artifact")
+        if source == "rahlfs":
+            data = "\n".join(
+                f"{info['books'][code]['source_book']}\t1\t1\tα<S>1</S><m>lxx.N</m><S>3056</S>"
+                for code in codes
+            )
+        else:
+            data = f"{info['books'][other]['source_book']:02d}0101 N- -------- α α α {lemma}"
+        path.write_bytes(data.encode())
         asset["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
-    monkeypatch.setattr(sources, "load_book", lambda _, other: [Verse(other, 1, 1, tokens)])
     counts, provenance = frequency.corpus_frequencies(tmp_path, code, Counter({("grc", keys[0]): 1}))
     assert counts == {("grc", keys[0]): 2}
     assert set(provenance["books"]) == set(codes)
+
+
+@pytest.fixture
+def lxx_frequency_state(greek_state):
+    info = sources.catalog()
+    codes = {"LXXGen", "LXXProv", "LXXOd", "LXXDanOG", "LXXDanTh"}
+    info["books"] = {
+        code: item for code, item in info["books"].items() if item.get("source") != "rahlfs" or code in codes
+    }
+    return greek_state
+
+
+def test_lxx_corpus_parses_shared_artifact_once_and_reuses_across_books_and_witnesses(
+    lxx_frequency_state, monkeypatch
+):
+    state = lxx_frequency_state
+    per_book = {
+        code: frequency.lemma_frequencies(sources.load_book(state, code))
+        for code in ("LXXGen", "LXXProv", "LXXOd", "LXXDanOG", "LXXDanTh")
+    }
+    main = sum((counts for code, counts in per_book.items() if code != "LXXDanTh"), Counter())
+    alternate = main - per_book["LXXDanOG"] + per_book["LXXDanTh"]
+    calls = Counter()
+    read_verified, iter_rahlfs = sources.read_verified, frequency.iter_rahlfs
+
+    def read(path, checksum):
+        calls[path.name] += 1
+        return read_verified(path, checksum)
+
+    def parse(*args):
+        calls["parse"] += 1
+        return iter_rahlfs(*args)
+
+    monkeypatch.setattr(sources, "read_verified", read)
+    monkeypatch.setattr(frequency, "iter_rahlfs", parse)
+    # Start with an alternate: the excluded main book must also be cached for
+    # subsequent main-witness reviews without counting both parallel witnesses.
+    for code, expected in [("LXXDanTh", alternate), ("LXXProv", main), ("LXXGen", main)]:
+        counts, provenance = frequency.corpus_frequencies(state, code, per_book[code])
+        assert counts == expected
+        assert ("LXXDanTh" in provenance["books"]) == (code == "LXXDanTh")
+        assert ("LXXDanOG" in provenance["books"]) == (code != "LXXDanTh")
+        assert set(provenance["artifacts"]) == set(provenance["books"])
+        counts.clear()  # Returning a total must not expose mutable cached counters.
+    assert calls == {"LXX-main.csv": 3, "LXX-alternate.csv": 1, "parse": 1}
+
+
+@pytest.mark.parametrize("filename", ["LXX-main.csv", "LXX-alternate.csv"])
+def test_lxx_corpus_verifies_cached_and_selected_artifacts_and_requires_complete_inputs(
+    lxx_frequency_state, filename
+):
+    state = lxx_frequency_state
+    selected = frequency.lemma_frequencies(sources.load_book(state, "LXXDanTh"))
+    frequency.corpus_frequencies(state, "LXXDanTh", selected)
+    path = state / "raw/greek" / filename
+    path.write_bytes(b"corrupt cached source")
+    with pytest.raises(ReaderError, match="checksum mismatch"):
+        frequency.corpus_frequencies(state, "LXXDanTh", selected)
+    path.unlink()
+    with pytest.raises(ReaderError, match="missing:.*--corpus rahlfs"):
+        frequency.corpus_frequencies(state, "LXXDanTh", selected)
+
+
+def test_lxx_corpus_cache_uses_artifact_checksum_and_state(lxx_frequency_state, tmp_path):
+    state = lxx_frequency_state
+    selected = frequency.lemma_frequencies(sources.load_book(state, "LXXProv"))
+    counts, _ = frequency.corpus_frequencies(state, "LXXProv", selected)
+    path = state / "raw/greek/LXX-main.csv"
+    # An explicitly synthetic extra frequency record represents a new artifact revision.
+    data = path.read_bytes().rstrip(b"\n") + "\n10\t999\t1\tα<S>1</S><m>lxx.N</m><S>9999</S>\n".encode()
+    path.write_bytes(data)
+    checksum = hashlib.sha256(data).hexdigest()
+    for item in sources.catalog()["books"].values():
+        if item.get("source") == "rahlfs" and item["witness"] == "main":
+            item["artifact"]["sha256"] = checksum
+    revised, provenance = frequency.corpus_frequencies(state, "LXXProv", selected)
+    assert revised == counts + Counter({("grc", "G9999"): 1})
+    assert set(provenance["artifacts"].values()) == {checksum}
+
+    other_state = tmp_path / "other-state"
+    other_path = other_state / "raw/greek/LXX-main.csv"
+    other_path.parent.mkdir(parents=True)
+    # A matching checksum must not bypass validation of a different workspace.
+    other_path.write_bytes(b"corrupt source in another workspace")
+    with pytest.raises(ReaderError, match="checksum mismatch"):
+        frequency.corpus_frequencies(other_state, "LXXProv", selected)
+
+
+def test_lxx_corpus_rejects_books_missing_from_a_shared_artifact(lxx_frequency_state):
+    state = lxx_frequency_state
+    selected = frequency.lemma_frequencies(sources.load_book(state, "LXXProv"))
+    frequency.corpus_frequencies(state, "LXXProv", selected)
+    sources.catalog()["books"]["LXXGen"]["source_book"] = 999
+    with pytest.raises(ReaderError, match="No Rahlfs records found for LXXGen"):
+        frequency.corpus_frequencies(state, "LXXProv", selected)
 
 
 def test_frequency_counts_every_segment_but_preserves_language_and_extended_keys():

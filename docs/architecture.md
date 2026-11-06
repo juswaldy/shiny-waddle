@@ -143,7 +143,9 @@ entries, explicit decisions, and name exclusions still apply after the threshold
 Corpus mode requires all its pinned inputs locally, verifies their checksums,
 and records book membership, source revision, counting/witness policy, and artifact
 hashes in `sources.frequency_corpus`. It never fetches sources or silently counts
-only installed books. In-memory count caching retains verification on every use.
+only installed books. In-memory count caching groups books by artifact and scans
+shared Rahlfs files once to collect per-book counters. Every required artifact is
+verified again on each use, including when its counters are cached.
 
 When no source candidates exist, a nonblank saved gloss creates an editorial
 proposal with effective `status` and `choice_method` set to `editorial`.
